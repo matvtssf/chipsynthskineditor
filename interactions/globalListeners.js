@@ -22,21 +22,21 @@ export function setupGlobalListeners() {
     const ackBtn = getAcknowledgeDisclaimerButton();
     const discModal = getDisclaimerModal();
     const loadBtn = getLoadFolderButton();
-    const textLogo = getTextLogo();
+    const currentTextLogo = getTextLogo();
 
     if (ackBtn && discModal && !document.body.dataset.disclaimerListenerAttached) {
         ackBtn.addEventListener('click', () => {
             console.log("[globalListeners] Disclaimer acknowledged: Triggering dissolve animation loop.");
             
             // Trigger digital text logo glitch animation
-            if (textLogo) {
-                textLogo.classList.add('logo-glitch-active');
-                textLogo.addEventListener('animationend', () => {
-                    textLogo.classList.remove('logo-glitch-active');
+            if (currentTextLogo) {
+                currentTextLogo.classList.add('logo-glitch-active');
+                currentTextLogo.addEventListener('animationend', () => {
+                    currentTextLogo.classList.remove('logo-glitch-active');
                 }, { once: true });
             }
 
-            // Apply animation classes
+            // Apply animation classes for blur dissolution and mist fade
             discModal.classList.add('dissolve-mist', 'dissolve-blur-active');
             
             const completeDismissal = () => {
@@ -48,8 +48,8 @@ export function setupGlobalListeners() {
                 }
             };
 
-            // Failsafe timeout filter in case transition events are missing or blocked by other CSS actions
-            const animationFailsafe = setTimeout(completeDismissal, 400);
+            // Failsafe timeout backstop (450ms) in case the animation fails to trigger or fire events
+            const animationFailsafe = setTimeout(completeDismissal, 450);
 
             discModal.addEventListener('animationend', () => {
                 clearTimeout(animationFailsafe);
@@ -60,6 +60,7 @@ export function setupGlobalListeners() {
     }
 
     // Logo Hover Effect
+    const textLogo = getTextLogo();
     // Use document.body to store listener flags (textLogo is already declared at the top of the function scope)
     if (textLogo && !document.body.dataset.logoHoverListenerAttached) {
         document.body.addEventListener('mousemove', handleLogoHover);

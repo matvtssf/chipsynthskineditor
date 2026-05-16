@@ -77,3 +77,75 @@
 
 /* Dynamic Styles Placeholder */
 #dynamic-styles { }
+
+
+/* ==========================================================================
+   ADDED SYSTEM INTERACTION ANIMATIONS (DO NOT REMOVE)
+   ========================================================================== */
+
+/* --- Disclaimer Dissolve Effects --- */
+.dissolve-blur-active {
+    animation: dissolveBlur 0.4s ease-out forwards;
+    pointer-events: none;
+}
+
+.dissolve-mist {
+    animation: dissolveMist 0.4s ease-in-out forwards;
+    pointer-events: none;
+}
+
+@keyframes dissolveBlur {
+    0% {
+        opacity: 1;
+        filter: blur(0px);
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(12px);
+        transform: scale(1.02);
+    }
+}
+
+@keyframes dissolveMist {
+    0% {
+        opacity: 1;
+        filter: brightness(1) contrast(1);
+    }
+    100% {
+        opacity: 0;
+        filter: brightness(1.4) contrast(0.6) blur(6px);
+    }
+}
+
+/* --- Text Logo Digital Glitch --- */
+.logo-glitch-active {
+    animation: digitalGlitch 0.3s ease-in-out;
+}
+
+@keyframes digitalGlitch {
+    0% {
+        transform: translate(0);
+        text-shadow: none;
+    }
+    20% {
+        transform: translate(-2px, 1px);
+        text-shadow: 2px 0 #60a5fa, -2px 0 #f43f5e;
+    }
+    40% {
+        transform: translate(1px, -1px);
+        text-shadow: -1px 0 #60a5fa, 1px 0 #f43f5e;
+    }
+    60% {
+        transform: translate(-1px, 2px);
+        text-shadow: 1px 0 #60a5fa, -1px 0 #f43f5e;
+    }
+    80% {
+        transform: translate(2px, 1px);
+        text-shadow: -2px 0 #60a5fa, 2px 0 #f43f5e;
+    }
+    100% {
+        transform: translate(0);
+        text-shadow: none;
+    }
+}

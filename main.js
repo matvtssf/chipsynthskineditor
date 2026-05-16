@@ -6,8 +6,6 @@
  * CORRECTED: Import and call for sidebar controls initialization.
  */
 
-// debugger; 
-
 import * as State from './core/state.js';
 import { loadInitialElementReferenceData, loadInitialParamReferenceData } from './core/references.js';
 import { initializeXmlEditor } from './core/xmlEditor.js'; 
@@ -87,8 +85,8 @@ async function initializeApp() {
                 loadBtn.disabled = true;
                 console.log("Disclaimer visible, load button disabled until acknowledged.");
             } else {
-                loadBtn.disabled = false;
-                console.log("Disclaimer not visible, load button ready.");
+                loadBtn.disabled = false; // Ensure load button is enabled if disclaimer isn't visible
+                console.log("Disclaimer not visible or not found, load button enabled.");
             }
         }
 
@@ -100,8 +98,6 @@ async function initializeApp() {
         showToast('Critical error during initialization. Check console.', 'error', 0);
     }
 }
-
-// Removed handleDisclaimerAcknowledge as its logic is now inline for clarity
 
 // --- Global error handlers ---
 window.addEventListener('error', (event) => {
