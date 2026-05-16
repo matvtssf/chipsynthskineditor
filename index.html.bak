@@ -66,7 +66,7 @@
                  </div>
             </div>
         </div>
-        <div id="sidebar" class="sidebar">
+        <div id="sidebar" class="sidebar initial-condensed">
             <div id="sidebar-header" class="flex items-start justify-between flex-shrink-0">
                 <button id="sidebar-toggle-btn" title="Collapse Sidebar" class="sidebar-header-button">
                     <i class="icon iconoir-sidebar-collapse icon-collapse"></i>

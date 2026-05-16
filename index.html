@@ -43,6 +43,91 @@
             animation: dissolveToMist 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
             pointer-events: none !important;
         }
+
+        /* Collapsed Sidebar FAB mode */
+        body:not(.app-loaded) #sidebar {
+            position: fixed !important;
+            bottom: 30px !important;
+            right: 30px !important;
+            width: 60px !important;
+            height: 60px !important;
+            border-radius: 30px !important;
+            min-height: unset !important;
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
+            overflow: hidden !important;
+            z-index: 9999 !important;
+            display: flex !important;
+            padding: 0 !important;
+            background: #3b82f6 !important; /* Tailwind blue-500 */
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        }
+
+        body:not(.app-loaded) #sidebar-header,
+        body:not(.app-loaded) .sidebar-content-wrapper > *:not(#sidebar-controls),
+        body:not(.app-loaded) #sidebar-controls > .mb-2,
+        body:not(.app-loaded) #sidebar-controls .flex-shrink-0,
+        body:not(.app-loaded) #text-logo {
+            display: none !important;
+        }
+
+        body:not(.app-loaded) .sidebar-content-wrapper {
+            padding: 0 !important;
+            margin: 0 !important;
+            height: 100% !important;
+            display: flex !important;
+            border: none !important;
+        }
+
+        body:not(.app-loaded) #sidebar-controls {
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+        }
+
+        body:not(.app-loaded) #sidebar-controls .flex.justify-between {
+            margin: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        body:not(.app-loaded) .load-button-area {
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+        }
+
+        body:not(.app-loaded) #load-folder-button {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: transparent !important;
+            color: white !important;
+            font-size: 0 !important; /* Hides the "Open" text */
+            border: none !important;
+            cursor: pointer !important;
+        }
+
+        body:not(.app-loaded) #load-folder-button i {
+            font-size: 24px !important;
+            margin: 0 !important;
+        }
+
+        body:not(.app-loaded) #load-folder-button:hover {
+            background-color: rgba(255,255,255,0.1) !important;
+        }
+
+        body.app-loaded #sidebar {
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800"> <div id="text-logo">chip<b>synth</b> skin editor</div>
@@ -513,5 +598,13 @@
     <div id="toast-container"></div>
 
     <script type="module" src="main.js"></script>
+    <script>
+        // Automatically animates the sidebar to its full state once a file gets selected
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                document.body.classList.add('app-loaded');
+            }
+        });
+    </script>
 </body>
 </html>
