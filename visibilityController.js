@@ -1,0 +1,202 @@
+// File: cs/visibilityController.js
+/**
+ * visibilityController.js
+ * Manages dynamic visibility of CS01ViewContainer elements.
+ * Phase 3: Resizing of parent GUI container implemented.
+ * FIXED: adjustGuiDimensions now targets '#gui-output' (via DomUtils.getGuiOutputDiv) for resizing.
+ */
+import * as State from './state.js';
+import * as DomUtils from './domUtils.js';
+
+// Map<visibilityChangeName (string), Array<ContainerInfo>>
+// ContainerInfo: {element: HTMLElement, direction: string, originalWidthPx: number, originalHeightPx: number, id: string }
+const registeredContainers = new Map();
+let uniqueContainerIdCounter = 0;
+
+/**
+ * Registers a CS01ViewContainer element when it's rendered.
+ * Stores necessary info for later updates and sets initial state.
+ * @param {HTMLElement} element - The container element.
+ */
+export function registerContainer(element) {
+    const changeName = element.dataset.visibilityChangeName;
+    const direction = element.dataset.visibilityChangeDirection || 'bottom';
+    const originalWidth = parseFloat(element.dataset.originalWidth);
+    const originalHeight = parseFloat(element.dataset.originalHeight);
+
+    if (!changeName) {
+        return;
+    }
+
+    if (!element.dataset.visibilityControllerId) {
+        element.dataset.visibilityControllerId = `vc-${uniqueContainerIdCounter++}`;
+    }
+    const containerId = element.dataset.visibilityControllerId;
+
+    if (!registeredContainers.has(changeName)) {
+        registeredContainers.set(changeName, []);
+    }
+
+    const containerList = registeredContainers.get(changeName);
+
+    if (!containerList.some(item => item.id === containerId)) {
+        const containerInfo = {
+            element,
+            direction,
+            originalWidthPx: !isNaN(originalWidth) ? originalWidth : 0,
+            originalHeightPx: !isNaN(originalHeight) ? originalHeight : 0,
+            id: containerId
+        };
+        containerList.push(containerInfo);
+        console.log(`[visibilityController] Registered container for changeName: "${changeName}"`, containerInfo);
+
+        const initialState = State.getVisibilityState(changeName);
+        element.style.display = initialState ? 'block' : 'none';
+        
+        // If it starts hidden, adjust dimensions immediately.
+        // This assumes the GUI is already at its "full" size considering *other* elements.
+        // This initial adjustment might need care if multiple elements start hidden.
+        // For now, if a section starts hidden, the main GUI should reflect that smaller size.
+        if (!initialState) {
+            // adjustGuiDimensions expects the element that *caused* the change, its visibility state, direction, and its own dimensions.
+            adjustGuiDimensions(element, false, direction, containerInfo.originalWidthPx, containerInfo.originalHeightPx);
+        }
+
+    } else {
+        const currentState = State.getVisibilityState(changeName);
+        element.style.display = currentState ? 'block' : 'none';
+    }
+}
+
+/**
+ * Adjusts the main GUI content holder's dimensions (#gui-output).
+ * @param {HTMLElement} vcElement - The CS01ViewContainer element that changed visibility.
+ * @param {boolean} isVisible - Whether the vcElement is becoming visible.
+ * @param {string} direction - The direction of the vcElement ('top', 'bottom', 'left', 'right').
+ * @param {number} widthToAdjust - The width of the vcElement.
+ * @param {number} heightToAdjust - The height of the vcElement.
+ */
+function adjustGuiDimensions(vcElement, isVisible, direction, widthToAdjust, heightToAdjust) {
+    const guiContentHolder = DomUtils.getSkinContainerActual(); // Target skin-container-actual
+    if (!guiContentHolder) {
+        console.error("[visibilityController] Main GUI content holder ('skin-container-actual') not found for resizing.");
+        return;
+    }
+
+    let currentGuiWidth = parseFloat(guiContentHolder.style.width);
+    let currentGuiHeight = parseFloat(guiContentHolder.style.height);
+
+    // Fallback to base dimensions if current style is not parsable
+    if (isNaN(currentGuiWidth) || isNaN(currentGuiHeight)) {
+        const baseDims = State.getBaseGuiDimensions();
+        currentGuiWidth = isNaN(currentGuiWidth) ? baseDims.width : currentGuiWidth;
+        currentGuiHeight = isNaN(currentGuiHeight) ? baseDims.height : currentGuiHeight;
+        console.warn("[visibilityController] Could not parse GUI content holder dimensions from style. Using base/current dimensions as fallback for calculation.", { currentW: currentGuiWidth, currentH: currentGuiHeight});
+    }
+
+    let newGuiWidth = currentGuiWidth;
+    let newGuiHeight = currentGuiHeight;
+
+    const effectiveWidth = !isNaN(widthToAdjust) ? widthToAdjust : 0;
+    const effectiveHeight = !isNaN(heightToAdjust) ? heightToAdjust : 0;
+
+    console.log(`[visibilityController] Adjusting GUI. Current: ${currentGuiWidth}x${currentGuiHeight}. VC (${vcElement.dataset.visibilityChangeName}): ${effectiveWidth}x${effectiveHeight}, Dir: ${direction}, BecomingVisible: ${isVisible}`);
+
+    switch (direction.toLowerCase()) {
+        case 'bottom':
+        case 'top': // Assuming 'top' direction sections also affect overall height.
+            newGuiHeight = isVisible ? currentGuiHeight + effectiveHeight : currentGuiHeight - effectiveHeight;
+            break;
+        case 'left':
+        case 'right': // Assuming 'left'/'right' direction sections affect overall width.
+            newGuiWidth = isVisible ? currentGuiWidth + effectiveWidth : currentGuiWidth - effectiveWidth;
+            break;
+        default:
+            console.warn(`[visibilityController] Unknown direction for resizing: ${direction}`);
+            return;
+    }
+
+    // Ensure dimensions don't go below zero or some reasonable minimum.
+    // For now, simple non-negative.
+    guiContentHolder.style.width = `${Math.max(0, newGuiWidth)}px`;
+    guiContentHolder.style.height = `${Math.max(0, newGuiHeight)}px`;
+
+    console.log(`[visibilityController] GUI content holder dimensions adjusted. New: ${guiContentHolder.style.width}x${guiContentHolder.style.height}`);
+    
+    // Optional: If the parent container (#gui-output-container) needs to react, one might
+    // trigger an event or call a function to update its layout, but typically if #gui-output
+    // changes size, and #gui-output-container is its parent with flex properties, it should adapt.
+}
+
+
+/**
+ * Updates the visibility of containers associated with a changeName.
+ * Called by state setter. Now includes parent resizing.
+ * @param {string} changeName - The visibilityChangeName identifier.
+ * @param {boolean} isVisible - The desired visibility state.
+ */
+export function updateVisibility(changeName, isVisible) {
+    if (!registeredContainers.has(changeName)) {
+        return;
+    }
+
+    console.log(`[visibilityController] Updating visibility for "${changeName}" to ${isVisible}`);
+    const containers = registeredContainers.get(changeName);
+
+    containers.forEach(containerInfo => {
+        const { element, direction, originalWidthPx, originalHeightPx } = containerInfo;
+        const targetDisplay = isVisible ? 'block' : 'none';
+
+        if (element.style.display !== targetDisplay) {
+            element.style.display = targetDisplay;
+            console.log(`   - Set display of element (ID: "${element.dataset.visibilityControllerId}", changeName: "${changeName}") to ${targetDisplay}`);
+            adjustGuiDimensions(element, isVisible, direction, originalWidthPx, originalHeightPx);
+        } else {
+            // If display is already correct, but maybe dimensions need re-evaluating (e.g., on initial load)
+            // This might be needed if a default-visible section's dimensions affect the GUI size from the start.
+            // However, current logic in registerContainer handles initial hidden adjustment.
+            // For now, only adjust if display *changes*.
+        }
+    });
+}
+
+/**
+ * Initializes the visibility state for all currently registered containers.
+ */
+export function initializeAllContainerStates() {
+    console.log("[visibilityController] Initializing all container states...");
+    registeredContainers.forEach((containerList, changeName) => {
+        const currentState = State.getVisibilityState(changeName); 
+        // Update visibility which also calls adjustGuiDimensions IF the display changes.
+        // If a section starts hidden, its dimensions should be subtracted from GUI.
+        // If it starts visible, GUI should be at full size. adjustGuiDimensions is called accordingly.
+        updateVisibility(changeName, currentState); 
+    });
+}
+
+
+/** Clears the registry and resets GUI dimensions - called when loading a new folder/skin */
+export function clearRegisteredContainers() {
+    const guiContentHolder = DomUtils.getSkinContainerActual(); // Target skin-container-actual
+    const baseDims = State.getBaseGuiDimensions();
+    if (guiContentHolder && baseDims.width && baseDims.height) {
+        console.log(`[visibilityController] Resetting GUI content holder dimensions to base: ${baseDims.width}x${baseDims.height}`);
+        guiContentHolder.style.width = `${baseDims.width}px`;
+        guiContentHolder.style.height = `${baseDims.height}px`;
+    }
+
+    registeredContainers.clear();
+    uniqueContainerIdCounter = 0; 
+    console.log("[visibilityController] Cleared registered containers and reset GUI content holder dimensions.");
+}
+
+// Expose functions to be callable from state.js or other modules if needed via window
+// This is how state.js calls updateVisibility and clearRegisteredContainers.
+if (window) {
+    window.visibilityController = {
+        registerContainer,
+        updateVisibility,
+        initializeAllContainerStates,
+        clearRegisteredContainers
+    };
+}

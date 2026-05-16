@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chipsynth Skin Editor</title>
+    <link rel="icon" href="data:," />
+    <script>
+      const originalWarn = console.warn;
+      console.warn = (...args) => {
+        if (typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com should not be used in production')) return;
+        originalWarn(...args);
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        corePlugins: {
+          preflight: false,
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/iconoir-icons/iconoir@main/css/iconoir.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://c.webfontfree.com/c.js?f=DesignSystemDW01-500R" type="text/javascript"></script>
+    <link rel="stylesheet" href="style.css">
+    <style id="dynamic-styles"></style>
+    <style>
+        @keyframes dissolveToMist {
+            0% {
+                opacity: 1;
+                filter: blur(0px) contrast(1) brightness(1);
+            }
+            100% {
+                opacity: 0;
+                filter: blur(40px) contrast(0.1) brightness(1.8);
+                transform: scale(1.08);
+            }
+        }
+        .dissolve-mist {
+            animation: dissolveToMist 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+            pointer-events: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800"> <div id="text-logo">chip<b>synth</b> skin editor</div>
+
+    <div class="editor-container">
+
+        <div id="main-content-area" class="main-content">
+            <div id="canvas-viewport"> <div id="gui-zoom-canvas" style="transform-origin: top left; transform: scale(1);"> <div id="fixed-dimension-content"> <div id="skin-container-actual">
+                            </div>
+                    </div>
+                </div>
+            </div>
+            <div id="status" class="status-message">Initializing...</div>
+            <div id="error-log-container" class="mt-auto pt-2 border-t flex-shrink-0" style="display: none;">
+                <div class="flex justify-between items-center mb-1">
+                    <strong class="text-sm text-red-800">Internal Errors:</strong>
+                    <button id="copy-log-btn" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded">Copy</button>
+                </div>
+                 <div id="error-log" class="p-2 bg-red-100 border border-red-300 text-red-800 rounded-lg text-xs overflow-auto max-h-24">
+                     <pre id="error-content" class="whitespace-pre-wrap break-words"></pre>
+                 </div>
+            </div>
+        </div>
+        <div id="sidebar" class="sidebar">
+            <div id="sidebar-header" class="flex items-start justify-between flex-shrink-0">
+                <button id="sidebar-toggle-btn" title="Collapse Sidebar" class="sidebar-header-button">
+                    <i class="icon iconoir-sidebar-collapse icon-collapse"></i>
+                    <i class="icon iconoir-sidebar-expand icon-expand"></i>
+                </button>
+                 <div id="product-logo-container" class="flex-grow text-center flex items-center justify-center h-full">
+                    <img id="product-logo-img" src="" alt="Product Logo" style="display: none; background: transparent;"/>
+                 </div>
+                 <button id="config-button" title="Settings" class="sidebar-header-button">
+                    <span class="icon"><i class="iconoir-settings"></i></span>
+                 </button>
+             </div>
+             <div class="sidebar-content-wrapper">
+                 <div id="skin-selector-container" class="mb-2 text-center flex-shrink-0" style="display: none;">
+                    <label for="skin-selector" class="mr-2 font-medium text-gray-700 text-sm">Skin:</label>
+                    <select id="skin-selector" class="p-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full"></select>
+                 </div>
+                 <div id="file-browser-container" class="bg-white rounded-lg shadow p-2 flex-grow flex flex-col overflow-hidden mb-2">
+                    <h2 class="text-base font-semibold mb-1 flex-shrink-0">File Browser</h2>
+                    <div id="file-tree" class="border border-gray-300 rounded p-1 mb-2 w-full flex-grow overflow-y-auto text-sm"></div>
+                    <div class="file-browser-buttons text-right flex-shrink-0">
+                        <button id="edit-button" class="text-xs px-2 py-1 border rounded hover:bg-gray-100" disabled>Edit XML</button>
+                    </div>
+                 </div>
+                <div id="preview-area-container" class="bg-white rounded-lg shadow p-2 flex-shrink-0 mb-2">
+                    <h2 class="text-base font-semibold mb-1 flex-shrink-0">Preview</h2>
+                    <div id="preview-area" class="border border-gray-200 rounded bg-gray-50 p-1 flex-grow overflow-auto text-xs cursor-pointer" title="Click to enlarge preview">Click a file to preview</div>
+                </div>
+                <div id="sidebar-controls" class="mt-auto pt-2 border-t border-gray-200 flex-shrink-0">
+                    <div class="mb-2 flex items-center gap-2">
+                        <div class="flex flex-col items-center flex-shrink-0 w-10">
+                            <i class="iconoir-search text-lg text-gray-600"></i>
+                            <span id="zoom-value" class="block text-center text-xs text-gray-500 mt-1">100%</span>
+                        </div>
+                         <div class="flex-grow">
+                            <input type="range" id="zoom-slider" min="0.5" max="4" step="0.05" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                         </div>
+                     </div>
+                     <div class="flex justify-between items-center mt-1 gap-2">
+                        <div class="load-button-area flex-grow">
+                            <button id="load-folder-button" class="sidebar-bottom-button open-button" title="Upload root chipsynth product folder">
+                                <i class="iconoir-folder"></i> Open
+                            </button>
+                            <input type="file" id="file-input" webkitdirectory directory multiple style="display: none;" />
+                           <input type="file" id="scl-file-input" accept=".scl" style="display: none;" />
+                           <input type="file" id="reference-file-input" accept=".json" style="display: none;">
+                           <input type="file" id="param-reference-file-input" accept=".json" style="display: none;">
+                           </div>
+                        <div class="flex-shrink-0">
+                            <button id="reference-button" class="sidebar-icon-button" title="Show Element Reference">
+                                <i class="iconoir-book"></i>
+                            </button>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button id="debug-toggle-button" class="sidebar-icon-button" role="switch" aria-checked="false" title="Toggle Debug Info">
+                                <i class="iconoir-bug"></i>
+                            </button>
+                            <input type="checkbox" id="debug-checkbox" class="hidden">
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button id="console-button" class="sidebar-icon-button" title="Show Console Log">
+                                <i class="iconoir-terminal-tag"></i>
+                            </button>
+                        </div>
+                    </div>
+                     </div>
+                 </div>
+             </div>
+        </div>
+
+    <div id="xml-editor-modal" class="modal-overlay">
+        <div id="xml-editor-content" class="modal-content-container w-3/4 h-3/4 flex flex-col bg-white text-gray-900 relative">
+            <div class="flex justify-between items-center p-2 border-b border-gray-300 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">Edit XML: <span id="editing-filename" class="font-mono text-sm"></span></h2>
+                    <button id="insert-element-xml-btn" class="ref-header-icon-button" title="Insert Element from Reference"><i class="iconoir-book-stack"></i></button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="save-xml-as-file-btn" class="ref-header-icon-button" title="Save XML to File (Download)">
+                        <i class="iconoir-floppy-disk"></i>
+                    </button>
+                    <button id="close-xml-editor-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                </div>
+            </div>
+            <div id="xml-editor-textarea-container" class="flex-grow flex relative overflow-hidden">
+                <div id="xml-editor-line-numbers" class="flex-shrink-0 overflow-y-hidden font-mono bg-slate-100 text-slate-500 text-right p-2 border-r border-gray-300" style="padding: 8px 4px 8px 8px; font-size: 13px !important; line-height: 21px !important; user-select: none;">
+                    </div>
+                <div class="relative flex-grow h-full xml-text-wrapper">
+                    <textarea id="xml-editor-textarea" class="absolute top-0 left-0 w-full h-full font-mono resize-none outline-none border-none overflow-auto whitespace-pre bg-transparent" spellcheck="false" style="tab-size:4; -moz-tab-size:4; color: transparent; caret-color: #333; z-index: 2; pointer-events: auto !important; user-select: text !important; padding: 8px 8px 15px 8px; font-size: 13px !important; line-height: 21px !important;"></textarea>
+                    <pre id="xml-editor-highlight-overlay" class="absolute top-0 left-0 w-full h-full font-mono overflow-auto whitespace-pre text-transparent" data-instance-id="" style="tab-size:4; -moz-tab-size:4; z-index: 1; background-color: transparent; user-select: none !important; padding: 8px 8px 15px 8px; font-size: 13px !important; line-height: 21px !important; color: #333;"></pre>
+                    <button id="copy-xml-content-btn" title="Copy XML Content">
+                        <i class="iconoir-copy"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="xml-editor-status-bar" class="p-1 border-t border-gray-300 text-xs text-gray-600 flex-shrink-0 font-mono">
+                <span class="original-status"></span>
+                <span class="status-warning"></span>
+                <span class="status-color-hover-info"></span>
+                <span class="status-description" title=""></span>
+            </div>
+            <div id="xml-editor-buttons" class="p-2 border-t border-gray-300 text-right flex-shrink-0 flex justify-end gap-2">
+                <button id="ok-xml-button" class="px-3 py-1 text-sm rounded border border-transparent bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1" title="Save changes, close editor, and re-render GUI if needed">
+                    <i class="iconoir-check"></i> OK
+                </button>
+                <button id="cancel-xml-button" class="px-3 py-1 text-sm rounded border border-gray-400 bg-gray-200 hover:bg-gray-300 text-gray-800 flex items-center gap-1" title="Discard changes and close editor">
+                    <i class="iconoir-cancel"></i> Cancel
+                </button>
+                <button id="apply-xml-button" class="px-3 py-1 text-sm rounded border border-gray-400 bg-gray-200 hover:bg-gray-300 text-gray-800 flex items-center gap-1" title="Save changes and re-render GUI if needed (Editor stays open)">
+                    <i class="iconoir-refresh-double"></i> Apply
+                </button>
+            </div>
+            <div id="xml-editor-resize-handle" class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-10"></div>
+        </div>
+        </div>
+    <div id="console-modal" class="modal-overlay">
+        <div class="modal-content-container w-3/4 max-w-4xl h-3/4 flex flex-col bg-gray-800 text-gray-100">
+            <div class="flex justify-between items-center p-2 border-b border-gray-600 flex-shrink-0">
+                <h2 class="text-lg font-semibold">Console Log</h2>
+                <button id="close-console-btn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+             </div>
+             <div id="console-content" class="p-2 flex-grow overflow-auto font-mono text-xs">
+                <pre id="console-log-output"></pre>
+             </div>
+             <div class="p-2 border-t border-gray-600 flex justify-between items-center flex-shrink-0 gap-2">
+                <div class="flex items-center gap-4 text-xs select-none">
+                    <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="console-filter-info" checked> Info</label>
+                    <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="console-filter-warn" checked> Warnings</label>
+                    <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="console-filter-error" checked> Failures</label>
+                </div>
+                <div class="flex gap-2">
+                    <button id="copy-console-btn" class="px-3 py-1 text-xs rounded border border-gray-500 bg-gray-600 hover:bg-gray-500 text-white">Copy Log</button>
+                    <button id="clear-console-btn" class="px-3 py-1 text-xs rounded border border-gray-500 bg-gray-600 hover:bg-gray-500 text-white">Clear</button>
+                </div>
+             </div>
+         </div>
+    </div>
+    <div id="config-modal" class="modal-overlay">
+        <div class="modal-content-container w-full max-w-md bg-white p-6 rounded-lg shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Settings</h2>
+                <button id="close-config-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+             </div>
+             <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <label for="grid-toggle" class="text-sm font-medium text-gray-700">Show Grid Lines</label>
+                    <button id="grid-toggle" role="switch" aria-checked="false" class="config-toggle-btn">
+                        <span class="toggle-circle"></span>
+                    </button>
+                    <input type="checkbox" id="grid-toggle-checkbox" class="hidden">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label for="bg-color-input" class="text-sm font-medium text-gray-700">Custom Background</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="color" id="bg-color-input" value="#4B5563" class="p-0 w-8 h-8 border border-gray-300 rounded cursor-pointer">
+                        <span id="bg-color-value" class="text-sm text-gray-500">#4B5563</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <label for="bg-mode-toggle" class="text-sm font-medium text-gray-700">Use Skin Default Background</label>
+                    <button id="bg-mode-toggle" role="switch" aria-checked="true" class="config-toggle-btn">
+                        <span class="toggle-circle"></span>
+                    </button>
+                    <input type="checkbox" id="bg-mode-checkbox" class="hidden" checked>
+                </div>
+                <div class="flex items-center justify-between">
+                    <label for="simulate-splash-toggle" class="text-sm font-medium text-gray-700" title="Simulate the overlay and splash screen shown when the plugin is inactive.">Simulate Splash/Overlay</label>
+                    <button id="simulate-splash-toggle" role="switch" aria-checked="false" class="config-toggle-btn">
+                        <span class="toggle-circle"></span>
+                    </button>
+                    <input type="checkbox" id="simulate-splash-checkbox" class="hidden">
+                </div>
+             </div>
+         </div>
+    </div>
+    <div id="disclaimer-modal" class="modal-overlay visible">
+        <div class="modal-content-container w-full max-w-lg bg-white p-6 rounded-lg shadow-xl text-gray-800">
+            <h2 class="text-xl font-semibold mb-4">Disclaimer & Important Notes</h2>
+            <div class="text-sm space-y-2 mb-6 max-h-60 overflow-y-auto pr-2">
+                <p>This tool is an <strong class="text-red-600">unofficial</strong> helper application designed to assist in visualizing and editing XML skin files for chipsynth synthesizers by Plogue.</p>
+                 <p>It attempts to interpret the XML structure and render a visual representation. However, it is <strong>not a complete emulation</strong> of the chipsynth engine's GUI rendering. Discrepancies may exist.</p>
+                 <p><strong>Always back up your original skin files before making changes with this tool.</strong> Plogue is not responsible for any issues arising from the use of this editor.</p>
+                 <p>This tool primarily focuses on layout and visual properties. Complex interactions, dynamic content, and some specific control behaviors might not be fully represented or editable.</p>
+                 <p>Use at your own risk. The developers of this tool are not liable for any data loss or corruption.</p>
+            </div>
+            <div class="text-right">
+                <button id="acknowledge-disclaimer" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">Acknowledge & Continue</button>
+            </div>
+        </div>
+    </div>
+    <div id="reference-modal" class="modal-overlay">
+        <div class="modal-content-container">
+            <div class="flex justify-between items-center p-2 border-b border-gray-300 flex-shrink-0 bg-white/30">
+                <h2 class="text-lg font-semibold text-gray-700">XML Element Reference</h2>
+                <div class="flex items-center gap-2">
+                    <button id="param-reference-button" class="ref-header-icon-button" title="Show Param Reference"><i class="iconoir-search-window"></i></button>
+                    <button id="import-reference-btn" class="ref-header-icon-button" title="Import element reference data from JSON file"><i class="iconoir-import"></i></button>
+                    <button id="export-reference-btn" class="ref-header-icon-button" title="Export current element reference data to JSON file"><i class="iconoir-floppy-disk"></i></button>
+                    <button id="close-reference-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                </div>
+            </div>
+            <div id="reference-content" class="flex flex-grow overflow-hidden">
+                 <div id="reference-element-list-container" class="reference-column">
+                     <div class="reference-column-header">
+                         <div class="flex items-center gap-2">
+                            <h3>Elements</h3>
+                            <button id="edit-element-categories-btn-ref" class="column-header-icon-button" title="Edit Element Categories"><i class="iconoir-folder-settings"></i></button>
+                         </div>
+                        <div class="header-actions">
+                            <button id="add-element-ref-btn" title="Add New Element Definition"><i class="iconoir-plus"></i></button>
+                             </div>
+                    </div>
+                    <p id="reference-placeholder-text" class="text-gray-500 italic p-4 text-center" style="display: none;">No data loaded. Import JSON.</p>
+                    <ul id="reference-element-list"></ul>
+                </div>
+                <div id="reference-attribute-list-container" class="reference-column">
+                    <div class="reference-column-header">
+                         <div class="flex items-center gap-2">
+                            <h3>Used Attributes</h3>
+                            <button id="manage-attribute-definitions-btn" class="column-header-icon-button" title="Manage Attribute Definitions"><i class="iconoir-settings"></i></button>
+                         </div>
+                         <div class="header-actions">
+                            <button id="add-attribute-ref-btn" title="Add Existing Attribute to Selected Element"><i class="iconoir-plus"></i></button>
+                             </div>
+                    </div>
+                    <ul id="reference-attribute-list"></ul>
+                </div>
+                <div id="reference-details-container" class="reference-column flex flex-col">
+                    <div class="p-2 border-b border-gray-200 flex-shrink-0">
+                        <label for="element-ref-name-input" class="block text-sm font-medium text-gray-700 mb-1">Element Name</label>
+                        <input type="text" id="element-ref-name-input" class="w-full p-1 border border-gray-300 rounded text-sm font-mono" placeholder="Select an element" disabled>
+                    </div>
+                    <div class="p-2 border-b border-gray-200 flex-shrink-0 flex items-center">
+                        <input type="checkbox" id="element-ref-supported-checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" disabled>
+                        <label for="element-ref-supported-checkbox" class="text-sm font-medium text-gray-700">Supported by Editor?</label>
+                    </div>
+                    <div id="reference-description-area" class="flex-grow flex flex-col p-2 overflow-hidden">
+                        <h3 class="text-sm font-semibold mb-1 text-gray-600 flex-shrink-0">Element Description</h3>
+                        <textarea id="reference-description-textarea" class="w-full flex-grow text-sm p-1 border border-gray-300 rounded resize-none font-mono bg-white" placeholder="Select an element or attribute..."></textarea>
+                    </div>
+                    <div id="reference-attribute-description-area" class="flex-grow flex flex-col p-2 border-t border-gray-200 overflow-hidden">
+                        <div class="flex justify-between items-center mb-1 flex-shrink-0">
+                            <label for="attribute-description-textarea" class="text-sm font-semibold text-gray-600">Attribute Description</label>
+                            <button id="override-attribute-description-btn" class="ref-header-icon-button text-blue-600" title="Override Description for this Element" style="display: none;"><i class="iconoir-design-pencil"></i></button>
+                        </div>
+                        <textarea id="attribute-description-textarea" class="w-full flex-grow text-sm p-1 border border-gray-300 rounded resize-none font-mono bg-gray-100" placeholder="Select an attribute..." readonly></textarea>
+                    </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+    <div id="attribute-editor-modal" class="modal-overlay">
+        <div class="modal-content-container w-full max-w-3xl">
+            <div class="flex justify-between items-center p-3 border-b border-gray-300 flex-shrink-0">
+                 <h2 id="attribute-editor-title" class="text-lg font-semibold">Attribute Editor</h2>
+                <button id="close-attribute-editor-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+             </div>
+             <div class="flex p-4 gap-4" style="max-height: 70vh;">
+                 <div class="w-2/5 border-r pr-4 flex flex-col">
+                     <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-semibold">All Defined Attributes</h3>
+                            <button id="edit-attribute-categories-btn-attr" class="column-header-icon-button" title="Edit Attribute Categories"><i class="iconoir-folder-settings"></i></button>
+                         </div>
+                         <div>
+                            <button id="add-new-attribute-btn" title="Define New Attribute" class="text-xs p-1 hover:bg-gray-200 rounded"><i class="iconoir-plus"></i></button>
+                             </div>
+                     </div>
+                     <ul id="attribute-editor-list" class="flex-grow overflow-y-auto text-sm space-y-1">
+                         <li>Loading...</li>
+                     </ul>
+                 </div>
+                 <div class="w-3/5 space-y-3 overflow-y-auto pl-2">
+                     <input type="hidden" id="attribute-editor-original-name">
+                     <input type="hidden" id="attribute-editor-type-flag">
+                     <div>
+                        <label for="attribute-editor-name" class="block text-sm font-medium text-gray-700 mb-1">Attribute Name</label>
+                        <input type="text" id="attribute-editor-name" class="w-full p-1 border border-gray-300 rounded text-sm font-mono" placeholder="e.g., vmin" required>
+                     </div>
+                     <div>
+                        <label for="attribute-editor-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="attribute-editor-description" rows="4" class="w-full p-1 border border-gray-300 rounded text-sm" placeholder="Describe what this attribute does..."></textarea>
+                     </div>
+                     <div class="grid grid-cols-2 gap-4">
+                         <div>
+                            <label for="attribute-editor-type" class="block text-sm font-medium text-gray-700 mb-1">Data Type</label>
+                            <select id="attribute-editor-type" class="w-full p-1 border border-gray-300 rounded text-sm">
+                                <option value="string">String</option>
+                                <option value="integer">Integer</option>
+                                <option value="float">Float</option>
+                                <option value="boolean">Boolean (0/1)</option>
+                                <option value="color">Color (#RRGGBBAA)</option>
+                                <option value="font-alias">Font Alias</option>
+                                <option value="path">File Path</option>
+                                <option value="other">Other</option>
+                            </select>
+                         </div>
+                         <div>
+                            <label for="attribute-editor-default" class="block text-sm font-medium text-gray-700 mb-1">Default Value (Optional)</label>
+                            <input type="text" id="attribute-editor-default" class="w-full p-1 border border-gray-300 rounded text-sm" placeholder="e.g., 1.0 or true">
+                         </div>
+                     </div>
+                     <div class="flex items-center">
+                        <input type="checkbox" id="attribute-editor-required" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="attribute-editor-required" class="ml-2 block text-sm text-gray-900">Required?</label>
+                     </div>
+                      <div>
+                        <label for="attribute-editor-category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="attribute-editor-category" class="w-full p-1 border border-gray-300 rounded text-sm">
+                            <option value="Other">Other</option>
+                        </select>
+                      </div>
+                 </div>
+             </div>
+             <div class="p-3 border-t border-gray-300 flex justify-end gap-2 flex-shrink-0">
+                </div>
+        </div>
+    </div>
+    <div id="element-editor-modal" class="modal-overlay">
+        <div class="modal-content-container w-full max-w-lg bg-white">
+            <div class="flex justify-between items-center p-3 border-b border-gray-300">
+                <h2 id="element-editor-title" class="text-lg font-semibold">Edit Element</h2>
+                <button id="close-element-editor-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto">
+                <input type="hidden" id="element-editor-original-name">
+                <div>
+                    <label for="element-editor-name" class="block text-sm font-medium text-gray-700 mb-1">Element Tag Name</label>
+                    <input type="text" id="element-editor-name" name="element-name" class="w-full p-1 border border-gray-300 rounded text-sm font-mono" placeholder="e.g., CS01Slider" required>
+                    <p class="text-xs text-gray-500 mt-1">Use exact XML tag name (case-sensitive recommended).</p>
+                </div>
+                <div>
+                    <label for="element-editor-category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                     <select id="element-editor-category" class="w-full p-1 border border-gray-300 rounded text-sm">
+                         <option value="Other">Other</option>
+                         </select>
+                 </div>
+                <div>
+                    <label for="element-editor-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="element-editor-description" name="element-description" rows="3" class="w-full p-1 border border-gray-300 rounded text-sm" placeholder="Describe what this element does..."></textarea>
+                </div>
+                <div class="flex items-center">
+                     <input type="checkbox" id="element-editor-uses-common" name="uses-common" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                     <label for="element-editor-uses-common" class="ml-2 block text-sm text-gray-900">Uses Common Attributes (x, y, w, h, style...)</label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Specific Attributes (Read-only)</label>
+                    <p class="text-xs text-gray-500 mb-1">Use Reference Modal to manage attribute usage.</p>
+                    <textarea id="element-editor-specific-attributes" name="specific-attributes" rows="3" class="w-full p-1 border border-gray-300 rounded text-sm font-mono bg-gray-100" readonly placeholder="{ ... }"></textarea>
+                </div>
+                 <div>
+                    <label for="element-editor-notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                    <textarea id="element-editor-notes" name="element-notes" rows="2" class="w-full p-1 border border-gray-300 rounded text-sm" placeholder="Any extra notes..."></textarea>
+                 </div>
+            </div>
+            <div class="p-3 border-t border-gray-300 flex justify-end gap-2 flex-shrink-0">
+                <button id="cancel-element-edit-btn" class="px-3 py-1 text-sm rounded border border-gray-400 bg-gray-200 hover:bg-gray-300 text-gray-800">Cancel</button>
+                <button id="save-element-edit-btn" class="px-3 py-1 text-sm rounded border border-transparent bg-blue-500 hover:bg-blue-600 text-white">Save Element</button>
+            </div>
+        </div>
+    </div>
+    <div id="xml-insert-element-modal" class="modal-overlay">
+        <div class="modal-content-container w-full max-w-md bg-white">
+            <div class="flex justify-between items-center p-3 border-b border-gray-300">
+                <h2 class="text-lg font-semibold">Insert Element</h2>
+                <button id="close-xml-insert-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+             </div>
+             <div class="p-4" style="max-height: 60vh; overflow-y: auto;">
+                 <p class="text-sm text-gray-600 mb-2">Select an element to insert:</p>
+                 <ul id="xml-insert-element-list" class="space-y-1">
+                     <li>Loading elements...</li>
+                 </ul>
+             </div>
+        </div>
+    </div>
+    <div id="param-reference-modal" class="modal-overlay" style="z-index: 6031;">
+        <div class="modal-content-container w-full max-w-4xl h-5/6 bg-white">
+            <div class="flex justify-between items-center p-2 border-b border-gray-300 flex-shrink-0 bg-gray-50">
+                <h2 class="text-lg font-semibold text-gray-700">Parameter Reference</h2>
+                <div class="flex items-center gap-2">
+                    <button id="import-param-ref-btn" class="ref-header-icon-button" title="Import parameter data from JSON file"><i class="iconoir-import"></i></button>
+                    <button id="export-param-ref-btn" class="ref-header-icon-button" title="Export current parameter data to JSON file"><i class="iconoir-floppy-disk"></i></button>
+                    <button id="close-param-ref-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                </div>
+            </div>
+            <div id="param-reference-content" class="flex flex-grow overflow-hidden">
+                <div id="param-columns-container" class="flex flex-grow overflow-hidden">
+                    <div id="param-list-container" class="w-2/5 border-r border-gray-200 flex flex-col overflow-hidden p-2">
+                         <div id="param-category-controls" class="flex flex-col flex-shrink-0 mb-2">
+                            <label for="param-category-select" class="block text-sm font-medium text-gray-700 mb-1">Category:</label>
+                            <div class="flex items-center gap-2 w-full">
+                                <select id="param-category-select" class="flex-grow p-1 border border-gray-300 rounded text-sm">
+                                    <option value="">-- Select Category --</option>
+                                    </select>
+                                <button id="add-param-category-btn" class="ref-header-icon-button flex-shrink-0" title="Add New Category"><i class="iconoir-plus"></i></button>
+                                <button id="rename-param-category-btn" class="ref-header-icon-button flex-shrink-0" title="Rename Selected Category"><i class="iconoir-edit-pencil"></i></button>
+                                <button id="remove-param-category-btn" class="ref-header-icon-button text-red-600 flex-shrink-0" title="Remove Selected Category"><i class="iconoir-bin"></i></button>
+                            </div>
+                        </div>
+                         <div class="reference-column-header mt-1 mb-1">
+                            <h3>Parameters</h3>
+                            <div class="header-actions">
+                                <button id="add-param-ref-btn" title="Add New Parameter to Selected Category"><i class="iconoir-plus"></i></button>
+                                </div>
+                        </div>
+                        <p id="param-placeholder-text" class="text-gray-500 italic p-4 text-center" style="display: none;">No data loaded or no category selected.</p>
+                        <ul id="param-list" class="flex-grow overflow-y-auto text-sm space-y-1 pr-1">
+                            </ul>
+                    </div>
+                    <div id="param-details-container" class="w-3/5 flex flex-col p-3 space-y-3 overflow-y-auto">
+                        <div class="space-y-2 flex-grow flex flex-col">
+                             <h3 class="text-sm font-semibold text-gray-600 flex-shrink-0">Selected Parameter Details</h3>
+                             <div>
+                                 <label for="param-id-input" class="block text-xs font-medium text-gray-600 mb-1">Param ID</label>
+                                 <input type="text" id="param-id-input" class="w-full p-1 border border-gray-300 rounded text-sm font-mono bg-gray-100" readonly placeholder="Select or Add Parameter">
+                             </div>
+                             <div>
+                                 <label for="param-label-input" class="block text-xs font-medium text-gray-600 mb-1">Label / Name</label>
+                                 <input type="text" id="param-label-input" class="w-full p-1 border border-gray-300 rounded text-sm" placeholder="Enter parameter name/label" disabled>
+                             </div>
+                             <div class="flex-grow flex flex-col">
+                                 <label for="param-description-textarea" class="block text-xs font-medium text-gray-600 mb-1 flex-shrink-0">Description</label>
+                                 <textarea id="param-description-textarea" class="w-full flex-grow p-1 border border-gray-300 rounded text-sm resize-none" placeholder="Enter parameter description..." disabled></textarea>
+                             </div>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+    <div id="preview-item-modal" class="modal-overlay">
+        <div class="modal-content-container w-3/4 max-w-3xl h-3/4">
+            <div class="flex justify-between items-center p-2 border-b border-gray-300 flex-shrink-0 bg-white/30">
+                <h2 id="preview-item-modal-title" class="text-lg font-semibold text-gray-700">Preview</h2>
+                <button id="close-preview-item-modal-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="preview-item-modal-content" class="p-4 flex-grow overflow-auto flex items-center justify-center">
+                <span class="text-gray-400">Loading preview...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="debug-overlay" style="display: none;"></div>
+    <div id="toast-container"></div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

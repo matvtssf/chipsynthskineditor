@@ -1,0 +1,157 @@
+// File: cs/renderers/textDisplayRenderer.js
+import * as DomUtils from '/cs/domUtils.js';
+import * as State from '/cs/state.js';
+
+function renderStaticText(xmlNode, mergedAttributes) {
+    const htmlElement = document.createElement('div'); // Use a div for StaticText
+    htmlElement.classList.add('gui-static-text');
+    
+    let textContent = mergedAttributes['text'] || xmlNode.textContent.trim() || '';
+    
+    // Check for localization keys like "$SOME_KEY"
+    if (textContent.startsWith('$')) {
+        const locKey = textContent.substring(1);
+        const localizedText = State.getLocalizedString(locKey);
+        if (localizedText !== null) {
+            textContent = localizedText;
+        } else {
+            console.warn(`[textDisplayRenderer] Localization key not found: ${locKey}`);
+            // Keep original key as fallback if not found, or set to empty/specific placeholder
+            // textContent = `?${locKey}?`; 
+        }
+    }
+    htmlElement.textContent = textContent;
+    
+    // Text alignment and font are applied by applyStyles based on 'alignment', 'valign', 'font' attributes
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false, // StaticText generally does not have children that need rendering
+        postProcessFunction: null
+    };
+}
+
+function renderLabel(xmlNode, mergedAttributes, currentParams) {
+    const htmlElement = document.createElement('div'); // Use a div for Label
+    htmlElement.classList.add('gui-label');
+    
+    const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
+    let textContent = mergedAttributes['text'] || ''; // Default text if param value not found or for design time
+
+    if (paramId) {
+        htmlElement.dataset.param = paramId;
+        // Actual value display will be handled by State updates and specific update functions
+        // For now, can display the default text or paramId
+        const paramValue = State.getElementState(paramId, mergedAttributes['vdefault'] || textContent);
+        // Formatting of paramValue would happen here based on 'format' attribute etc.
+        // For simplicity, just display it, or the 'text' attribute as fallback.
+        textContent = paramValue !== null ? String(paramValue) : textContent; 
+    }
+     htmlElement.textContent = textContent;
+    
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
+}
+
+function renderTextEditor(xmlNode, mergedAttributes, currentParams) {
+    const htmlElement = document.createElement('div'); // Or input, but div allows easier styling/customization
+    htmlElement.classList.add('gui-text-editor');
+    
+    const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
+    let initialText = mergedAttributes['tdefault'] || ''; // Default text
+
+    if (paramId) {
+        htmlElement.dataset.param = paramId;
+        initialText = State.getElementState(paramId, initialText);
+    }
+    htmlElement.textContent = initialText; // Display initial text
+
+    // Editable property, typically handled by JS interactions on focus/click
+    if (mergedAttributes['editable'] === '1' || mergedAttributes['editable'] === 'true') {
+        htmlElement.setAttribute('contenteditable', 'true'); // Basic contenteditable
+        // Further JS would be needed for actual text input handling, state updates, etc.
+    } else {
+        htmlElement.setAttribute('contenteditable', 'false');
+    }
+    
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
+}
+
+function renderDisplayStringOption(xmlNode, mergedAttributes, currentParams) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-display-string-option'); // New class
+
+    const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
+    let textContent = mergedAttributes['text'] || ''; // Default text if no param or value found
+
+    if (paramId) {
+        htmlElement.dataset.param = paramId;
+        const paramValue = State.getElementState(paramId, mergedAttributes['vdefault']);
+        
+        // This element typically has <DisplayStringOptionItem name="..." value="..."/> children in XML
+        // to map paramValue to a display string.
+        // For now, we'll just display the raw paramValue or default text.
+        // A more complete implementation would parse these children and use them for display.
+        if (paramValue !== null) {
+            textContent = String(paramValue); // Placeholder: should format based on children or 'format' attr
+            
+            // Example of looking up display string from children (if they were parsed and stored)
+            // const displayItems = parseDisplayStringOptionItems(xmlNode); // Hypothetical function
+            // const matchedItem = displayItems.find(item => String(item.value) === String(paramValue));
+            // if (matchedItem) textContent = matchedItem.name;
+            // else if (mergedAttributes['format']) textContent = formatValue(paramValue, mergedAttributes['format']);
+        }
+         // Apply format attribute if present (simplified)
+        if (mergedAttributes['format'] && paramValue !== null) {
+            try {
+                if (mergedAttributes['format'].includes('%.')) { // e.g. %.2f ct
+                    const decimals = parseInt(mergedAttributes['format'].match(/%\.(d+)f/)?.[1] || '0');
+                    const suffix = mergedAttributes['format'].split('f').pop() || '';
+                    textContent = parseFloat(paramValue).toFixed(decimals) + suffix;
+                } else if (mergedAttributes['format'].includes('%d') || mergedAttributes['format'].includes('%s')) {
+                     textContent = mergedAttributes['format'].replace(/%[ds]/, String(paramValue));
+                }
+            } catch (e) { console.warn("Error applying format to DisplayStringOption", e); }
+        }
+
+
+    }
+    htmlElement.textContent = textContent;
+    
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false, // Child <DisplayStringOptionItem> tags are for data, not direct rendering here
+        postProcessFunction: null
+    };
+}
+
+
+export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourcePath, mergedAttributes) {
+    const normalizedTagName = tagName.toUpperCase();
+    switch (normalizedTagName) {
+        case 'STATICTEXT':
+            return renderStaticText(xmlNode, mergedAttributes);
+        case 'LABEL':
+            return renderLabel(xmlNode, mergedAttributes, currentParams);
+        case 'TEXTEDITOR':
+            return renderTextEditor(xmlNode, mergedAttributes, currentParams);
+        case 'DISPLAYSTRINGOPTION': // Added
+            return renderDisplayStringOption(xmlNode, mergedAttributes, currentParams);
+        default:
+            console.warn(`[textDisplayRenderer] Attempted to render unhandled tag: ${tagName}`);
+            const placeholder = DomUtils.createErrorPlaceholder(tagName);
+            if(mergedAttributes['x']) placeholder.style.left = mergedAttributes['x'] + 'px';
+            if(mergedAttributes['y']) placeholder.style.top = mergedAttributes['y'] + 'px';
+            return { htmlElement: placeholder, mainElementForAttributes: placeholder, requiresRecursiveRender: false, postProcessFunction: null };
+    }
+}

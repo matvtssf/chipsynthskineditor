@@ -1,0 +1,1291 @@
+/* File: cs/style.css */
+/* Custom styles */
+html { box-sizing: border-box; }
+*, *:before, *:after { box-sizing: inherit; }
+body { font-family: 'Inter', Helvetica, Arial, sans-serif; padding: 0; margin: 0; background-color: #f3f4f6; overflow: hidden; height: 100vh; position: relative; }
+b, strong { font-weight: bold; }
+
+/* --- Global Icon Style --- */
+.iconoir {
+    stroke-width: 1.5;
+}
+
+/* Text Logo */
+#text-logo {
+    font-family: 'DesignSystemDW01-500R', cursive;
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 1010;
+    padding: 0.5rem 1rem;
+    background-color: transparent;
+    border-radius: 0.375rem;
+    pointer-events: none;
+    user-select: none;
+    font-size: 1.5rem;
+    color: #ffffff;
+    text-shadow: 3px 3px 0px rgba(0,0,0,1);
+    opacity: 0.85;
+    transition: opacity 0.3s ease-out;
+}
+body.logo-hover #text-logo { opacity: 0.1; }
+
+/* Main Container */
+.editor-container { padding: 0; position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; display: flex; gap: 1rem; }
+
+/* Main Content Area - Overall container for canvas viewport, status, error log */
+#main-content-area {
+    flex-grow: 1;
+    min-width: 0; /* Flexbox fix for children with min-width */
+    display: flex;
+    flex-direction: column; /* Stacks canvas-viewport, status, error-log */
+    overflow: hidden; /* IMPORTANT: This parent does NOT scroll. #canvas-viewport below will scroll. */
+    background-color: var(--editor-bg, #374151); /* Main editor dark background, visible if #canvas-viewport had margins */
+    padding: 0; /* Maximized */
+    position: relative;
+    z-index: 10;
+}
+
+/* Canvas Viewport - This div handles scrolling and centers the zoomable canvas */
+#canvas-viewport {
+    flex-grow: 1; /* Takes up available space before status/error logs */
+    min-height: 0; /* Crucial for flex children that need to scroll */
+    overflow: auto; /* SCROLLBARS APPEAR HERE for #gui-zoom-canvas */
+    display: flex; /* Using flex to center #gui-zoom-canvas */
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-color: var(--canvas-bg, #4B5563); /* Match #gui-zoom-canvas base color to make "empty" space around it consistent */
+}
+
+/* GUI Zoom Canvas - This is scaled, has the grid, and FILLS #canvas-viewport. It centers #fixed-dimension-content. */
+#gui-zoom-canvas {
+    width: 100%; /* Fills canvas-viewport */
+    height: 100%; /* Fills canvas-viewport */
+    position: relative; /* For transform-origin and positioning #fixed-dimension-content */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--canvas-bg, #4B5563); /* Base color - grid is applied on top */
+    
+    /* Grid background styling */
+    --grid-background-size: 100px; /* Control grid size with this variable */
+    --grid-line-color: rgba(255, 255, 255, 0.07); /* Control grid line color and opacity */
+    background-image: 
+        repeating-linear-gradient(to right, var(--grid-line-color) 0, var(--grid-line-color) 1px, transparent 1px, transparent var(--grid-background-size)),
+        repeating-linear-gradient(to bottom, var(--grid-line-color) 0, var(--grid-line-color) 1px, transparent 1px, transparent var(--grid-background-size));
+    background-size: var(--grid-background-size) var(--grid-background-size);
+    background-position: 0 0; /* Initial position, JS might update for panning illusion */
+    
+    will-change: transform, background-position; /* Performance hint for zooming and panning grid */
+    overflow: visible; /* Its child (#fixed-dimension-content) is larger and needs to be visible as it scales */
+    /* transform-origin and transform are applied inline via JS */
+    pointer-events: auto; /* Enable mouse events for zoom/pan directly on this surface */
+}
+
+/* Control grid visibility via a class on #main-content-area (or #canvas-viewport) */
+#main-content-area:not(.grid-visible) #gui-zoom-canvas {
+    background-image: none; /* Hide grid lines if .grid-visible is not on parent */
+}
+/* If #gui-zoom-canvas has its own .grid-active class: */
+/* #gui-zoom-canvas:not(.grid-active) { background-image: none; } */
+
+
+/* Fixed Dimension Content - Sits inside gui-zoom-canvas, has the large fixed size (e.g., 2500x2500) */
+#fixed-dimension-content {
+    width: 2500px;
+    height: 2500px; /* Or 1500px if preferred for vertical, ensure consistency with JS logic if any expects this */
+    position: relative; /* For #skin-container-actual positioning if needed, though flex usually handles it */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* Ensure it doesn't shrink if #gui-zoom-canvas had different flex properties */
+    /* This div itself usually doesn't need a background, as #skin-container-actual or #gui-zoom-canvas provides it */
+}
+
+/* Skin Container Actual - Holds the rendered skin, sized by XML */
+#skin-container-actual {
+    position: relative; /* For absolute positioning of GUI elements within it */
+    overflow: hidden;   /* CRITICAL: No scrollbars on the skin itself */
+    /* Width, height, and background-color will be set by guiBuilder.js based on skin XML */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2); /* Optional: for depth */
+}
+
+
+/* Cleanup of OLD GUI styles that are no longer used for the main rendering path */
+/* These selectors might be entirely removable if not used elsewhere for different purposes */
+/* #gui-output-container {} */ /* Was previously a padded container or viewport */
+/* #gui-output {} */          /* Was previously viewport or large canvas */
+/* #gui-content-wrapper {} */ /* Was previously skin holder or large canvas */
+
+
+/* Sidebar Area - Existing styles are largely unaffected by canvas changes */
+#sidebar {
+    position: fixed; right: 1rem; top: 1rem; bottom: 1rem; width: 320px;
+    background-color: rgba(255, 255, 255, 0.8); border-radius: 0.5rem;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.15); z-index: 1000;
+    display: flex; flex-direction: column; overflow: hidden; padding: 0;
+    transition: width 0.4s ease-in-out, padding 0.4s ease-in-out;
+    -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+    -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+#sidebar.collapsed { width: 48px; padding: 0; overflow: visible; }
+
+#sidebar-header {
+    display: flex; position: relative; width: 100%; height: 100px; overflow: hidden;
+    background-color: rgba(55, 65, 81, 0.85); padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-top-left-radius: inherit; border-top-right-radius: inherit; box-sizing: border-box;
+    align-items: flex-start; justify-content: space-between; flex-shrink: 0;
+    transition: height 0.4s ease-in-out, background-color 0.4s ease-in-out, border-radius 0.4s ease-in-out, padding 0.4s ease-in-out;
+}
+#sidebar.collapsed #sidebar-header {
+    position: static; height: 100%; overflow: visible; background-color: rgba(55, 65, 81, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); justify-content: flex-start;
+    align-items: flex-start; padding: 0.5rem; border-radius: inherit; width: 100%;
+}
+#sidebar.collapsed #sidebar-header #product-logo-container,
+#sidebar.collapsed #sidebar-header #config-button { display: none; }
+#sidebar.collapsed #sidebar-header #sidebar-toggle-btn { margin: 0; }
+#sidebar-header #product-logo-container { flex-grow: 1; padding: 0; height: 100%; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#sidebar-header #product-logo-img { display: block; flex-shrink: 0; width: 100%; height: 100%; max-width: 90%; max-height: 90%; object-fit: cover; }
+.sidebar-header-button { flex-shrink: 0; background-color: rgba(255, 255, 255, 0.1); color: #e5e7eb; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.25rem; padding: 0.3rem; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; width: 32px; height: 32px; box-sizing: border-box; }
+.sidebar-header-button:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4); }
+#sidebar-toggle-btn i.icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; transform: scaleX(-1); font-size: 20px; color: currentColor; line-height: 1; }
+#sidebar:not(.collapsed) #sidebar-toggle-btn .icon-expand { display: none; }
+#sidebar:not(.collapsed) #sidebar-toggle-btn .icon-collapse { display: block; }
+#sidebar.collapsed #sidebar-toggle-btn .icon-collapse { display: none; }
+#sidebar.collapsed #sidebar-toggle-btn .icon-expand { display: block; }
+
+.logo-placeholder-text { font-size: 0.7rem; color: #e0e0e0; text-align: center; padding: 0.5rem; word-break: break-all; line-height: 1.2; font-family: monospace; }
+#sidebar .sidebar-content-wrapper { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; width: 100%; overflow: hidden; padding: 1rem; margin-top: 0; }
+#sidebar .sidebar-content-wrapper > #skin-selector-container,
+#sidebar .sidebar-content-wrapper > #sidebar-controls { transition: opacity 0.4s ease-in-out; opacity: 1; pointer-events: auto; }
+#sidebar.collapsed .sidebar-content-wrapper > #skin-selector-container,
+#sidebar.collapsed .sidebar-content-wrapper > #sidebar-controls { opacity: 0; pointer-events: none; }
+#file-browser-container,
+#preview-area-container { opacity: 0; visibility: hidden; transition: opacity 0.5s ease-in-out, visibility 0s linear 0.5s; pointer-events: none; }
+#file-browser-container.loaded-visible,
+#preview-area-container.loaded-visible { opacity: 1; visibility: visible; transition: opacity 0.5s ease-in-out, visibility 0s linear 0s; pointer-events: auto; }
+#sidebar.collapsed .sidebar-content-wrapper > #file-browser-container,
+#sidebar.collapsed .sidebar-content-wrapper > #preview-area-container { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.4s ease-in-out, visibility 0s linear 0.4s; }
+#skin-selector-container { flex-shrink: 0; margin-bottom: 0.5rem; text-align: left; }
+#skin-selector-container label { margin-right: 0.5rem; }
+#skin-selector { background-color: #fff; border: 1px solid #ccc; border-radius: 0.25rem; padding: 0.15rem 0.3rem; font-size: 0.8rem; cursor: pointer; width: auto; max-width: 100%; display: inline-block; vertical-align: middle; }
+#file-browser-container { flex-grow: 1; flex-shrink: 1; min-height: 100px; width: 100%; display: flex; flex-direction: column; overflow: hidden; background-color: rgba(255, 255, 255, 0.7); border-radius: 0.25rem; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); padding: 0.5rem; margin-bottom: 0.5rem; border: 1px solid #d1d5db; }
+#file-browser-container h2 { margin-bottom: 0.25rem; font-size: 0.875rem; }
+#file-tree { flex-grow: 1; overflow-y: auto; padding-right: 0.25rem; font-size: 0.8rem; }
+#file-tree ul { list-style: none; padding-left: 1em; margin: 0; } #file-tree li { padding: 0.1em 0; position: relative; } #file-tree li span { cursor: pointer; display: inline-flex; align-items: center; gap: 0.2em; border-radius: 3px; padding: 1px 3px; transition: background-color 0.15s ease; } #file-tree li span:hover { background-color: rgba(0,0,0,0.05); } #file-tree li.highlighted > span { background-color: #dbeafe; font-weight: 500; } #file-tree li.folder > span::before { content: '▸'; display: inline-block; margin-right: 0.3em; transition: transform 0.15s ease; } #file-tree li.folder.open > span::before { transform: rotate(90deg); } #file-tree li.folder > ul { display: none; } #file-tree li.folder.open > ul { display: block; } #file-tree li i { font-size: 1em; vertical-align: middle; margin-right: 0.2em; color: #555; }
+#file-tree .file-checkmark { display: none; margin-left: 6px; font-size: 0.9em; line-height: 1; vertical-align: middle; }
+#file-tree li.used-file > span { color: #16a34a; }
+#file-tree li.used-file .file-checkmark i.iconoir-check-square-solid { color: #16a34a; }
+#file-tree li.used-file > span > i:not(.iconoir-check-square-solid) { color: #107c38; }
+.file-browser-buttons { flex-shrink: 0; text-align: right; margin-top: 0.5rem; } .file-browser-buttons button { padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 0.25rem; background-color: #e5e7eb; transition: background-color 0.2s; } .file-browser-buttons button:hover:not(:disabled) { background-color: #d1d5db; } .file-browser-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+#preview-area-container { flex-shrink: 0; flex-grow: 0; width: 100%; height: 150px; min-height: 80px; display: flex; flex-direction: column; background-color: rgba(255, 255, 255, 0.7); border-radius: 0.25rem; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); padding: 0.5rem; margin-bottom: 0.5rem; border: 1px solid #d1d5db; }
+#preview-area-container h2 { margin-bottom: 0.25rem; font-size: 0.875rem; }
+#preview-area { width: 100%; flex-grow: 1; overflow: auto; border: 1px solid #ccc; border-radius: 0.25rem; background-color: #fff; padding: 0.5rem; font-family: monospace; white-space: pre-wrap; word-break: break-all; font-size: 0.75rem; box-sizing: border-box; cursor: pointer; }
+#preview-area .font-preview { white-space: pre-wrap; } #preview-area.flex { display: flex; } #preview-area.items-center { align-items: center; } #preview-area.justify-center { justify-content: center; } #preview-area img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto; }
+#preview-area.image-preview-bg { background-image: linear-gradient(45deg, #cccccc 25%, transparent 25%), linear-gradient(-45deg, #cccccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cccccc 75%), linear-gradient(-45deg, transparent 75%, #cccccc 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0px; background-color: #ffffff; }
+#preview-area img.preview-image-transparent-bg { background-color: transparent !important; }
+#sidebar-controls { flex-shrink: 0; padding-top: 0.5rem; border-t: 1px solid #e5e7eb; } #sidebar-controls .mb-2 { margin-bottom: 0.5rem; } #sidebar-controls #zoom-slider { appearance: auto; width: 100%; height: 0.5rem; cursor: pointer; margin: 0; background-color: #e5e7eb; border-radius: 9999px; } #sidebar-controls #zoom-slider::-webkit-slider-thumb { appearance: none; width: 1rem; height: 1rem; background: #60a5fa; border-radius: 50%; cursor: pointer; } #sidebar-controls #zoom-slider::-moz-range-thumb { width: 1rem; height: 1rem; background: #60a5fa; border-radius: 50%; cursor: pointer; border: none; } #sidebar-controls .flex.justify-between { gap: 0.5rem; align-items: stretch; } .load-button-area { flex-grow: 1; flex-shrink: 1; flex-basis: auto; min-width: 60px; margin-bottom: 0; display: flex; } .sidebar-bottom-button.open-button { background-color: #3b82f6; color: white; padding: 0 0.75rem; border: none; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3em; flex-grow: 1; height: 2rem; box-sizing: border-box; } .sidebar-bottom-button.open-button:hover { background-color: #2563eb; } .sidebar-bottom-button.open-button i { font-size: 1.1em; } .sidebar-icon-button { padding: 0; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #9ca3af; background-color: #f3f4f6; color: #555; font-size: 1.1rem; transition: background-color 0.2s, color 0.2s, border-color 0.2s; border-radius: 0.25rem; cursor: pointer; flex-shrink: 0; box-sizing: border-box; position: relative; } .sidebar-icon-button:hover { background-color: #e5e7eb; border-color: #6b7280; } #debug-toggle-button.active { background-color: #dbeafe; border: 2px solid #60a5fa; color: #1e40af; } #console-button.error { color: #dc2626; border-color: #fca5a5; } #console-button.error:hover { background-color: #fee2e2; border-color: #ef4444; } #console-button.error::after { content: ''; position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; background-color: #dc2626; border-radius: 50%; border: 1px solid white; }
+.config-toggle-btn { position: relative; display: inline-flex; height: 1.25rem; width: 2.25rem; flex-shrink: 0; cursor: pointer; border-radius: 9999px; border: 1px solid transparent; background-color: #e5e7eb; transition: background-color 0.2s ease-in-out; outline: none; } .config-toggle-btn[aria-checked="true"] { background-color: #3b82f6; border-color: #3b82f6; } .config-toggle-btn[aria-checked="true"] .toggle-circle { transform: translateX(1.125rem); } .toggle-circle { pointer-events: none; display: inline-block; height: 1rem; width: 1rem; transform: translateX(0.125rem); background-color: white; border-radius: 9999px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: transform 0.2s ease-in-out; }
+
+/* Modal Styles */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; display: none; opacity: 0; justify-content: center; align-items: center; transition: opacity 0.3s ease-out; z-index: 5000; pointer-events: none; }
+.modal-overlay.visible { display: flex; opacity: 1; }
+.modal-content-container { position: relative; top: 0; left: 0; background-color: #fff; padding: 0; border-radius: 0.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.3); overflow: hidden; pointer-events: auto; transform: scale(0.95); transition: transform 0.3s ease-out; max-height: 90vh; display: flex; flex-direction: column; border: 1px solid rgba(0,0,0, 0.1); user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; min-width: 400px; min-height: 300px; }
+.modal-overlay.visible .modal-content-container { transform: scale(1); }
+.modal-content-container input, .modal-content-container textarea, .modal-content-container pre { user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; }
+#xml-editor-modal { z-index: 6000; } #console-modal { z-index: 6010; } #config-modal { z-index: 6020; } #reference-modal { z-index: 6030; } #param-reference-modal { z-index: 6031; }
+#preview-item-modal { z-index: 6032; }
+#attribute-editor-modal { z-index: 6035; } #xml-insert-element-modal { z-index: 6045; } #element-editor-modal { z-index: 6050; } #disclaimer-modal { z-index: 7000; }
+#console-modal .modal-content-container { background-color: #1f2937; color: #d1d5db; border: 1px solid #4b5563; width: 75%; max-width: 56rem; height: 75%; } #config-modal .modal-content-container { padding: 1.5rem; max-width: 28rem; width: 100%; overflow: auto; height: auto; } #element-editor-modal .modal-content-container { max-width: 36rem; width: 90%; padding: 0; overflow: hidden; height: auto; max-height: 90vh; } #disclaimer-modal .modal-content-container { padding: 2rem; max-width: 600px; overflow: hidden; }
+#reference-modal .modal-content-container,
+#preview-item-modal .modal-content-container { padding: 0; width: 60rem; max-width: 90vw; height: 80vh; overflow: hidden; background-color: rgba(255, 255, 255, 0.8); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); border: 1px solid rgba(255, 255, 255, 0.5); }
+#preview-item-modal .modal-content-container { width: 75%; max-width: 1000px; height: 75%; }
+#preview-item-modal #preview-item-modal-content { background-color: transparent; display: flex; align-items: center; justify-content: center; overflow: auto; }
+#preview-item-modal #preview-item-modal-content img,
+#preview-item-modal #preview-item-modal-content svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+#attribute-editor-modal .modal-content-container { background-color: #ffffff; width: 90%; max-width: 48rem; } #xml-insert-element-modal .modal-content-container { background-color: #ffffff; max-width: 24rem; width: 90%; height: auto; max-height: 60vh;} #xml-insert-element-list { list-style: none; padding: 0.5rem; margin: 0; font-size: 0.8rem; } #xml-insert-element-list li { padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 0.25rem; } #xml-insert-element-list li:hover { background-color: #f3f4f6; } #xml-insert-element-list .element-category-header { font-size: 0.7rem; font-weight: 700; color: #374151; background-color: rgba(0,0,0,0.04); padding: 0.2rem 0.5rem; margin-top: 0.6rem; margin-bottom: 0.3rem; border-top: 1px solid rgba(0,0,0,0.08); border-bottom: 1px solid rgba(0,0,0,0.08); cursor: default; text-transform: uppercase; letter-spacing: 0.05em; } #xml-insert-element-list .element-category-header:first-child { margin-top: 0; border-top: none; }
+#xml-editor-status-bar { user-select: none; display: flex; align-items: center; flex-wrap: nowrap; border-right: 1px solid rgba(0,0,0,0.1); } #reference-element-list li, #reference-attribute-list li { padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 0.25rem; margin-bottom: 1px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; line-height: 1.3; position: relative; } #reference-element-list li:not(.element-category-header):hover, #reference-attribute-list li:not(.attribute-category-header):hover { background-color: #f3f4f6; } #reference-element-list li.selected, #reference-attribute-list li.selected { background-color: #dbeafe; font-weight: 500; } #reference-attribute-list li span { flex-grow: 1; margin-right: 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #reference-element-list li.element-supported > span { font-weight: 600; color: #16a34a; } .element-category-header, .attribute-category-header { font-size: 0.7rem; font-weight: 700; color: #374151; background-color: rgba(0,0,0,0.04); padding: 0.2rem 0.5rem; margin-top: 0.6rem; margin-bottom: 0.3rem; border-top: 1px solid rgba(0,0,0,0.08); border-bottom: 1px solid rgba(0,0,0,0.08); cursor: default; text-transform: uppercase; letter-spacing: 0.05em; } .element-category-header:first-child, .attribute-category-header:first-child { margin-top: 0; border-top: none; } #reference-description-area { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; border-top: none; padding: 0.5rem; } #reference-description-area h3 { margin-bottom: 0.25rem; flex-shrink: 0; } #reference-description-textarea { width: 100%; flex-grow: 1; border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.5rem; font-size: 0.875rem; background-color: #ffffff; resize: none; overflow-y: auto; font-family: sans-serif; } #export-reference-btn.unsaved-changes { background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; animation: pulse-yellow 1.5s infinite; } #reference-details-container > div { padding: 0.5rem; } #reference-details-container > div:not(:last-child) { border-bottom: 1px solid #e5e7eb; } #element-ref-name-input { width: 100%; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem; font-family: monospace; } #reference-attribute-description-area { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0.5rem; } #attribute-description-textarea { width: 100%; flex-grow: 1; border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.5rem; font-size: 0.875rem; background-color: #f3f4f6; resize: none; overflow-y: auto; font-family: sans-serif; } #attribute-description-textarea:not([readonly]) { background-color: #ffffff; } #override-attribute-description-btn { padding: 0; width: 1.5rem; height: 1.5rem; font-size: 0.9rem; } #reference-element-list li, #reference-attribute-list li, #param-list li, #attribute-editor-list li { position: relative; } #reference-element-list li:not(.element-category-header):hover .delete-item-btn, #reference-attribute-list li:not(.attribute-category-header):hover .delete-item-btn, #param-list li:not(.text-gray-500):hover .delete-param-item-btn, #attribute-editor-list li:not(.attribute-category-header):hover .delete-item-btn { display: inline-flex; } .delete-item-btn, .delete-param-item-btn { display: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #ef4444; cursor: pointer; padding: 0 2px; font-size: 1em; line-height: 1; opacity: 0.7; transition: opacity 0.2s; z-index: 2; } .delete-item-btn:hover, .delete-param-item-btn:hover { opacity: 1; color: #dc2626; }
+#param-reference-modal #param-reference-content { display: flex; flex-grow: 1; overflow: hidden; padding: 0.5rem; } #param-columns-container { display: flex; flex-grow: 1; min-height: 0; } #param-list-container { flex-basis: 40%; display: flex; flex-direction: column; border-right: 1px solid rgba(0,0,0,0.1); padding: 0; overflow: hidden; } #param-details-container { flex-basis: 60%; display: flex; flex-direction: column; padding: 0.75rem; overflow-y: auto; } #param-category-controls { flex-shrink: 0; padding: 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid #e5e7eb; } #param-list { list-style: none; padding: 0 0.5rem 0.5rem 0.5rem; margin: 0; flex-grow: 1; overflow-y: auto; } #param-list li { padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 0.25rem; margin-bottom: 1px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; line-height: 1.3; } #param-list li:hover { background-color: #f3f4f6; } #param-list li.selected { background-color: #dbeafe; font-weight: 500; } #param-details-container label { display: block; margin-bottom: 0.1rem; font-size: 0.75rem; font-weight: 500; color: #4b5563; } #param-details-container input[type="text"], #param-details-container select { border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.25rem 0.5rem; width: 100%; font-size: 0.875rem; } #param-description-textarea { min-height: 80px; } #param-details-container .param-detail-actions { margin-top: auto; padding-top: 0.5rem; flex-shrink: 0; } #param-id-input.bg-gray-100 { background-color: #f3f4f6; color: #6b7280; cursor: not-allowed; } #param-id-input.border-red-500 { border-color: #ef4444; } #export-param-ref-btn.unsaved-changes { background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; animation: pulse-yellow 1.5s infinite; }
+#attribute-editor-modal .modal-content-container { background-color: #ffffff; border-radius: 0.5rem; } #attribute-editor-list { list-style: none; padding: 0.25rem; margin: 0; flex-grow: 1; overflow-y: auto; space-y-1: 0; font-size: 0.8rem; background-color: #f9fafb; border-radius: 0.25rem; border: 1px solid #e5e7eb; } #attribute-editor-list li { padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 0.25rem; margin-bottom: 1px; display: flex; justify-content: space-between; align-items: center; } #attribute-editor-list li:hover { background-color: #f3f4f6; } #attribute-editor-list li.selected { background-color: #e0e7ff; font-weight: 500; } #attribute-editor-list li.common-attribute span::after { content: '(common)'; font-size: 0.8em; color: #6b7280; margin-left: 0.5em; } #attribute-editor-list .attribute-category-header { background-color: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.05); }
+#element-editor-modal .modal-content-container { background-color: #ffffff; } #element-editor-modal .modal-content-container > div:nth-child(2) { padding: 1rem; overflow-y: auto; } #element-editor-modal label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.875rem; } #element-editor-modal input[type="text"], #element-editor-modal select, #element-editor-modal textarea { border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.25rem 0.5rem; width: 100%; font-size: 0.875rem; } #element-editor-modal textarea { min-height: 60px; } #element-editor-modal input[type="checkbox"] { margin-right: 0.5rem; width: 1rem; height: 1rem; } #element-editor-modal .p-3 { padding: 0.75rem; } #element-editor-modal .text-xs { font-size: 0.75rem; } #element-editor-modal .text-gray-500 { color: #6b7280; } #element-editor-modal .font-mono { font-family: monospace; }
+
+/* XML Editor Styles */
+#xml-editor-modal .modal-content-container { background-color: #ffffff; }
+
+.xml-highlight-overlay-instance {
+    z-index: 3 !important;
+    pointer-events: none;
+    user-select: none;
+    overflow: auto;
+    color: #333;
+    background-color: transparent;
+}
+.xml-highlight-overlay-instance::-webkit-scrollbar { display: none; }
+.xml-highlight-overlay-instance { -ms-overflow-style: none; scrollbar-width: none; }
+
+.xml-highlight-overlay-instance .hl-tag { color: #1e40af; }
+.xml-highlight-overlay-instance .hl-known-tag { font-weight: bold; }
+.xml-highlight-overlay-instance .hl-attr-name { color: #991b1b; }
+.xml-highlight-overlay-instance .hl-known-attr-name { font-weight: bold; }
+.xml-highlight-overlay-instance .hl-attr-value { color: #065f46; }
+.xml-highlight-overlay-instance .hl-filepath,
+.hl-color-box-wrapper,
+.hl-color-rgb-warning-box {
+    position: relative;
+    pointer-events: auto;
+}
+.xml-highlight-overlay-instance .hl-filepath { color: #2563eb; text-decoration: underline; }
+.xml-highlight-overlay-instance .hl-filepath:hover { color: #1d4ed8; }
+.hl-color-box-wrapper { display: inline; vertical-align: baseline; padding: 0; margin: 0; line-height: inherit; }
+.hl-color-box-wrapper::before { content: ''; position: absolute; left: -1px; right: -1px; top: -1px; bottom: -1px; background-color: var(--box-bg-color, transparent); border-radius: 4px; z-index: -2; transition: opacity 0.3s ease-in-out; }
+.hl-color-box-wrapper::after { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; border: 2px solid var(--box-border-color, transparent); border-radius: 4px; z-index: -1; transition: opacity 0.3s ease-in-out; }
+.hl-color-box-wrapper.color-text-focused::before,
+.hl-color-box-wrapper.color-text-focused::after { opacity: 0.2; }
+.hl-color-rgba-text { text-decoration: underline; text-decoration-style: solid; text-decoration-color: currentColor; padding: 0px; position: relative; z-index: 0; }
+.hl-color-rgb-warning-box { display: inline; vertical-align: baseline; padding: 0; margin: 0; line-height: inherit; }
+.hl-color-rgb-warning-box::before { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; background-image: var(--box-bg-image-warning, repeating-linear-gradient( 45deg, rgba(255, 192, 203, 0.5), rgba(255, 192, 203, 0.5) 4px, rgba(255, 192, 203, 0.3) 4px, rgba(255, 192, 203, 0.3) 8px )); border-radius: 4px; z-index: -2; transition: opacity 0.3s ease-in-out; }
+.hl-color-rgb-warning-box::after { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; border: 2px solid var(--box-border-color-warning, red); border-radius: 4px; z-index: -1; transition: opacity 0.3s ease-in-out; }
+.hl-color-rgb-warning-box.color-text-focused::before,
+.hl-color-rgb-warning-box.color-text-focused::after { opacity: 0.2; }
+.hl-color-rgb-warning-text { color: #000000 !important; font-style: italic; text-decoration: underline; text-decoration-style: solid; text-decoration-color: #cc0000; padding: 0px; position: relative; z-index: 0; }
+.xml-highlight-overlay-instance .hl-param-value { font-weight: bold; color: #6d28d9; }
+.xml-highlight-overlay-instance .hl-comment { color: #6b7280; font-style: italic; }
+.icon-action-trigger { display: flex; align-items: center; justify-content: center; position: absolute; top: -10px; right: -5px; width: 16px; height: 16px; background-color: rgba(229, 231, 235, 0.85); border: 1px solid rgba(156, 163, 175, 0.7); border-radius: 50%; cursor: pointer; z-index: 10; opacity: 0; transform: scale(0.3) translate(50%, -50%); transform-origin: center; pointer-events: none; transition: opacity 0.15s ease-out, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1); }
+.icon-action-trigger.visible { opacity: 1; transform: scale(1) translate(0, 0); pointer-events: auto; }
+.icon-action-trigger:hover { background-color: rgba(209, 213, 219, 0.95); border-color: rgba(107, 114, 128, 0.9); }
+.icon-action-trigger svg { width: 10px; height: 10px; stroke: #1f2937; fill: none; display: block; }
+#xml-editor-textarea-container { border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; background-color: #ffffff; position: relative; overflow: hidden; flex-grow: 1; display: flex; }
+#xml-editor-line-numbers { flex-shrink: 0; min-width: 40px; height: 100%; background-color: #f3f4f6; color: #6b7280; padding: 8px 4px 15px 8px; text-align: right; overflow: hidden !important; user-select: none; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; font-size: 13px !important; line-height: 21px !important; box-sizing: border-box; border-right: 1px solid #d1d5db; position: relative; white-space: pre; }
+#xml-editor-line-numbers .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; }
+#xml-editor-textarea-container > .xml-text-wrapper { flex-grow: 1; height: 100%; overflow: hidden; position: relative; min-width: 0; }
+#xml-editor-textarea, .xml-highlight-overlay-instance { position: absolute; top: 0; left: 0; width: 100%; height: 100%; margin: 0; border: 0; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; font-size: 13px !important; line-height: 21px !important; padding: 8px 8px 15px 8px; box-sizing: border-box; tab-size: 4; -moz-tab-size: 4; white-space: pre; overflow: auto; }
+#xml-editor-textarea { z-index: 2; color: transparent; caret-color: #333; background-color: transparent; pointer-events: auto !important; user-select: text !important; resize: none; outline: none; }
+#xml-editor-buttons button { cursor: pointer; }
+#xml-editor-status-bar { user-select: none; display: flex; align-items: center; flex-wrap: nowrap; }
+#xml-editor-status-bar .status-warning { color: red; font-weight: bold; margin-left: 8px; white-space: nowrap; }
+#xml-editor-status-bar .original-status { white-space: nowrap; }
+#xml-editor-status-bar .status-color-hover-info { color: #1d4ed8; font-style: italic; margin-left: 8px; white-space: nowrap; }
+#close-xml-editor-btn { cursor: pointer; }
+#insert-element-xml-btn { margin-left: 0.5rem; }
+#copy-xml-content-btn { position: absolute; top: 10px; right: 25px; padding: 0.25rem; border: none; background-color: transparent; color: #4B5563; border-radius: 0.25rem; cursor: pointer; z-index: 4; opacity: 0.6; transition: opacity 0.2s, background-color 0.2s, color 0.2s; }
+#copy-xml-content-btn:hover { opacity: 1; background-color: rgba(209, 213, 219, 0.7); color: #1F2937; }
+#copy-xml-content-btn i.iconoir-copy { display: block; font-size: 1.25rem; }
+#xml-editor-resize-handle { position: absolute; bottom: 0px; right: 0px; width: 16px; height: 16px; cursor: se-resize; z-index: 5; }
+#xml-insert-element-modal .modal-content-container { background-color: #ffffff; border-radius: 0.5rem; max-width: 24rem; width: 90%; height: auto; max-height: 60vh;} #xml-insert-element-list { list-style: none; padding: 0.5rem; margin: 0; font-size: 0.8rem; } #xml-insert-element-list li { padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 0.25rem; } #xml-insert-element-list li:hover { background-color: #f3f4f6; } #xml-insert-element-list .element-category-header { font-size: 0.7rem; font-weight: 700; color: #374151; background-color: rgba(0,0,0,0.04); padding: 0.2rem 0.5rem; margin-top: 0.6rem; margin-bottom: 0.3rem; border-top: 1px solid rgba(0,0,0,0.08); border-bottom: 1px solid rgba(0,0,0,0.08); cursor: default; text-transform: uppercase; letter-spacing: 0.05em; } #xml-insert-element-list .element-category-header:first-child { margin-top: 0; border-top: none; }
+#xml-editor-status-bar { user-select: none; display: flex; align-items: center; flex-wrap: nowrap; justify-content: space-between; gap: 8px; padding: 2px 8px; min-height: 24px; }
+#xml-editor-status-bar > div { display: flex; align-items: center; gap: 8px; }
+#xml-editor-status-bar .status-left { flex-shrink: 0; }
+#xml-editor-status-bar .status-center { flex-grow: 1; min-width: 0; overflow: hidden; text-align: left; }
+#xml-editor-status-bar .status-right { flex-shrink: 0; }
+#xml-editor-status-bar .original-status { white-space: nowrap; color: #6b7280; flex-shrink: 0; }
+#xml-editor-status-bar .status-separator { color: #cbd5e1; margin: 0 4px; flex-shrink: 0; }
+#xml-editor-status-bar .status-description { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #374151; font-style: italic; flex-grow: 1; min-width: 50px; }
+#xml-editor-status-bar .status-warning { color: #ef4444; font-weight: bold; white-space: nowrap; flex-shrink: 0; }
+#debug-overlay { position: fixed; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px; font-size: 10px; font-family: monospace; border-radius: 3px; z-index: 8000; pointer-events: none; white-space: pre; } .debug-highlight { outline: 1px dashed red; outline-offset: -1px; }
+
+/* GUI Element Base Styles */
+.gui-element { position: absolute; box-sizing: border-box; overflow: hidden; }
+.gui-knob-container { overflow: visible !important; }
+
+/* Specific Element Styles */
+.gui-staticimage { image-rendering: pixelated; display: block; }
+.gui-statictext { padding: 0 2px; white-space: nowrap; text-overflow: ellipsis; }
+.gui-rect, .gui-rounded-rect { }
+.gui-optionmenu { font-size: 11px; background-color: #eee; color: #333; cursor: pointer; z-index: 20; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none; }
+.gui-optionmenu option { background-color: #fff; color: #000; text-align: left; }
+.gui-option-disabled { font-weight: bold; color: #666; background-color: #ddd; }
+.gui-error-placeholder { z-index: 100; }
+.gui-visibility-container { position: absolute; overflow: visible; }
+.gui-view-container { position: absolute; overflow: hidden; background-color: transparent; /* Ensure view containers are transparent for "cut-out" */ }
+.gui-onoff-button { cursor: pointer; border: 1px solid #888; background-color: #ccc; transition: background-color 0.2s ease; text-indent: -9999px; color: transparent; font-size: 1px; }
+.gui-onoff-button:hover { border-color: #555; }
+.gui-onoff-button.active { background-color: #60a5fa; border-color: #3b82f6; }
+.gui-slider-container { background-color: rgba(35,35,35,0); overflow: hidden; }
+.gui-slider-knob { position: absolute; background-color: #696969; cursor: grab; display: flex; align-items: center; justify-content: center; }
+.gui-slider-knob.dragging { cursor: grabbing; }
+.slider-value-text { color: #fff; font-size: 9px; font-family: sans-serif; user-select: none; pointer-events: none; }
+.slider-value-text.slider-value-hidden { display: none; }
+.slider-value-input { position: absolute; width: 90%; height: 80%; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1; border: 1px solid #ccc; border-radius: 2px; font-size: 10px; padding: 0; box-sizing: border-box; }
+.knob-container { position: absolute; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; cursor: grab; transform-origin: center center; overflow: visible !important; } .knob-container:active { cursor: grabbing; } .knob-container.centered { transform: scale(6); z-index: 100 !important; box-shadow: 0 0 15px rgba(0,0,0,0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%; } .knob-label { position: absolute; display: flex; justify-content: left; align-items: center; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 10; font-size: 10px; color: #fff; } .knob-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; } .knob-svg circle[data-original-fill], .knob-svg path[data-original-stroke], .knob-svg rect[data-original-fill] { transition: fill 0.1s ease-in-out, stroke 0.1s ease-in-out; }
+.gui-popup-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 500; pointer-events: none; } .gui-splash { position: absolute; z-index: 501; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: auto; } .gui-splash .gui-staticimage { position: relative !important; left: auto !important; top: auto !important; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+#toast-container { z-index: 7000; position: fixed; bottom: 1rem; left: 1rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; pointer-events: none; } .toast-notification { position: relative; padding: 0.75rem 2rem 0.75rem 1.25rem; border-radius: 0.375rem; color: white; font-size: 0.875rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); opacity: 1; transition: opacity 0.5s ease-out; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; pointer-events: auto; max-width: 300px; word-wrap: break-word; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; } .toast-notification.info { background-color: rgba(59, 130, 246, 0.85); } .toast-notification.error { background-color: rgba(239, 68, 68, 0.85); } .toast-notification.warn { background-color: rgba(245, 158, 11, 0.85); } .toast-notification.fade-out { opacity: 0; } .toast-close-btn { position: absolute; top: 0.3rem; right: 0.3rem; width: 1.2rem; height: 1.2rem; background-color: rgba(0, 0, 0, 0.2); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; padding: 0; font-weight: bold; transition: background-color 0.2s; } .toast-close-btn:hover { background-color: rgba(0, 0, 0, 0.4); }
+#dynamic-styles { /* Placeholder for GUI styles generated by guiBuilder.js */ }
+@keyframes flash-border { 0%, 100% { box-shadow: 0 5px 15px rgba(0,0,0,0.3), 0 0 0 0px rgba(0, 0, 0, 0.4); } 10%, 30%, 50%, 70%, 90% { box-shadow: 0 5px 15px rgba(0,0,0,0.3), 0 0 0 3px rgba(0, 0, 0, 0.7); } 20%, 40%, 60%, 80% { box-shadow: 0 5px 15px rgba(0,0,0,0.3), 0 0 0 0px rgba(0, 0, 0, 0.4); } }
+.modal-flash .modal-content-container { animation: flash-border 0.5s ease-out forwards; }
+.gui-scrollview-pagecontroller { gap: 5px; } .scroll-page-button { } .scroll-page-button:hover img { filter: brightness(1.1); } .scroll-page-button:active img { filter: brightness(0.9); } .scroll-page-name-display { cursor: default; padding: 0 5px; }
+.scroll-page-name-select { background-color: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 20px 2px 5px; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 5px center; background-size: 8px 8px; }
+.scroll-page-name-select:focus { outline: 1px solid #3b82f6; border-color: #3b82f6; } .scroll-page-circle-edit { }
+.gui-presetmenu { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; }
+.preset-menu-button { width: 16px; height: 16px; flex-shrink: 0; border: none; background-color: transparent; background-repeat: no-repeat; cursor: pointer; padding: 0; background-size: 100% 200%; background-position: center 100%; transition: background-position 0.1s ease-in-out; font-size: 0; line-height: 0; }
+.preset-menu-button:hover { background-position: center 0%; }
+.preset-menu-label { flex-grow: 1; flex-shrink: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+.gui-keyboard-container { position: relative; }
+.gui-key { position: absolute; image-rendering: pixelated; }
+.gui-key-inactive-overlay { pointer-events: none; }
+
+/* === Updated TabView Styles Start === */
+.gui-tabview-container {
+    display: flex;
+    position: relative; /* Establishes stacking context for z-indexed children */
+    z-index: 1;       /* Default stacking for the whole TabView, can be adjusted if it conflicts with other main GUI elements */
+    overflow: hidden;   /* Should clip anything trying to escape its bounds */
+}
+
+/* Core TabView Layout based on tab position */
+.gui-tabview-container.tab-position-top,
+.gui-tabview-container.tab-position-bottom {
+    flex-direction: column;
+}
+
+.gui-tabview-container.tab-position-left,
+.gui-tabview-container.tab-position-right {
+    flex-direction: row;
+}
+
+.gui-tab-bar {
+    display: flex;     /* Lays out tab buttons */
+    flex-shrink: 0;    /* Prevent tab bar from shrinking */
+    position: relative;  /* For z-index to work correctly against pane-content-area */
+    z-index: 10;       /* Tab bar should be visually on top of the pane content area */
+}
+
+/* Adjust how buttons are laid out within the tab bar itself */
+.gui-tabview-container.tab-position-top .gui-tab-bar,
+.gui-tabview-container.tab-position-bottom .gui-tab-bar {
+    flex-direction: row; /* Buttons run horizontally */
+    width: 100%;
+}
+.gui-tabview-container.tab-position-left .gui-tab-bar,
+.gui-tabview-container.tab-position-right .gui-tab-bar {
+    flex-direction: column; /* Buttons run vertically */
+    height: 100%;
+}
+
+.gui-tab-button {
+    cursor: pointer;
+    border: none; 
+    background-color: transparent; /* Tabs are often image-based or rely on XML styling */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative; /* For image sprites or complex content */
+    user-select: none;
+    line-height: normal;
+    box-sizing: border-box;
+}
+.gui-tab-button .gui-tab-label {
+    pointer-events: none;
+    white-space: nowrap;
+    display: inline-block;
+    color: inherit; /* Color will be set by JS from XML */
+}
+
+.gui-pane-content-area {
+    flex-grow: 1;     /* Crucial: Takes up available space not used by tab bar */
+    position: relative; /* Establishes stacking context for individual pane items */
+    overflow: hidden;   /* Clip content if GUIMacro elements try to go outside */
+    background-color: transparent !important; /* ESSENTIAL for the "cut-out hole" effect */
+    z-index: 1;         /* Positioned below the tab bar */
+}
+
+.gui-pane-content-item { /* This is the div that gets display:block/none */
+    width: 100%;
+    height: 100%;
+    overflow: hidden;   /* Changed from auto to hidden to remove scrollbars on panes */
+    box-sizing: border-box;
+    position: absolute; /* Positioned within .gui-pane-content-area */
+    top: 0;
+    left: 0;
+    background-color: transparent !important; /* ESSENTIAL: must be transparent */
+}
+/* === End Updated TabView Styles === */
+
+/* Style for active editor modal (optional, for visual distinction) */
+.modal-overlay .modal-content-container.active-editor-modal {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3), 0 0 0 2px #3b82f6;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+    width: 10px; /* Width of vertical scrollbar */
+    height: 10px; /* Height of horizontal scrollbar */
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1); /* Track color */
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3); /* Thumb color */
+    border-radius: 5px;
+    border: 2px solid transparent; /* Creates padding around thumb */
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5); /* Thumb color on hover */
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-track:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+::-webkit-scrollbar-corner {
+    background: rgba(0, 0, 0, 0.05); /* Color of the bottom-right corner */
+}
+
+/* For Firefox */
+* {
+    scrollbar-width: thin; /* "auto" or "thin" */
+    scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1); /* thumb and track color */
+}
+
+
+/* Animation for unsaved changes indication */
+@keyframes pulse-yellow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.4); } /* yellow-300 with opacity */
+  50% { box-shadow: 0 0 0 4px rgba(252, 211, 77, 0); }
+}
+
+/* Real VST UI Simulation Layer: Prevents browser text selections and text I-beam cursors over layout objects */
+#skin-container-actual {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    cursor: default;
+}
+
+#skin-container-actual * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Explicit fallback to ensure static text elements always maintain standard arrow behavior */
+#skin-container-actual .gui-statictext,
+#skin-container-actual text {
+    cursor: default;
+}
+
+/* High-Fidelity VCR Analog Tracking Glitch System */
+@keyframes vcrTapeTrackingGlitch {
+    0%, 14.9%, 39.9%, 54.9%, 74.9%, 87.9%, 100% {
+        transform: translate(0, 0) skewX(0deg) scaleY(1);
+        filter: blur(0px) contrast(1) brightness(1);
+        text-shadow: 3px 3px 0px rgba(0,0,0,1);
+    }
+    /* Burst Wave 1: Intense Horizontal Tearing & Chromatic Offsets */
+    2% {
+        transform: translate(-6px, 1px) skewX(22deg) scaleY(1.2);
+        filter: blur(1.5px) contrast(3) brightness(1.4);
+        text-shadow: -4px -1px 0 #ff003c, 4px 2px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    5% {
+        transform: translate(5px, -3px) skewX(-18deg) scaleY(0.8);
+        filter: blur(0.5px) contrast(1.8) brightness(1.1);
+        text-shadow: 5px 3px 0 #ff003c, -5px -2px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    9% {
+        transform: translate(-2px, 4px) skewX(30deg) scaleY(1.4);
+        filter: blur(2px) contrast(3.5) brightness(1.7);
+        text-shadow: -8px 0 0 #ff003c, 8px -1px 0 #00f0ff, 4px 4px 0 rgba(0,0,0,1);
+    }
+    12% {
+        transform: translate(7px, -2px) skewX(-28deg) scaleY(0.7);
+        filter: blur(3px) contrast(0.5) brightness(0.8);
+        text-shadow: 7px -4px 0 #ff003c, -7px 4px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    /* Burst Wave 2: Bad Tracking Horizontal Slip */
+    42% {
+        transform: translate(-5px, -2px) skewX(-25deg) scaleY(1.25);
+        filter: blur(1px) contrast(2.2) brightness(1.5);
+        text-shadow: -6px 4px 0 #ff003c, 6px -3px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    48% {
+        transform: translate(6px, 3px) skewX(24deg) scaleY(0.75);
+        filter: blur(0px) contrast(4) brightness(1.3);
+        text-shadow: 5px -2px 0 #ff003c, -5px 4px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    /* Burst Wave 3: VCR V-Sync Hop & Sharp Noise Bloom */
+    78% {
+        transform: translate(8px, -4px) skewX(35deg) scaleY(1.5);
+        filter: blur(2.5px) contrast(2) brightness(1.6);
+        text-shadow: -9px -2px 0 #ff003c, 9px 2px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+    83% {
+        transform: translate(-7px, 5px) skewX(-32deg) scaleY(0.65);
+        filter: blur(0.5px) contrast(4.5) brightness(1.8);
+        text-shadow: 7px 5px 0 #ff003c, -7px -5px 0 #00f0ff, 3px 3px 0px rgba(0,0,0,1);
+    }
+}
+
+.logo-glitch-active {
+    animation: vcrTapeTrackingGlitch 1.5s linear forwards !important;
+}
+
+/* Chromatic Aberration Text Glitch Animation */
+@keyframes cyberGlitch {
+    0%, 100% {
+        transform: translate(0);
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    5% {
+        transform: translate(-3px, 2px) skewX(6deg);
+        text-shadow: 3px 0 #ff0055, -3px 0 #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    10% {
+        transform: translate(2px, -1px) skewX(-8deg);
+        text-shadow: -3px 0 #ff0055, 3px 0 #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    15% {
+        transform: translate(0);
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    20% {
+        transform: translate(-1px, -2px);
+        text-shadow: 2px -2px #ff0055, -2px 2px #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    25% {
+        transform: translate(3px, 1px) skewX(12deg);
+        text-shadow: -4px 0 #ff0055, 4px 0 #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    30% {
+        transform: translate(0);
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    45% {
+        transform: translate(-2px, 2px) skewX(-4deg);
+        text-shadow: 4px 0 #ff0055, -2px 0 #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    50% {
+        transform: translate(1px, -2px);
+        text-shadow: -2px 0 #ff0055, 2px 0 #3b82f6, 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+    55% {
+        transform: translate(0);
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 1);
+    }
+}
+
+.logo-glitch-active {
+    animation: cyberGlitch 1.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+}
+
+/* Sidebar Vertically Shrunken Initial State */
+#sidebar {
+    transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+#sidebar.initial-condensed {
+    top: calc(100vh - 1rem - 44px) !important; /* Collapses the top edge down to only show the bottom row */
+    overflow: hidden !important;
+}
+
+/* Hide all upper content elements when the sidebar is shrunken */
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+/* Clear borders and padding handles for clean layout alignment when shrunken */
+#sidebar.initial-condensed #sidebar-controls {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+}
+
+/* Hide auxiliary icons next to the open button until the sidebar expands */
+#sidebar.initial-condensed .flex.justify-between > div:not(.load-button-area) {
+    display: none !important;
+}
+
+/* Sidebar Shrunken Bottom Right Layout System */
+#sidebar {
+    transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+#sidebar.initial-condensed {
+    top: calc(100vh - 1rem - 56px) !important; /* Shrunk flat to fit just the layout button height */
+    bottom: 1rem !important;
+    right: 1rem !important;
+    width: 320px !important; /* Keep original fixed sidebar width and position */
+    border-radius: 0.5rem !important;
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.15) !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Hide all other sidebar content views when collapsed */
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+/* Re-route layout panels into a centered grid container for the button */
+#sidebar.initial-condensed .sidebar-content-wrapper,
+#sidebar.initial-condensed #sidebar-controls,
+#sidebar.initial-condensed .flex.justify-between {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+/* Hide auxiliary action buttons next to the open folder button when shrunken */
+#sidebar.initial-condensed .flex.justify-between > div:not(.load-button-area) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .load-button-area {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-grow: 1 !important;
+}
+
+/* Center the original rectangular button exactly within the 320px shrunken block */
+#sidebar.initial-condensed #load-folder-button {
+    flex-grow: 0 !important;
+    width: auto !important;
+    min-width: 90px !important;
+    margin: 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Sidebar Shrunken Bottom-Right Layout System */
+#sidebar {
+    transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+#sidebar.initial-condensed {
+    top: calc(100vh - 1rem - 54px) !important; /* Fold flat down to just enclose the button height */
+    bottom: 1rem !important;
+    right: 1rem !important;
+    width: 320px !important; /* Maintain original fixed width in place */
+    border-radius: 0.5rem !important;
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.15) !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Hide all other sections in the shrunken state */
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+/* Align layout wrappers into a centered grid space for the button */
+#sidebar.initial-condensed .sidebar-content-wrapper,
+#sidebar.initial-condensed #sidebar-controls,
+#sidebar.initial-condensed .flex.justify-between {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+/* Hide secondary buttons next to the open folder button when shrunken */
+#sidebar.initial-condensed .flex.justify-between > div:not(.load-button-area) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .load-button-area {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-grow: 1 !important;
+}
+
+/* Center the original sidebar button exactly without modifying its padding or border radius */
+#sidebar.initial-condensed #load-folder-button {
+    flex-grow: 0 !important;
+    width: auto !important;
+    min-width: 90px !important;
+    margin: 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Sidebar Shrunken Bottom Right Layout System */
+#sidebar {
+    transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                width 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                background-color 0.3s ease !important;
+}
+
+#sidebar.initial-condensed {
+    top: calc(100vh - 1rem - 54px) !important;
+    bottom: 1rem !important;
+    right: 1rem !important;
+    width: 320px !important; /* Kept at standard width docked on the right side */
+    border-radius: 0.5rem !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Hide everything except the bottom container controls when shrunken */
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .sidebar-content-wrapper,
+#sidebar.initial-condensed #sidebar-controls,
+#sidebar.initial-condensed .flex.justify-between {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+/* Hide supplementary sidebar buttons inside the row when shrunken */
+#sidebar.initial-condensed .flex.justify-between > div:not(.load-button-area) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .load-button-area {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-grow: 1 !important;
+}
+
+/* Keep the open button its exact design proportions while centered inside the shrunken area */
+#sidebar.initial-condensed #load-folder-button {
+    flex-grow: 0 !important;
+    width: auto !important;
+    min-width: 90px !important;
+    height: 2.2rem !important;
+    margin: 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Sidebar Shrunken Corner Layout System */
+#sidebar {
+    transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                width 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                background-color 0.3s ease !important;
+}
+
+#sidebar.initial-condensed {
+    top: calc(100vh - 1rem - 54px) !important;
+    bottom: 1rem !important;
+    right: 1rem !important;
+    width: 120px !important;
+    border-radius: 0.5rem !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+/* Hide everything except the bottom folder button container when shrunken */
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .sidebar-content-wrapper,
+#sidebar.initial-condensed #sidebar-controls,
+#sidebar.initial-condensed .flex.justify-between {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+}
+
+/* Hide other control utilities next to the open button when shrunken */
+#sidebar.initial-condensed .flex.justify-between > div:not(.load-button-area) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .load-button-area {
+    width: auto !important;
+    flex-grow: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure the open button retains its exact design proportions while centered */
+#sidebar.initial-condensed #load-folder-button {
+    flex-grow: 0 !important;
+    width: auto !important;
+    min-width: 84px !important;
+    height: 2rem !important;
+    margin: 0 !important;
+}
+
+/* Sidebar Initial Condensed Floating Layout System */
+#sidebar {
+    transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+#sidebar.initial-condensed {
+    top: auto !important;
+    bottom: 2.5rem !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: 200px !important;
+    height: 54px !important;
+    border-radius: 27px !important;
+    background-color: #1f2937 !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#sidebar.initial-condensed #sidebar-header,
+#sidebar.initial-condensed #skin-selector-container,
+#sidebar.initial-condensed #file-browser-container,
+#sidebar.initial-condensed #preview-area-container,
+#sidebar.initial-condensed #sidebar-controls > div:not(.flex.justify-between) {
+    display: none !important;
+}
+
+#sidebar.initial-condensed #sidebar-controls {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#sidebar.initial-condensed .sidebar-content-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+#sidebar.initial-condensed .flex.justify-between {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+#sidebar.initial-condensed .flex-shrink-0 {
+    display: none !important;
+}
+
+#sidebar.initial-condensed .load-button-area {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#sidebar.initial-condensed #load-folder-button {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 27px !important;
+    margin: 0 !important;
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    font-size: 1rem !important;
+    border: none !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
+    transition: background-color 0.2s ease !important;
+}
+
+#sidebar.initial-condensed #load-folder-button:hover {
+    background-color: #2563eb !important;
+}
+
+/* Disclaimer Splash Screen Blur Dissolve Animation */
+@keyframes blurToNothing {
+    0% {
+        opacity: 1;
+        filter: blur(0px);
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(25px);
+        transform: scale(1.04);
+    }
+}
+
+.dissolve-blur-active {
+    animation: blurToNothing 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Blur Dissolve Animation */
+@keyframes blurToNothing {
+    0% {
+        opacity: 1;
+        filter: blur(0px);
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(25px);
+        transform: scale(1.04);
+    }
+}
+
+.dissolve-blur-active {
+    animation: blurToNothing 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Blur Dissolve Animation */
+@keyframes blurToNothing {
+    0% {
+        opacity: 1;
+        filter: blur(0px);
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(25px);
+        transform: scale(1.04);
+    }
+}
+
+.dissolve-blur-active {
+    animation: blurToNothing 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Blur Dissolve Animation */
+@keyframes blurToNothing {
+    0% {
+        opacity: 1;
+        filter: blur(0px);
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(25px);
+        transform: scale(1.04);
+    }
+}
+
+.dissolve-blur-active {
+    animation: blurToNothing 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Thanos Snap Disintegration Ash System */
+.thanos-dust {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    z-index: 10000;
+    will-change: transform, opacity;
+    animation: thanosDrift var(--duration) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes thanosDrift {
+    0% {
+        transform: translate(0, 0) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(0) rotate(var(--rot));
+        opacity: 0;
+    }
+}
+
+.thanos-snap-active {
+    pointer-events: none !important;
+    animation: thanosWipe 0.9s linear forwards !important;
+}
+
+@keyframes thanosWipe {
+    0% {
+        clip-path: inset(0 0 0 0);
+        opacity: 1;
+    }
+    100% {
+        clip-path: inset(0 0 0 100%);
+        opacity: 0;
+    }
+}
+
+/* Thanos Snap Disintegration Ash System */
+.thanos-dust {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    z-index: 10000;
+    will-change: transform, opacity;
+    animation: thanosDrift var(--duration) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes thanosDrift {
+    0% {
+        transform: translate(0, 0) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(0) rotate(var(--rot));
+        opacity: 0;
+    }
+}
+
+.thanos-snap-active {
+    pointer-events: none !important;
+    animation: thanosWipe 0.9s linear forwards !important;
+}
+
+@keyframes thanosWipe {
+    0% {
+        clip-path: inset(0 0 0 0);
+        opacity: 1;
+    }
+    100% {
+        clip-path: inset(0 0 0 100%);
+        opacity: 0;
+    }
+}
+
+/* Disclaimer Splash Screen Particle Dissolution System */
+.disclaimer-particle {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa, #93c5fd);
+    z-index: 9999;
+    will-change: transform, opacity;
+    animation: particleEvaporate 1.4s cubic-bezier(0.1, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes particleEvaporate {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+        filter: blur(0px);
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(var(--size-factor, 0));
+        opacity: 0;
+        filter: blur(5px);
+    }
+}
+
+@keyframes modalFadeCollapse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.96);
+        filter: blur(12px);
+    }
+}
+
+.dissolve-particles-active {
+    animation: modalFadeCollapse 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Particle Dissolution System */
+.disclaimer-particle {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa, #93c5fd);
+    z-index: 9999;
+    will-change: transform, opacity;
+    animation: particleEvaporate 1.4s cubic-bezier(0.1, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes particleEvaporate {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+        filter: blur(0px);
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(var(--size-factor, 0));
+        opacity: 0;
+        filter: blur(5px);
+    }
+}
+
+@keyframes modalFadeCollapse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.96);
+        filter: blur(12px);
+    }
+}
+
+.dissolve-particles-active {
+    animation: modalFadeCollapse 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Particle Dissolution System */
+.disclaimer-particle {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa, #93c5fd);
+    z-index: 9999;
+    will-change: transform, opacity;
+    animation: particleEvaporate 1.4s cubic-bezier(0.1, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes particleEvaporate {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+        filter: blur(0px);
+    }
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(var(--size-factor, 0));
+        opacity: 0;
+        filter: blur(5px);
+    }
+}
+
+@keyframes modalFadeCollapse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.96);
+        filter: blur(12px);
+    }
+}
+
+.dissolve-particles-active {
+    animation: modalFadeCollapse 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Disclaimer Splash Screen Mist Dissolve Effect */
+@keyframes dissolveToMist {
+    0% {
+        opacity: 1;
+        filter: blur(0px) contrast(1) brightness(1);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(40px) contrast(0.1) brightness(1.8);
+        transform: scale(1.08);
+    }
+}
+
+.dissolve-mist {
+    animation: dissolveToMist 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+    pointer-events: none !important;
+}

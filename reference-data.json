@@ -1,0 +1,3379 @@
+{
+  "globalAttributes": {
+    "x": {
+      "description": "The horizontal coordinate (position) of the element's top-left corner relative to its parent container, measured in pixels from the left edge."
+    },
+    "y": {
+      "description": "The vertical coordinate (position) of the element's top-left corner relative to its parent container, measured in pixels from the top edge."
+    },
+    "w": {
+      "description": "The width of the element in pixels."
+    },
+    "h": {
+      "description": "The height of the element in pixels."
+    },
+    "style": {
+      "description": "References a named style defined in an external 'styles.xml' file or within a <Styles> tag. Applies a set of predefined visual and behavioral properties (colors, fonts, sizes, etc.) to the element. Multiple styles can sometimes be applied by separating their names with semicolons."
+    },
+    "param": {
+      "description": "The unique identifier (parameter ID) that links this UI control to a specific parameter in the underlying audio engine or plugin logic. Interaction with the control reads or modifies the value of this parameter."
+    },
+    "vmin": {
+      "description": "The minimum value allowed or represented by the control/parameter."
+    },
+    "vmax": {
+      "description": "The maximum value allowed or represented by the control/parameter."
+    },
+    "vdefault": {
+      "description": "The default value for the control/parameter. Used for initialization or reset actions."
+    },
+    "path": {
+      "description": "Specifies a file path, typically relative to the main GUI definition file. Used for loading external resources like style sheets, included GUI layouts, or macro definitions."
+    },
+    "text": {
+      "description": "The static text content to be displayed by the element (e.g., button label, static text label)."
+    },
+    "labelText": {
+      "description": "The text label associated with a control (like a knob or slider), usually displayed near it."
+    },
+    "font": {
+      "description": "References a font alias defined in a <Font> element, specifying the typeface to use for the element's text content."
+    },
+    "font_size": {
+      "description": "Specifies the font size, either as a predefined category (e.g., 'Small', 'Normal', 'VerySmall') or potentially a numeric value. Overrides font size defined in a referenced style or global setting."
+    },
+    "color_text": {
+      "description": "Defines the color for the text displayed by the element. Overrides colors from styles or global settings."
+    },
+    "backgroundColor": {
+      "description": "Defines the background color for the element or the main GUI window. Specified in #AARRGGBB or #RRGGBB format."
+    },
+    "alignment": {
+      "description": "Specifies the horizontal alignment of text or content within the element ('left', 'center', 'right')."
+    },
+    "xoffset": {
+      "description": "A horizontal offset in pixels applied to the element or its content, relative to its standard 'x' position or the position determined by layout rules."
+    },
+    "yoffset": {
+      "description": "A vertical offset in pixels applied to the element or its content, relative to its standard 'y' position or the position determined by layout rules."
+    },
+    "param_offset": {
+      "description": "A numerical offset added to all 'param' values within an included file (via GUIContainer or GUIMacro). This allows reusing UI modules while mapping them to different parameter ranges in the audio engine."
+    },
+    "image": {
+      "description": "Specifies the path to an image file (e.g., .svg, .png) used by the element, such as a background, icon, or button state graphic."
+    },
+    "imageHL": {
+      "description": "Specifies the path to an image file used for the element's highlighted state (e.g., when hovered over or selected)."
+    },
+    "roundedRatio": {
+      "description": "Determines the roundness of corners for elements like buttons or panels. It's a ratio (0.0 to 0.5) of the smaller dimension (width or height), where 0.0 is sharp and 0.5 is fully rounded (pill shape or circle)."
+    },
+    "enabledByOnOff": {
+      "description": "A flag (0 or 1) indicating that the enabled/disabled state of this element is controlled by an associated CS01OnOffButton. If 1, this element is typically enabled only when the controlling button is 'on'."
+    },
+    "role": {
+      "description": "Assigns a specific functional role to the element within a larger component or system (e.g., 'controller', 'onOff', 'fileBrowser', 'curveParameter_0'). This role often dictates how the element interacts with code or other UI elements."
+    },
+    "controller": {
+      "description": "References the 'controller_name' of another UI element (often an OptionMenu or CS01OnOffButton). The state (value) of the referenced controller determines the visibility or availability of this element, based on the specified 'rule'."
+    },
+    "controller_name": {
+      "description": "Assigns a unique name to this element, allowing it to act as a controller for other elements. Other elements can reference this name in their 'controller' attribute."
+    },
+    "rule": {
+      "description": "Defines the comparison rule used to evaluate the state of a 'controller' element to determine this element's visibility/availability (e.g., 'eq' for equals, 'diff' for different, 'gt' for greater than, 'lt' for less than, 'visibility_diff', 'availability_diff', 'availability_eq', 'availability_lt')."
+    },
+    "rule_d1": {
+      "description": "The primary data value (often numeric) used for comparison in the 'rule'. For example, if rule='eq' and rule_d1='1', the element is affected when the controller's value is 1."
+    },
+    "command": {
+      "description": "Specifies an internal command string to be executed when the element is interacted with (e.g., button click, menu selection). Commands often trigger actions like loading files ('load:scl'), checking versions ('versioncheck_product'), changing UI states ('visibilityChangingView'), or showing licenses ('license')."
+    },
+    "data0": {
+      "description": "An optional data parameter passed along with the 'command'. Its meaning depends on the command (e.g., file type filter for 'load', target view name for 'visibilityChangingView')."
+    },
+    "data1": {
+      "description": "A second optional data parameter passed along with the 'command'. Its meaning depends on the command (e.g., dialog title for 'load', descriptive text for 'versioncheck_product')."
+    },
+    "value": {
+      "description": "Represents a value associated with the element. Its specific meaning depends heavily on the element type (e.g., the value of a global property, the value assigned to an OptionItem, the value to define for a GUIMacro variable)."
+    },
+    "name": {
+      "description": "A name identifier for the element. Its specific meaning varies: the name of a global property, the displayed text for a Pane or OptionItem, the name of a GUIMacro variable, the name of a StyleMacro or Style, the name of a CS01ViewConfiguration or CS01ViewConfigurationSet."
+    },
+    "stepped": {
+      "description": "Indicates if a control (like a knob or slider) should snap to discrete integer values (1) or allow continuous adjustment (0). Can sometimes be a specific step count."
+    },
+    "unipolar": {
+      "description": "A flag (0 or 1) for knobs/sliders. '0' typically indicates a bipolar range (e.g., -1 to 1, centered around 0), while '1' indicates a unipolar range (e.g., 0 to 1)."
+    },
+    "label_font": {
+      "description": "Specifies the font alias for the element's primary text label (distinct from value display)."
+    },
+    "value_font_size": {
+      "description": "Specifies the font size for displaying the element's current numeric value."
+    },
+    "mod_margin": {
+      "description": "The margin or padding (in pixels) around a control used for drawing the modulation range indicator."
+    },
+    "mod_fillColor": {
+      "description": "The fill color used for the visual representation of the modulation range affecting this control."
+    },
+    "wantsFocus": {
+      "description": "A flag (0 or 1) indicating whether the element can receive keyboard focus, allowing interaction via keyboard input (e.g., arrow keys for sliders/knobs)."
+    },
+    "color_back": {
+      "description": "Defines a background color, often used for the main GUI or specific containers. Can override styles."
+    },
+    "color_textHL": {
+      "description": "Defines the text color when the element is highlighted (e.g., hovered or selected)."
+    },
+    "color_back_disabled": {
+      "description": "Defines the background color when the element is disabled."
+    },
+    "color_text_disabled": {
+      "description": "Defines the text color when the element is disabled."
+    },
+    "transparent": {
+      "description": "A flag (0 or 1) indicating whether the element's background should be transparent (1) or opaque (0)."
+    },
+    "checkCurrentValue": {
+      "description": "A flag (0 or 1) for OptionMenus, likely related to ensuring the displayed selection always matches the underlying parameter value, especially after programmatic changes."
+    },
+    "knob_x": {
+      "description": "The relative x-coordinate offset of the knob graphic within the bounds of a knob or slider element."
+    },
+    "knob_y": {
+      "description": "The relative y-coordinate offset of the knob graphic within the bounds of a knob or slider element."
+    },
+    "knob_w": {
+      "description": "The width of the knob graphic itself."
+    },
+    "knob_h": {
+      "description": "The height of the knob graphic itself."
+    },
+    "label_w": {
+      "description": "The width allocated for the element's text label."
+    },
+    "label_h": {
+      "description": "The height allocated for the element's text label."
+    },
+    "label_x": {
+      "description": "The relative x-coordinate offset of the element's label text."
+    },
+    "label_y": {
+      "description": "The relative y-coordinate offset of the element's label text."
+    },
+    "valueText_format": {
+      "description": "Specifies how the numeric value of a control should be formatted for display. Can be a C-style format string (e.g., '%.1f', '%.f%%') or a predefined keyword (e.g., 'FORMAT_STEREOPAN', 'FORMAT_LINEAR2DB_CONCAVE')."
+    },
+    "factor": {
+      "description": "A multiplier applied to the raw parameter value before it's displayed, often used for scaling (e.g., factor='100' to show a 0-1 value as a percentage)."
+    },
+    "offset": {
+      "description": "An offset added to the raw parameter value before applying the 'factor' and formatting, used for adjusting the displayed range or center point."
+    },
+    "identifier": {
+      "description": "A unique string identifier for an element, primarily used by CS01ViewContainer elements to allow CS01ViewConfigurationSet to dynamically load content into them."
+    },
+    "eslot": {
+      "description": "Specifies the effect slot index (e.g., 0, 1) that this control belongs to, used when controlling parameters of insert or send effects."
+    },
+    "target": {
+      "description": "Indicates the target entity or data source for the element's action or data binding. Meaning varies: preset target for PresetMenu, data source for editors/maps, plugin identifier for commands."
+    },
+    "type": {
+      "description": "Specifies a type identifier, often related to the 'target'. Used by PresetMenu to define the preset type, or by CS01TransportButton to define its function (e.g., 'play', 'stop')."
+    },
+    "drawMode": {
+      "description": "Specifies how a graphical element (Rect, RoundedRect, Line) should be drawn, typically 'filled' or 'stroked' (outline)."
+    },
+    "fill_color": {
+      "description": "The color used to fill the shape of the element when drawMode is 'filled'."
+    },
+    "border_color": {
+      "description": "The color used for the outline of the element when drawMode is 'stroked'."
+    },
+    "frameWidth": {
+      "description": "The width (thickness) in pixels of the outline when drawMode is 'stroked'."
+    },
+    "url": {
+      "description": "A web URL associated with the element. If present, clicking the element (typically a StaticImage or StaticText) will open this URL in the default web browser."
+    },
+    "useImageSize": {
+      "description": "A flag (0 or 1) for StaticImage elements. If 1, the element dimensions are automatically set to the native size of the loaded image. If 0, dimensions must be set via 'w' and 'h' attributes."
+    },
+    "imageb": {
+      "description": "Path to a specific background image for a tab button (Pane element), often used for the first or last tab to give them unique shapes."
+    },
+    "imagebHL": {
+      "description": "Path to the highlighted version of the specific tab button background image specified by 'imageb'."
+    },
+    "close_button_tag": {
+      "description": "A numeric or string tag used to link an CS01ExpandViewButton to a corresponding CS01CloseButton (or other element acting as a closer) within the view that gets expanded. Allows the expanded view to be closed from within."
+    },
+    "expandedViewCloser": {
+      "description": "A flag (0 or 1) for CS01ExpandViewButton. If 1, clicking the button again when the associated view is already expanded will close the view."
+    },
+    "visibilityChangeName": {
+      "description": "Assigns a name to a container (usually CS01ViewContainer). Other controls (like CS01OnOffButton with a matching 'command' like 'visibilityChangingView|name') can then toggle the visibility of this container."
+    },
+    "visibilityChangeDirection": {
+      "description": "Specifies the animation direction (e.g., 'bottom', 'top') used when a container's visibility is toggled via the 'visibilityChangeName' mechanism."
+    },
+    "contextualTarget": {
+      "description": "Links a CS01ViewContainer (often holding detailed parameters) to another UI element ('identifier'). The container linked via 'contextualTarget' might only display its content when the element with the matching 'identifier' is selected or active."
+    },
+    "dropListener": {
+      "description": "Specifies the name of a listener function (defined in the plugin's code) that will handle file drop events occurring over this element. Enables drag-and-drop functionality."
+    },
+    "spring_mode": {
+      "description": "A flag (0 or 1) for sliders. If 1, the slider knob returns to its 'vdefault' position when released (like a pitch bend wheel)."
+    },
+    "enable_keys": {
+      "description": "A flag (0 or 1) indicating whether the control can be manipulated using keyboard keys (e.g., arrow keys for sliders, space bar for buttons)."
+    },
+    "enable_mousewheel": {
+      "description": "A flag (0 or 1) indicating whether the control's value can be changed using the mouse wheel."
+    },
+    "mod_knobMode": {
+      "description": "Defines how the modulation range is visually represented relative to a knob control (e.g., centered on the knob, as a separate arc)."
+    },
+    "keysMultiplier": {
+      "description": "A factor by which the value changes per key press when 'enable_keys' is active."
+    },
+    "start_key": {
+      "description": "The MIDI note number for the lowest key displayed on a CS01Keyboard element."
+    },
+    "end_key": {
+      "description": "The MIDI note number for the highest key displayed on a CS01Keyboard element."
+    },
+    "offset0": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the C key."
+    },
+    "offset1": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the D key."
+    },
+    "offset2": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the E key."
+    },
+    "offset3": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the F key."
+    },
+    "offset4": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the G key."
+    },
+    "offset5": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the A key."
+    },
+    "offset6": {
+      "description": "Internal layout offset for CS01Keyboard, likely related to the positioning of the B key."
+    },
+    "white_key_on": {
+      "description": "Path to the image file for a pressed white key on the CS01Keyboard."
+    },
+    "white_key_off": {
+      "description": "Path to the image file for an unpressed white key on the CS01Keyboard."
+    },
+    "black_key_on": {
+      "description": "Path to the image file for a pressed black key on the CS01Keyboard."
+    },
+    "black_key_off": {
+      "description": "Path to the image file for an unpressed black key on the CS01Keyboard."
+    },
+    "inactiveColor": {
+      "description": "Color overlay for keys outside the active range on the CS01Keyboard."
+    },
+    "ksActiveColor": {
+      "description": "Color indicating the active key split zone on the CS01Keyboard."
+    },
+    "ksInactiveColor": {
+      "description": "Color indicating inactive key split zones on the CS01Keyboard."
+    },
+    "entry_init": {
+      "description": "Flag (0 or 1) to include an 'Initialize' or 'Default' entry in a PresetMenu."
+    },
+    "entry_save": {
+      "description": "Flag (0 or 1) to enable the 'Save' option in a PresetMenu."
+    },
+    "entry_saveasdefault": {
+      "description": "Flag (0 or 1) to enable the 'Save as Default' option in a PresetMenu."
+    },
+    "entry_empty": {
+      "description": "Flag (0 or 1) to include an 'Empty' or 'None' option in a PresetMenu."
+    },
+    "entry_reload": {
+      "description": "Flag (0 or 1) to include a 'Reload Preset' option in a PresetMenu."
+    },
+    "entry_load": {
+      "description": "Flag (0 or 1) to enable loading presets from external files via the PresetMenu."
+    },
+    "displayCategory": {
+      "description": "Flag (0 or 1) to control whether preset categories are displayed in the PresetMenu."
+    },
+    "preventIdle": {
+      "description": "Flag (0 or 1) possibly preventing the plugin from idling during interaction with this control."
+    },
+    "rule_s1": {
+      "description": "A secondary data value (often string) used for comparison in the 'rule'."
+    },
+    "supportsMod": {
+      "description": "Flag (0 or 1) indicating if the parameter associated with this control can be targeted by modulation."
+    },
+    "mod_x": {
+      "description": "The x-offset relative to the control for drawing the modulation indicator."
+    },
+    "mod_y": {
+      "description": "The y-offset relative to the control for drawing the modulation indicator."
+    },
+    "mod_w": {
+      "description": "The width of the modulation indicator graphic."
+    },
+    "mod_h": {
+      "description": "The height of the modulation indicator graphic."
+    },
+    "mod_font": {
+      "description": "The font alias to use for any text within the modulation indicator."
+    },
+    "on_value": {
+      "description": "The specific value the control's parameter should take when in the 'on' state (used by OnOff buttons)."
+    },
+    "off_value": {
+      "description": "The specific value the control's parameter should take when in the 'off' state (used by OnOff buttons)."
+    },
+    "mod_onColor": {
+      "description": "The color of the control when it's 'on' and being modulated."
+    },
+    "mod_offColor": {
+      "description": "The color of the control when it's 'off' and being modulated."
+    },
+    "label_fontColor_off": {
+      "description": "The color of the associated label text when the control is 'off'."
+    },
+    "label_fontColor_on": {
+      "description": "The color of the associated label text when the control is 'on'."
+    },
+    "label_fontColor_disabled": {
+      "description": "The color of the associated label text when the control is disabled."
+    },
+    "addControl": {
+      "description": "Unclear purpose, potentially related to dynamic UI generation or internal control linking."
+    },
+    "offColor": {
+      "description": "The color of the control when in its 'off' or default state."
+    },
+    "onColor": {
+      "description": "The color of the control when in its 'on' or active state."
+    },
+    "color_disabled": {
+      "description": "The color of the control when it is disabled."
+    },
+    "prefs": {
+      "description": "Indicates the control manages a persistent preference setting. Value often structured as 'category;group;name'."
+    },
+    "valueText_format_format": {
+      "description": "The specific C-style format string (e.g., '%3.f') used when valueText_format is set to a keyword like 'FORMAT_FACTOROFFSET'."
+    },
+    "format": {
+      "description": "A C-style format string (e.g., '%.f') used for displaying the control's numeric value."
+    },
+    "showValueTextOverKnob": {
+      "description": "Flag (0 or 1) to display the numeric value directly superimposed on the knob graphic."
+    },
+    "mouseIncrement": {
+      "description": "Specifies the increment/decrement step size when adjusting the value using fine mouse control (e.g., Shift+drag)."
+    },
+    "mouseIncrements": {
+      "description": "Defines value-dependent fine mouse control increments (e.g., '26;0.2;27;0.1')."
+    },
+    "textEdit_font": {
+      "description": "Specifies the font size category (e.g., 'normal', 'small') for the text input field when editing a control's value directly."
+    },
+    "showValueTextOnHL": {
+      "description": "Flag (0 or 1) indicating that the numeric value text should only be shown when the control is highlighted or being interacted with."
+    },
+    "value_font": {
+      "description": "Specifies the font alias used for displaying the control's numeric value."
+    },
+    "disabledOverlay": {
+      "description": "Flag (0 or 1) to enable/disable a visual overlay drawn on top of the control when it's disabled."
+    },
+    "disabledOverlayColor": {
+      "description": "Specifies the color and alpha transparency of the overlay shown when the control is disabled."
+    },
+    "valueTrackColor": {
+      "description": "The color of the track or background area representing the possible range of a knob/slider."
+    },
+    "valueFillColor": {
+      "description": "The color used to fill the portion of the track representing the current value of a knob/slider."
+    },
+    "valueTrackWidth": {
+      "description": "The width (thickness) in pixels of the value track for a knob/slider."
+    },
+    "valueTrackOrder": {
+      "description": "The drawing order layer for the value track relative to other elements like the modulation track (e.g., 0 for behind, 1 for front)."
+    },
+    "valueIndicatorType": {
+      "description": "Specifies the type of visual indicator used to show the current value on a knob (e.g., a line, a dot, an image)."
+    },
+    "valueIndicatorMargin": {
+      "description": "The margin (in pixels) between the knob edge and the value indicator."
+    },
+    "knobFillColor": {
+      "description": "The fill color for the main knob graphic itself."
+    },
+    "valueIndicatorFillColor": {
+      "description": "The fill color for the value indicator graphic (dot, line)."
+    },
+    "modTrackColor": {
+      "description": "The color of the track or background area representing the modulation range."
+    },
+    "modTrackMargin": {
+      "description": "The margin (in pixels) for the modulation track."
+    },
+    "modTrackWidth": {
+      "description": "The width (thickness) in pixels of the modulation track."
+    },
+    "textEdit_backColor": {
+      "description": "The background color for the text input field when editing a control's value directly."
+    },
+    "textEdit_backColorTransparentMode": {
+      "description": "Flag (0 or 1) related to the transparency of the text edit background."
+    },
+    "color_pushed": {
+      "description": "The color of a button element when it is being actively pressed."
+    },
+    "valueIndicator_x": {
+      "description": "The relative x-coordinate offset of the value indicator graphic within a knob element."
+    },
+    "valueIndicator_y": {
+      "description": "The relative y-coordinate offset of the value indicator graphic within a knob element."
+    },
+    "valueIndicator_w": {
+      "description": "The width of the value indicator graphic."
+    },
+    "valueIndicator_h": {
+      "description": "The height of the value indicator graphic."
+    },
+    "image_next": {
+      "description": "Path to the image file used for the 'next' arrow/button in controls like PresetMenu."
+    },
+    "image_previous": {
+      "description": "Path to the image file used for the 'previous' arrow/button in controls like PresetMenu."
+    },
+    "image_vertical_align": {
+      "description": "Vertical alignment adjustment (in pixels) for the next/previous arrow images."
+    },
+    "btn_margin": {
+      "description": "The margin (in pixels) around the next/previous buttons in controls like PresetMenu."
+    },
+    "arrowsTolerance": {
+      "description": "The clickable area tolerance (in pixels) around the next/previous arrow buttons."
+    },
+    "sendToArrows": {
+      "description": "Flag (0 or 1), likely controlling whether clicks on the main display area of a PresetMenu should also trigger the next/previous arrow actions."
+    },
+    "param_lo": {
+      "description": "The lower bound parameter ID for a range of parameters managed by a PresetMenu (used with param_behaviour='1')."
+    },
+    "param_hi": {
+      "description": "The upper bound parameter ID for a range of parameters managed by a PresetMenu (used with param_behaviour='1')."
+    },
+    "param_behaviour": {
+      "description": "Defines how a PresetMenu interacts with parameters. '1' typically means it saves/loads the state of all parameters between 'param_lo' and 'param_hi'."
+    },
+    "entry_export": {
+      "description": "Flag (0 or 1) to enable an 'Export' option in a PresetMenu, allowing the current state (defined by param_lo/hi) to be saved to a file format."
+    },
+    "isTitle": {
+      "description": "Flag (0 or 1) for OptionItem elements. If 1, the item acts as a non-selectable section header within the dropdown list."
+    },
+    "stringToDraw": {
+      "description": "For OptionItem, specifies alternative text to display on the OptionMenu button itself when this item is selected, overriding the 'name' attribute for the button display."
+    },
+    "rule_list": {
+      "description": "Specifies the rule type (e.g., 'availability_eq', 'availability_diff') when checking a controller's state against multiple values in 'rule_dlist'."
+    },
+    "rule_dlist": {
+      "description": "A semicolon-separated list of values used in conjunction with 'rule_list' for conditional visibility/availability."
+    },
+    "shapesMode": {
+      "description": "A flag (likely 0 or 1) used within sequencer shape generation contexts (CS01TextButton roles like 'rampUp'). Its specific effect is context-dependent."
+    },
+    "fireValueChanged0": {
+      "description": "Flag (0 or 1) for CS01TextButton, likely forcing a parameter update notification even if the value hasn't changed, ensuring commands tied to the parameter trigger."
+    },
+    "textb": {
+      "description": "Alternative text for a CS01TextButton, possibly used for a different state like 'pressed' or for tooltip text (less likely)."
+    },
+    "knob": {
+      "description": "Path to an SVG image file used as the main graphic for a knob control."
+    },
+    "valueIndicator": {
+      "description": "Path to an SVG image file used as the value indicator (needle, dot) for a knob control."
+    },
+    "valueIndicatorImageOriginalAngle": {
+      "description": "The inherent angle (in degrees, usually 0 or -180) of the indicator image specified by 'valueIndicator', used as a baseline for rotation."
+    },
+    "track_x": {
+      "description": "The relative x-coordinate offset of a slider's track within the slider element."
+    },
+    "track_y": {
+      "description": "The relative y-coordinate offset of a slider's track."
+    },
+    "track_w": {
+      "description": "The width of a slider's track."
+    },
+    "track_h": {
+      "description": "The height of a slider's track."
+    },
+    "trackColor": {
+      "description": "The color of the background track for a slider or knob."
+    },
+    "mod_knobColor": {
+      "description": "The color of the knob graphic when modulation is active."
+    },
+    "curveType": {
+      "description": "Specifies the type or behavior model for a curve editor (e.g., 'MDCurve', 'EGSCurve', 'EGSPitchCurve')."
+    },
+    "curveArea_x": {
+      "description": "Relative x-coordinate of the drawing area within a curve editor."
+    },
+    "curveArea_y": {
+      "description": "Relative y-coordinate of the drawing area within a curve editor."
+    },
+    "curveArea_w": {
+      "description": "Width of the drawing area within a curve editor."
+    },
+    "curveArea_h": {
+      "description": "Height of the drawing area within a curve editor."
+    },
+    "xAxisLineStyle": {
+      "description": "Style flag for drawing the horizontal (time) axis in an editor."
+    },
+    "curveWidth": {
+      "description": "Thickness (in pixels) of the line used to draw the curve/waveform."
+    },
+    "handleType": {
+      "description": "Specifies the visual style or type of handles used for manipulating points on a curve."
+    },
+    "handle_w": {
+      "description": "Width of the curve point handles."
+    },
+    "handle_h": {
+      "description": "Height of the curve point handles."
+    },
+    "handle_x": {
+      "description": "Relative x-offset of the handle graphic."
+    },
+    "handle_y": {
+      "description": "Relative y-offset of the handle graphic."
+    },
+    "timeWidthDefault": {
+      "description": "The default time duration (in abstract units or seconds) represented by the full width of a curve editor."
+    },
+    "timeMax": {
+      "description": "The maximum time duration that the curve editor can represent (influences zoom limits)."
+    },
+    "verticalLineStyle": {
+      "description": "Style flag for drawing vertical grid lines within an editor."
+    },
+    "mouseEnabled": {
+      "description": "Flag (0 or 1) determining if mouse interaction is enabled for the editor's content (curve/steps)."
+    },
+    "pointsAddingEnabled": {
+      "description": "Flag (0 or 1) allowing the user to add new points to a curve."
+    },
+    "pointsMovingEnabled": {
+      "description": "Flag (0 or 1) allowing the user to move existing points on a curve."
+    },
+    "lineShapeChangeEnabled": {
+      "description": "Flag (0 or 1) allowing the user to change the line segment type between points (e.g., linear, curved)."
+    },
+    "useLoopIndicators": {
+      "description": "Flag (0 or 1) to display visual markers for loop start and end points in an editor."
+    },
+    "loopIndicatorsInvisibleLoopModeValuesI": {
+      "description": "Specifies loop mode values (integer) for which loop indicators should be hidden."
+    },
+    "useMusicalTimeValuesI": {
+      "description": "Specifies modes (integer, semicolon-separated) where the editor's time axis should use musical divisions (sync to host tempo)."
+    },
+    "useScrollbar": {
+      "description": "Flag (0 or 1) to enable a horizontal scrollbar for navigating the time axis of an editor."
+    },
+    "textEditRelative_x": {
+      "description": "Relative x-offset for the popup text editor used when editing point values."
+    },
+    "textEditRelative_y": {
+      "description": "Relative y-offset for the popup text editor."
+    },
+    "textEditRelative_w": {
+      "description": "Width of the popup text editor."
+    },
+    "textEditRelative_h": {
+      "description": "Height of the popup text editor."
+    },
+    "out": {
+      "description": "Index (typically 0 or 1) used by LoopPointControl elements to distinguish between the start and end loop points."
+    },
+    "internalwidth": {
+      "description": "The total conceptual width of the content within a ScrollView, which may be larger than the visible width."
+    },
+    "internalheight": {
+      "description": "The total conceptual height of the content within a ScrollView."
+    },
+    "showScrollbars": {
+      "description": "Flag (0 or 1) explicitly controlling the visibility of scrollbars in a ScrollView."
+    },
+    "scrollbarwidth": {
+      "description": "The width (thickness) in pixels of the scrollbar in a ScrollView."
+    },
+    "image_1": {
+      "description": "Path to the image file for the first state/button of a ScrollViewPageController (typically 'previous' or 'inactive dot')."
+    },
+    "image_2": {
+      "description": "Path to the image file for the second state/button of a ScrollViewPageController (typically 'next' or 'active dot')."
+    },
+    "image_1HL": {
+      "description": "Path to the highlighted image for the first state/button of a ScrollViewPageController."
+    },
+    "image_2HL": {
+      "description": "Path to the highlighted image for the second state/button of a ScrollViewPageController."
+    },
+    "disabledLuminanceChange": {
+      "description": "Luminance adjustment factor applied to ScrollViewPageController buttons when disabled (e.g., at the start/end of pages)."
+    },
+    "showPageName": {
+      "description": "Flag (0 or 1) to enable the display of the current page name in a ScrollViewPageController."
+    },
+    "showPageNameType": {
+      "description": "Specifies the format or style for displaying the page name (e.g., '2' might indicate text)."
+    },
+    "circleEdit": {
+      "description": "Flag (0 or 1) potentially enabling an alternative page indication style using editable circles."
+    },
+    "circleEditColor": {
+      "description": "The color used for the circle indicators if 'circleEdit' is enabled."
+    },
+    "showPageNameCheckCurrentValue": {
+      "description": "Flag (0 or 1) likely related to ensuring the displayed page name updates correctly based on the ScrollView's position."
+    },
+    "idx": {
+      "description": "The zero-based index associated with a PageName element, linking it to a specific page in the ScrollView."
+    },
+    "copyOf": {
+      "description": "Used in CS01ViewConfigurationSet to specify the 'name' of another set from which to inherit configurations."
+    },
+    "containerName": {
+      "description": "Used in CS01ViewConfigurationSet when copying, specifies the target 'identifier' of the CS01ViewContainer this copied set will apply to."
+    },
+    "containeeFind": {
+      "description": "Used when copying configurations, specifies a string to find within the 'containee' attributes of the source set's associations."
+    },
+    "containeeReplace": {
+      "description": "Used when copying configurations, specifies the string to replace 'containeeFind' with in the copied 'containee' attributes."
+    },
+    "nameFind": {
+      "description": "Used when copying configurations, specifies a string to find within the 'name' attributes of the source set's configurations."
+    },
+    "nameReplace": {
+      "description": "Used when copying configurations, specifies the string to replace 'nameFind' with in the copied configuration names."
+    },
+    "copySkip": {
+      "description": "Used when copying configurations, specifies the 'name' of a configuration in the source set that should *not* be copied."
+    },
+    "container": {
+      "description": "In a CS01ViewAssoc, specifies the 'identifier' of the target CS01ViewContainer."
+    },
+    "containee": {
+      "description": "In a CS01ViewAssoc, specifies the 'identifier' of the CS01ViewContainer whose content should be loaded into the 'container'."
+    },
+    "defines": {
+      "description": "In a CS01ViewAssoc, provides a semicolon-separated list of key=value pairs that define variables within the scope of the 'containee' for that specific association."
+    },
+    "codedName": {
+      "description": "The internal code or name associated with a modulation source/destination, used by CS01ModSourceTextButton."
+    },
+    "stepsArea_x": {
+      "description": "Relative x-coordinate of the step drawing grid within a CS01StepEditor."
+    },
+    "stepsArea_y": {
+      "description": "Relative y-coordinate of the step drawing grid within a CS01StepEditor."
+    },
+    "stepsArea_w": {
+      "description": "Width of the step drawing grid within a CS01StepEditor."
+    },
+    "stepsArea_h": {
+      "description": "Height of the step drawing grid within a CS01StepEditor."
+    },
+    "numSteps": {
+      "description": "The default or current number of steps in a CS01StepEditor."
+    },
+    "minNumSteps": {
+      "description": "The minimum allowable number of steps in a CS01StepEditor."
+    },
+    "maxNumSteps": {
+      "description": "The maximum allowable number of steps in a CS01StepEditor."
+    },
+    "useKeys": {
+      "description": "Flag (0 or 1) likely enabling keyboard interaction within a CS01StepEditor."
+    },
+    "stepDivisionHintCount": {
+      "description": "Number of visual subdivisions to draw within each main beat/grid division in a CS01StepEditor."
+    },
+    "stepDivisionHintLuminanceChange": {
+      "description": "Luminance difference for the subdivision hint lines in a CS01StepEditor."
+    },
+    "loopIndicatorHandleLeft": {
+      "description": "Path to the image file for the loop start handle marker in editors."
+    },
+    "loopIndicatorHandleLeft_alignment": {
+      "description": "Alignment ('left', 'right', 'center') for the loop start handle marker image."
+    },
+    "loopIndicatorHandleRight": {
+      "description": "Path to the image file for the loop end handle marker in editors."
+    },
+    "loopIndicatorHandleRight_alignment": {
+      "description": "Alignment for the loop end handle marker image."
+    },
+    "bitModeNumRows": {
+      "description": "Number of rows used when a CS01StepEditor is in 'bit mode' (for waveform component selection)."
+    },
+    "bitModeRowHeight": {
+      "description": "Height in pixels of each row in 'bit mode'."
+    },
+    "bitModeOffBorder": {
+      "description": "Style flag for the border of 'off' bits in 'bit mode'."
+    },
+    "bitModeOnBorder": {
+      "description": "Style flag for the border of 'on' bits in 'bit mode'."
+    },
+    "bitModefont_size": {
+      "description": "Font size for labels used in 'bit mode'."
+    },
+    "bitModeExclusiveOffBorder": {
+      "description": "Style flag for the border of 'off' bits in exclusive rows ('bit mode')."
+    },
+    "bitModeExclusiveOnBorder": {
+      "description": "Style flag for the border of 'on' bits in exclusive rows ('bit mode')."
+    },
+    "bitModeBitValuePerRow": {
+      "description": "Semicolon-separated list mapping row index to the corresponding bit value in 'bit mode' (e.g., '1;2;4;8')."
+    },
+    "bitModeNamePerRow": {
+      "description": "Semicolon-separated list providing names for each row in 'bit mode' (e.g., 'tri;saw;pulse;noise')."
+    },
+    "bitModeExclusiveRows": {
+      "description": "Index (or indices) of the row(s) that operate exclusively in 'bit mode' (only one bit can be on)."
+    },
+    "bitModeExclusiveOverwrite": {
+      "description": "Flag (0 or 1) controlling behavior when clicking a bit in an exclusive row if another is already on."
+    },
+    "bitModeExclusiveOverwriteReverse": {
+      "description": "Flag (0 or 1) potentially reversing the overwrite logic in exclusive rows."
+    },
+    "drawRects": {
+      "description": "Flag (0 or 1) for CS01StepEditor, likely switching between drawing steps as bars/lines or as filled rectangles."
+    },
+    "tabType": {
+      "description": "Specifies the style or type of tabs used within certain container elements (e.g., CS01WaveEditorContainer)."
+    },
+    "targets_multi": {
+      "description": "Defines multiple potential data targets, often used by containers that manage different data instances selectable via tabs (e.g., multiple sample slots)."
+    },
+    "instanceLabelFormat": {
+      "description": "Format string (e.g., '%c') for displaying the label of the current data instance (e.g., sample slot 'A')."
+    },
+    "instanceLabelStartIndexDisplay": {
+      "description": "Starting index for the instance label display (e.g., 65 for 'A')."
+    },
+    "sizeLabelFormat": {
+      "description": "Format string (e.g., '%d bytes') for displaying the size of the current data instance (e.g., sample size)."
+    },
+    "loopIn_x": {
+      "description": "X-coordinate for the loop-in point display/edit field."
+    },
+    "loopIn_y": {
+      "description": "Y-coordinate for the loop-in point display/edit field."
+    },
+    "loopIn_w": {
+      "description": "Width of the loop-in point display/edit field."
+    },
+    "loopIn_h": {
+      "description": "Height of the loop-in point display/edit field."
+    },
+    "loopOut_x": {
+      "description": "X-coordinate for the loop-out point display/edit field."
+    },
+    "loopOut_y": {
+      "description": "Y-coordinate for the loop-out point display/edit field."
+    },
+    "loopOut_w": {
+      "description": "Width of the loop-out point display/edit field."
+    },
+    "loopOut_h": {
+      "description": "Height of the loop-out point display/edit field."
+    },
+    "browserTargetItemLoad": {
+      "description": "Specifies the target or action when an item is loaded/selected from an associated browser."
+    },
+    "assignmentMapTarget": {
+      "description": "Specifies the target data pool or assignment map related to the control's function."
+    },
+    "waveEditorPoolName": {
+      "description": "An internal name likely linking a WaveEditor instance to its data pool within a container."
+    },
+    "defaultLoopStart": {
+      "description": "The default frame index for the loop start point when a new sample/waveform is loaded."
+    },
+    "defaultLoopLength": {
+      "description": "The default length in frames for the loop region when a new sample/waveform is loaded."
+    },
+    "fixedLoopSection": {
+      "description": "Flag (0 or 1) potentially preventing the user from editing the loop start/end points."
+    },
+    "activeIndicatorLineWidth": {
+      "description": "Line width for the playback position indicator in an editor."
+    },
+    "activeIndicator_x": {
+      "description": "Relative x-offset for the playback position indicator."
+    },
+    "activeIndicator_y": {
+      "description": "Relative y-offset for the playback position indicator."
+    },
+    "activeIndicator_w": {
+      "description": "Width of the playback position indicator."
+    },
+    "activeIndicator_h": {
+      "description": "Height of the playback position indicator."
+    },
+    "activeIndicatorLineColor": {
+      "description": "Line color for the playback position indicator."
+    },
+    "activeIndicatorFillColor": {
+      "description": "Fill color for the playback position indicator."
+    },
+    "activeIndicatorFrameColor": {
+      "description": "Frame color for the playback position indicator."
+    },
+    "activeIndicatorShape": {
+      "description": "Shape type identifier for the playback position indicator."
+    },
+    "drawFades": {
+      "description": "Flag (0 or 1) to enable visualization of fade-in/fade-out or crossfade regions."
+    },
+    "fadesType": {
+      "description": "Specifies the style or type code for how fades are visualized."
+    },
+    "fadesAlpha": {
+      "description": "Alpha transparency value for the fade visualization overlay."
+    },
+    "sourceType": {
+      "description": "Specifies the type of source providing items for a browser (e.g., 'fileLister', 'fileLister03')."
+    },
+    "sourceSubType": {
+      "description": "Further specifies the source subtype (e.g., '1')."
+    },
+    "sourceTypePrefs": {
+      "description": "Links browser root directories to preference keys for user configuration (e.g., '1;1;1;SYXBaseDir')."
+    },
+    "sourceTypeExtra": {
+      "description": "Specifies file extensions to filter in the browser, potentially with multiple filters separated by '|'."
+    },
+    "rootNames": {
+      "description": "Pipe-separated list of display names for the root directories shown in the browser (e.g., 'Factory|User')."
+    },
+    "browserName": {
+      "description": "Unique name identifier for a CS01Browser instance."
+    },
+    "entries_font": {
+      "description": "Font alias used for displaying items in a browser list."
+    },
+    "entries_indent": {
+      "description": "Indentation in pixels for hierarchical items in a browser list."
+    },
+    "entries_height": {
+      "description": "Height in pixels of each row in a browser list."
+    },
+    "entries_heightSpacing": {
+      "description": "Vertical spacing in pixels between rows in a browser list."
+    },
+    "selected_fontColor": {
+      "description": "Text color for selected items in a browser list."
+    },
+    "selected_backgroundColor": {
+      "description": "Background color for selected items in a browser list."
+    },
+    "hovered_fontColor": {
+      "description": "Text color for hovered items in a browser list."
+    },
+    "hovered_backgroundColor": {
+      "description": "Background color for hovered items in a browser list."
+    },
+    "drag_fontColor": {
+      "description": "Text color used for the drag preview when dragging items from a browser/map."
+    },
+    "drag_font_size": {
+      "description": "Font size used for the drag preview text."
+    },
+    "autoExpandSingleLevelRoots": {
+      "description": "Pipe-separated list of root directory names in a browser that should automatically expand if they contain only one level of sub-items."
+    },
+    "scrollbarColor": {
+      "description": "Color of the scrollbar thumb."
+    },
+    "scrollbarBackgroundColor": {
+      "description": "Color of the scrollbar track area."
+    },
+    "scrollbarFrameColor": {
+      "description": "Color of the border around the scrollbar."
+    },
+    "inputs": {
+      "description": "Flag (0 or 1) for CS01OptionMenuMIDIDevice, specifying whether to list MIDI inputs (1) or outputs (0)."
+    },
+    "text_w": {
+      "description": "Width allocated for text display within certain controls (e.g., MIDI device selector)."
+    },
+    "textErrorColor": {
+      "description": "Text color used to indicate an error state (e.g., missing MIDI device)."
+    },
+    "textErrorColorHL": {
+      "description": "Highlighted text color for an error state."
+    },
+    "frameDraw": {
+      "description": "Flag (0 or 1) to explicitly draw a frame around an element (e.g., ScrollViewPageController)."
+    },
+    "frameColor": {
+      "description": "Color of the frame if 'frameDraw' is enabled."
+    },
+    "fontColor": {
+      "description": "Primary font color for an element."
+    },
+    "fontColorHL": {
+      "description": "Font color when the element is highlighted."
+    },
+    "textColor": {
+      "description": "Primary text color (synonym for fontColor/color_text)."
+    },
+    "textColorHL": {
+      "description": "Highlighted text color (synonym for fontColorHL/color_textHL)."
+    },
+    "textColorDisabled": {
+      "description": "Text color when disabled."
+    },
+    "textEditIcon_backColor": {
+      "description": "Background color for the text edit icon/button within a control (e.g., PresetMenuPool)."
+    },
+    "textEditIcon_fillColor": {
+      "description": "Fill color for the graphic within the text edit icon/button."
+    },
+    "textEditIcon_textColor": {
+      "description": "Text color for the text edit icon/button."
+    },
+    "textEditIcon_x": {
+      "description": "X-coordinate offset for the text edit icon/button."
+    },
+    "textEditIcon_y": {
+      "description": "Y-coordinate offset for the text edit icon/button."
+    },
+    "textEditIcon_w": {
+      "description": "Width of the text edit icon/button."
+    },
+    "textEditIcon_h": {
+      "description": "Height of the text edit icon/button."
+    },
+    "textEditIconType": {
+      "description": "Style type identifier for the text edit icon/button."
+    },
+    "textEditIcon_roundedRatio": {
+      "description": "Corner rounding for the text edit icon/button."
+    },
+    "textEditIcon_font_size": {
+      "description": "Font size for the text edit icon/button."
+    },
+    "textEditIcon_text": {
+      "description": "Text label for the text edit icon/button (e.g., 'Rename')."
+    },
+    "saveIcon_backColor": {
+      "description": "Background color for the save icon/button."
+    },
+    "saveIcon_fillColor": {
+      "description": "Fill color for the save icon graphic."
+    },
+    "saveIcon_textColor": {
+      "description": "Text color for the save icon/button."
+    },
+    "saveIcon_x": {
+      "description": "X-coordinate offset for the save icon/button."
+    },
+    "saveIcon_y": {
+      "description": "Y-coordinate offset for the save icon/button."
+    },
+    "saveIcon_w": {
+      "description": "Width of the save icon/button."
+    },
+    "saveIcon_h": {
+      "description": "Height of the save icon/button."
+    },
+    "saveIconType": {
+      "description": "Style type identifier for the save icon/button."
+    },
+    "saveIcon_roundedRatio": {
+      "description": "Corner rounding for the save icon/button."
+    },
+    "saveIcon_font_size": {
+      "description": "Font size for the save icon/button."
+    },
+    "saveIcon_text": {
+      "description": "Text label for the save icon/button (e.g., 'Store')."
+    },
+    "saveIcon_param": {
+      "description": "Parameter ID triggered by clicking the save icon/button."
+    },
+    "drawnNameProcessing": {
+      "description": "Flag (0 or 1) enabling special processing or formatting for the displayed name in a control (e.g., PresetMenuPool)."
+    },
+    "drawnNameProcessingType": {
+      "description": "Specifies the type of name processing/formatting to apply (e.g., '7')."
+    },
+    "valueDisplayAlways": {
+      "description": "Flag (0 or 1) forcing the display of the item's value (e.g., index) even if a name is present."
+    },
+    "valueDisplayFormat": {
+      "description": "Format string for displaying the item's value/index (e.g., '%02d', '%c')."
+    },
+    "valueDisplayOffset": {
+      "description": "Offset added to the item's index before displaying (e.g., 1 for 1-based, 65 for 'A')."
+    },
+    "renameEmpty": {
+      "description": "Flag (0 or 1) allowing renaming of items currently marked as empty."
+    },
+    "col0_w": {
+      "description": "Width of the first column in a list/map view."
+    },
+    "col0_h": {
+      "description": "Height of the header for the first column."
+    },
+    "col0_name": {
+      "description": "Header text for the first column."
+    },
+    "col0_format": {
+      "description": "Format string for displaying data in the first column."
+    },
+    "col0_alignment": {
+      "description": "Text alignment for the first column."
+    },
+    "startIndexDisplay": {
+      "description": "Starting index/value for display in the first column."
+    },
+    "col1_w": {
+      "description": "Width of the second column in a list/map view."
+    },
+    "col1_h": {
+      "description": "Height of the header for the second column."
+    },
+    "col1_name": {
+      "description": "Header text for the second column."
+    },
+    "col1_format": {
+      "description": "Format string for displaying data in the second column."
+    },
+    "col1_alignment": {
+      "description": "Text alignment for the second column."
+    },
+    "assignType": {
+      "description": "Specifies the type of data being assigned or listed (e.g., 'preset')."
+    },
+    "supportsFileDrop": {
+      "description": "Flag (0 or 1) indicating if the list accepts dropped files."
+    },
+    "moveItemOnSelfDragDrop": {
+      "description": "Flag (0 or 1) allowing items to be reordered by dragging within the same list."
+    },
+    "copyItemOnNotSelfDragDrop": {
+      "description": "Flag (0 or 1) to copy items instead of moving them when dropped from a different list."
+    },
+    "activeSelectionOverlayColor": {
+      "description": "Color overlay for the currently selected/active item in a list."
+    },
+    "dndoperations": {
+      "description": "Bitmask likely defining allowed drag-and-drop operations (copy, move)."
+    },
+    "dropTypes": {
+      "description": "Pipe-separated list of 'dragType' identifiers that this list accepts via drop."
+    },
+    "deleteIcon_font_size": {
+      "description": "Font size for the delete icon associated with list items."
+    },
+    "deleteMultiple": {
+      "description": "Flag (0 or 1) allowing multiple selected items to be deleted at once."
+    },
+    "useCommands": {
+      "description": "Flag (0 or 1) indicating interactions trigger internal commands rather than direct parameter changes."
+    },
+    "useArrowKeys": {
+      "description": "Flag (0 or 1) enabling list navigation using keyboard arrow keys."
+    },
+    "deleteIcon": {
+      "description": "Flag (0 or 1) controlling the visibility of a delete icon for list items."
+    },
+    "rename": {
+      "description": "Flag (0 or 1) enabling in-place renaming of list items."
+    },
+    "fontColorError": {
+      "description": "Text color used to indicate an error state for a list item."
+    },
+    "dragOverOverlayColor": {
+      "description": "Color overlay shown when a compatible item is dragged over the list."
+    },
+    "currentSelectionOverlayColor": {
+      "description": "Color overlay for the current selection in the list (may differ from active item)."
+    },
+    "currentSelectionFontColor": {
+      "description": "Font color for the current selection."
+    },
+    "activeSelectionFontColor": {
+      "description": "Font color for the active item (potentially different if not the current selection)."
+    },
+    "assignmentMapName": {
+      "description": "Unique name identifying the data pool associated with an AssignmentMap."
+    },
+    "outsideClearsSelection": {
+      "description": "Flag (0 or 1) determining if clicking outside the list clears the current selection."
+    },
+    "holdMode": {
+      "description": "Flag (0 or 1) enabling hold behavior for buttons (stays pressed visually while held)."
+    },
+    "manageHLStates": {
+      "description": "Flag (0 or 1) indicating a button manages its own highlight/pressed visual states."
+    },
+    "closeShape": {
+      "description": "Flag (0 or 1) for Shape elements, indicating if the last point should connect to the first."
+    },
+    "reversePoints": {
+      "description": "Flag (0 or 1) for Line elements, reversing start/end points, potentially affecting diagonal line direction."
+    },
+    "lineEnd": {
+      "description": "Style identifier for line endings/caps."
+    },
+    "clip_x": {
+      "description": "X-coordinate of a clipping rectangle applied to an element."
+    },
+    "clip_y": {
+      "description": "Y-coordinate of a clipping rectangle."
+    },
+    "clip_w": {
+      "description": "Width of a clipping rectangle."
+    },
+    "clip_h": {
+      "description": "Height of a clipping rectangle."
+    }
+  },
+  "elements": [
+    {
+      "element": "GUI",
+      "description": "Root element for the Graphical User Interface definition. Defines global properties like window size, background, and default styles.",
+      "attributes": {
+        "w": {},
+        "h": {},
+        "backgroundColor": {},
+        "idleThrottle": {},
+        "DrawingBoundaries": {},
+        "color_DrawingBoundaries": {},
+        "color_back": {},
+        "color_text": {},
+        "color_border": {},
+        "font_size": {},
+        "modulatedParamSource": {},
+        "highlight_Luminance": {},
+        "image": {},
+        "droppedFilesHandling": {},
+        "x": {},
+        "y": {}
+      },
+      "customAttributes": [],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "Property",
+      "description": "Defines global properties or settings for the GUI, often configuring behavior related to modulation linking, display formats, or specific plugin features.",
+      "attributes": {
+        "name": {},
+        "value": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The specific name of the global property being set (e.g., 'modulationDestinationsAlphaOrder', 'modulationLinksDataSources')."
+        },
+        {
+          "name": "value",
+          "description": "The value assigned to the named property. Format depends on the property (e.g., 0/1 for flags, semicolon-separated strings for lists)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "Styles",
+      "description": "References an external XML file containing style definitions (like colors, fonts, dimensions) used throughout the GUI.\n\nUsed as a macro to allow a global area to modify element attributes when used within designated styles XML.",
+      "attributes": {
+        "path": {}
+      },
+      "customAttributes": [
+        {
+          "name": "path",
+          "description": "Specifies the relative path to the styles XML file containing <Style> and <StyleMacro> definitions."
+        }
+      ],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "Rect",
+      "description": "Defines a rectangular UI element, often used for background panels, dividers, or simple visual elements.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "drawMode": {},
+        "border_color": {},
+        "frameWidth": {},
+        "fill_color": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Font",
+      "description": "Defines a font resource for use in the GUI, potentially specifying different properties per operating system. Referenced elsewhere using its 'alias'.",
+      "attributes": {
+        "alias": {},
+        "filename": {},
+        "name_windows": {},
+        "name_osx": {},
+        "size_windows": {},
+        "style_windows": {},
+        "size_osx": {},
+        "style_osx": {},
+        "lores_filename": {},
+        "lores_name": {},
+        "lores_threshold": {},
+        "weight": {},
+        "adjustb_windows": {},
+        "adjustb_osx": {}
+      },
+      "customAttributes": [
+        {
+          "name": "alias",
+          "description": "An alias or nickname used to reference this font definition elsewhere in the GUI XML (e.g., in 'font' attributes of other elements)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "StaticImage",
+      "description": "Displays a static image, potentially acting as a clickable link.",
+      "attributes": {
+        "image": {},
+        "x": {},
+        "y": {},
+        "url": {},
+        "useImageSize": {},
+        "w": {},
+        "h": {},
+        "style": {}
+      },
+      "customAttributes": [
+        {
+          "name": "image",
+          "description": "The path to the image file (e.g., .svg, .png) to be displayed."
+        }
+      ],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "TabView",
+      "description": "A container element that displays content in selectable tabs. Allows organizing different sections of the GUI.",
+      "attributes": {
+        "id": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "image": {},
+        "imageHL": {},
+        "position": {},
+        "alignment": {},
+        "font": {},
+        "style": {},
+        "color_selected": {},
+        "color_deselected": {},
+        "margin_x": {},
+        "font_size": {}
+      },
+      "customAttributes": [
+        {
+          "name": "image",
+          "description": "Path to the image used for the *default* state of a tab button within this TabView."
+        },
+        {
+          "name": "imageHL",
+          "description": "Path to the image used for the *highlighted/selected* state of a tab button within this TabView."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "Pane",
+      "description": "Represents a single tab's content area within a TabView. It defines the tab's label and can optionally specify unique background images for its associated tab button.",
+      "attributes": {
+        "name": {},
+        "imageb": {},
+        "imagebHL": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The text label displayed on the tab button corresponding to this pane."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "GUIContainer",
+      "description": "Includes the content of another XML file within the current GUI structure, effectively embedding one GUI definition within another. Useful for modular design.",
+      "attributes": {
+        "path": {},
+        "xoffset": {},
+        "yoffset": {},
+        "param_offset": {},
+        "x": {},
+        "y": {}
+      },
+      "customAttributes": [
+        {
+          "name": "path",
+          "description": "Specifies the relative path to the GUI XML file to be included/embedded."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "GUIMacro",
+      "description": "Similar to GUIContainer, but primarily used in conjunction with child <Define> elements to pass variables into the included XML file. This enables more complex reuse and parameterization of UI components.",
+      "attributes": {
+        "path": {},
+        "xoffset": {},
+        "yoffset": {},
+        "param_offset": {},
+        "x": {},
+        "y": {}
+      },
+      "customAttributes": [
+        {
+          "name": "path",
+          "description": "Specifies the relative path to the GUI XML file to be included as a parameterized macro."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "Define",
+      "description": "Defines a variable substitution within the scope of its parent GUIMacro. Occurrences of the variable 'name' (typically starting with '$') in the included file are replaced with the specified 'value'.",
+      "attributes": {
+        "name": {},
+        "value": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The name of the variable to be defined (conventionally starting with '$')."
+        },
+        {
+          "name": "value",
+          "description": "The string value that will replace occurrences of the variable name in the macro's included file."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ExpandViewButton",
+      "description": "A custom button control that expands or collapses an associated view container (typically a child CS01ViewContainer). Used for revealing/hiding settings panels or detailed views.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "close_button_tag": {},
+        "text": {},
+        "expandedViewCloser": {},
+        "roundedRatio": {},
+        "role": {},
+        "enabledByOnOff": {},
+        "expandingViewButtonName": {},
+        "close_button_tag_2": {},
+        "font": {},
+        "on_value": {},
+        "off_value": {},
+        "vdefault": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ViewContainer",
+      "description": "A versatile container for UI elements. It can load content dynamically from another XML file ('path' attribute), serve as the content area for tabs or expandable views ('identifier' attribute linked via CS01ViewConfigurationSet), or simply group related elements. Supports visibility toggling and positioning offsets.",
+      "attributes": {
+        "path": {},
+        "backgroundColor": {},
+        "xoffset": {},
+        "yoffset": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "visibilityChangeName": {},
+        "visibilityChangeDirection": {},
+        "param_offset": {},
+        "identifier": {},
+        "style": {},
+        "role": {},
+        "contextualTarget": {},
+        "dropListener": {},
+        "visible": {},
+        "aliases": {}
+      },
+      "customAttributes": [
+        {
+          "name": "path",
+          "description": "Specifies the relative path to an XML file whose content will be loaded into this container. Often used for static includes or as a fallback within dynamic configurations."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01Slider",
+      "description": "A custom slider control, typically vertical in these UIs (e.g., ADSR, MIDI wheels, levels). Connects to a specific parameter.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "vmin": {},
+        "vmax": {},
+        "vdefault": {},
+        "spring_mode": {},
+        "enable_keys": {},
+        "enable_mousewheel": {},
+        "knob_x": {},
+        "knob_y": {},
+        "knob_w": {},
+        "knob_h": {},
+        "boxColor": {},
+        "fillColor": {},
+        "knobColor": {},
+        "fontColor": {},
+        "font_size": {},
+        "stepped": {},
+        "mod_margin": {},
+        "mod_knobMode": {},
+        "mod_fillColor": {},
+        "wantsFocus": {},
+        "keysMultiplier": {},
+        "clickOnTrack": {},
+        "knob_pickingTolerance": {},
+        "show_text": {},
+        "textEdit_enabled": {},
+        "track_x": {},
+        "track_y": {},
+        "track_w": {},
+        "track_h": {},
+        "trackColor": {},
+        "knob": {},
+        "modFillColor": {},
+        "mod_knobColor": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01Keyboard",
+      "description": "A custom control representing an on-screen piano keyboard. Visualizes note presses and potentially key zones.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "start_key": {},
+        "end_key": {},
+        "offset0": {},
+        "offset1": {},
+        "offset2": {},
+        "offset3": {},
+        "offset4": {},
+        "offset5": {},
+        "offset6": {},
+        "white_key_on": {},
+        "white_key_off": {},
+        "black_key_on": {},
+        "black_key_off": {},
+        "inactiveColor": {},
+        "ksActiveColor": {},
+        "ksInactiveColor": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "PresetMenu",
+      "description": "A control for selecting, loading, and potentially saving presets for the plugin or a specific section (like an effect or patch).",
+      "attributes": {
+        "param": {},
+        "target": {},
+        "type": {},
+        "entry_init": {},
+        "entry_save": {},
+        "entry_saveasdefault": {},
+        "entry_empty": {},
+        "entry_reload": {},
+        "entry_load": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "displayCategory": {},
+        "eslot": {},
+        "enabledByOnOff": {},
+        "font": {},
+        "transparent": {},
+        "alignment": {},
+        "color_text": {},
+        "color_textHL": {},
+        "color_back": {},
+        "image_next": {},
+        "image_previous": {},
+        "image_vertical_align": {},
+        "btn_margin": {},
+        "arrowsTolerance": {},
+        "sendToArrows": {},
+        "param_lo": {},
+        "param_hi": {},
+        "param_behaviour": {},
+        "entry_export": {}
+      },
+      "customAttributes": [
+        {
+          "name": "target",
+          "description": "Identifies the target component or plugin whose presets are managed (e.g., 'com.Plogue.Fermata.chipsynth C64', 'com.Garritan.Ambience', 'com.Plogue.Emulator.MD.Patch')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "StaticText",
+      "description": "Displays non-editable text. Can be used for labels, titles, or informational messages. Can optionally act as a clickable link or be controlled by visibility/availability rules.",
+      "attributes": {
+        "text": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "alignment": {},
+        "font": {},
+        "font_size": {},
+        "color_text": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "rule_s1": {},
+        "role": {},
+        "url": {},
+        "color_text_disabled": {},
+        "command": {},
+        "data0": {},
+        "color_back": {},
+        "color_border": {},
+        "transparent": {},
+        "mouseEnabled": {}
+      },
+      "customAttributes": [],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "OptionMenu",
+      "description": "A dropdown menu control allowing the user to select one option from a list. Used for selecting modes, ranges, MIDI channels, tuning settings, enum values, etc.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "vdefault": {},
+        "style": {},
+        "role": {},
+        "controller_name": {},
+        "preventIdle": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "supportsMod": {},
+        "mod_x": {},
+        "mod_y": {},
+        "mod_w": {},
+        "mod_h": {},
+        "mod_font": {},
+        "command": {},
+        "vmin": {},
+        "vmax": {},
+        "enabledByOnOff": {},
+        "font": {},
+        "checkCurrentValue": {},
+        "alignment": {},
+        "transparent": {},
+        "wantsFocus": {},
+        "color_text": {},
+        "color_textHL": {},
+        "color_back": {},
+        "mod_color_text": {},
+        "drawFrame": {},
+        "backgroundColor": {},
+        "textColor": {},
+        "textColorHL": {},
+        "textErrorColor": {},
+        "textErrorColorHL": {},
+        "text_x": {},
+        "text_y": {},
+        "text_h": {},
+        "font_size": {},
+        "rule_list": {},
+        "rule_dlist": {}
+      },
+      "customAttributes": [],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "OptionItem",
+      "description": "Defines a single selectable item within an OptionMenu or similar list-based control (like CS01CheckButtons or CS01RadioButtons).",
+      "attributes": {
+        "name": {},
+        "value": {},
+        "isTitle": {},
+        "stringToDraw": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "image_on": {},
+        "image_off": {},
+        "exclusive": {},
+        "image_on_mod": {},
+        "image_off_mod": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The text displayed for this option in the dropdown list or as a label."
+        },
+        {
+          "name": "value",
+          "description": "The underlying value assigned to the parent control's parameter when this item is selected."
+        },
+        {
+          "name": "x",
+          "description": "X-coordinate, used when OptionItem defines layout for check/radio buttons."
+        },
+        {
+          "name": "y",
+          "description": "Y-coordinate, used when OptionItem defines layout for check/radio buttons."
+        },
+        {
+          "name": "w",
+          "description": "Width, used when OptionItem defines layout for check/radio buttons."
+        },
+        {
+          "name": "h",
+          "description": "Height, used when OptionItem defines layout for check/radio buttons."
+        },
+        {
+          "name": "image_on",
+          "description": "Path to image for the 'on'/'selected' state (for radio/check buttons)."
+        },
+        {
+          "name": "image_off",
+          "description": "Path to image for the 'off'/'unselected' state (for radio/check buttons)."
+        },
+        {
+          "name": "exclusive",
+          "description": "Flag (0 or 1) indicating if selecting this item deselects others in the group (radio button behavior)."
+        },
+        {
+          "name": "image_on_mod",
+          "description": "Path to image for the 'on' state when modulated."
+        },
+        {
+          "name": "image_off_mod",
+          "description": "Path to image for the 'off' state when modulated."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "VisibilityContainer",
+      "description": "A container whose visibility (and that of its children) is controlled by the state of another UI element (the 'controller'). Useful for showing/hiding sections based on selections.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "style": {},
+        "shapesMode": {},
+        "enabledByOnOff": {},
+        "rule_list": {},
+        "rule_dlist": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01OnOffButton",
+      "description": "A custom On/Off toggle button control. Can control parameters, trigger commands, or manage the visibility/availability of other elements.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "vdefault": {},
+        "style": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "roundedRatio": {},
+        "wantsFocus": {},
+        "role": {},
+        "command": {},
+        "on_value": {},
+        "off_value": {},
+        "enable_mousewheel": {},
+        "controller_name": {},
+        "mod_margin": {},
+        "mod_onColor": {},
+        "mod_offColor": {},
+        "label_fontColor_off": {},
+        "label_fontColor_on": {},
+        "label_fontColor_disabled": {},
+        "labelText": {},
+        "label_x": {},
+        "label_y": {},
+        "label_w": {},
+        "label_h": {},
+        "label_font": {},
+        "addControl": {},
+        "offColor": {},
+        "onColor": {},
+        "color_disabled": {},
+        "prefs": {},
+        "button_x": {},
+        "button_y": {},
+        "button_w": {},
+        "button_h": {}
+      },
+      "customAttributes": [
+        {
+          "name": "button_x",
+          "description": "X-offset within the element's bounds for drawing the actual button graphic, allowing space for labels."
+        },
+        {
+          "name": "button_y",
+          "description": "Y-offset within the element's bounds for drawing the actual button graphic."
+        },
+        {
+          "name": "button_w",
+          "description": "Width of the actual button graphic."
+        },
+        {
+          "name": "button_h",
+          "description": "Height of the actual button graphic."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS03Knob",
+      "description": "A custom rotary knob control. Used extensively for adjusting parameters like volume, tuning, envelope stages, effect levels, etc. Supports modulation display and various value formatting options.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "style": {},
+        "w": {},
+        "label_w": {},
+        "label_h": {},
+        "knob_x": {},
+        "vmin": {},
+        "vmax": {},
+        "vdefault": {},
+        "stepped": {},
+        "labelText": {},
+        "value_font_size": {},
+        "label_font": {},
+        "role": {},
+        "factor": {},
+        "valueText_format": {},
+        "disabledOverlay": {},
+        "unipolar": {},
+        "format": {},
+        "showValueTextOverKnob": {},
+        "controller_name": {},
+        "offset": {},
+        "valueText_format_format": {},
+        "knob_y": {},
+        "h": {},
+        "valueIndicator_x": {},
+        "valueIndicator_y": {},
+        "valueIndicator_w": {},
+        "valueIndicator_h": {},
+        "valueTrackMargin": {},
+        "label_x": {},
+        "label_y": {},
+        "modTrackOrder": {},
+        "font_size": {},
+        "textEdit_backColor": {},
+        "mouseIncrement": {},
+        "mouseIncrementAuto": {},
+        "textEdit_font": {},
+        "showValueTextOnHL": {},
+        "value_font": {},
+        "disabledOverlayColor": {},
+        "mouseIncrements": {},
+        "knob": {},
+        "knob_w": {},
+        "knob_h": {},
+        "valueIndicator": {},
+        "valueIndicatorImageOriginalAngle": {},
+        "modTrackColor": {},
+        "modFillColor": {},
+        "trackColor": {},
+        "textEdit_backColorTransparentMode": {},
+        "label_alignment": {},
+        "enabledByOnOff": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "rule_list": {},
+        "rule_dlist": {}
+      },
+      "customAttributes": [
+        {
+          "name": "role",
+          "description": "Assigns a specific functional role, e.g., 'sensitivity' (WaveEditor), 'curveParameter_X' (CurveEditor linking knob to EG stage), 'loopMode' (Curve/StepEditor), 'controller' (state affects others), 'swing', 'speedScale', 'delay', 'ramp' (StepEditor)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "PopupOverlay",
+      "description": "An overlay element used for displaying modal popups or dimming the background during certain interactions (like dragging modulation sources).",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "color_back": {}
+      },
+      "customAttributes": [],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "Splash",
+      "description": "Represents a splash screen element, displayed briefly when the plugin GUI is initially loading.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {}
+      },
+      "customAttributes": [],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "XMLMacroText",
+      "description": "Defines a block of reusable XML text, typically containing multiple <OptionItem> elements for complex OptionMenus (e.g., hardware model selection). This text can be inserted elsewhere using <XMLMacroTextUse>.",
+      "attributes": {
+        "name": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The unique name used to identify this macro text block, referenced by <XMLMacroTextUse>."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "XMLMacroTextUse",
+      "description": "Inserts the content of a previously defined <XMLMacroText> block at the current location. Used primarily to populate OptionMenus with predefined, complex lists.",
+      "attributes": {
+        "name": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The 'name' of the <XMLMacroText> block whose content should be inserted here."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ViewContainer1",
+      "description": "A container for UI elements, functionally similar to CS01ViewContainer but possibly with minor behavioral or styling differences. Often used for grouping controls within a larger section and managing their collective enabled/disabled state or visibility based on a controller.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "backgroundColor": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "disabled_x": {},
+        "disabled_y": {},
+        "disabled_w": {},
+        "disabled_h": {},
+        "disabled2_x": {},
+        "disabled2_y": {},
+        "disabled2_w": {},
+        "disabled2_h": {},
+        "dropListener": {},
+        "enabledByOnOff": {},
+        "rule_list": {},
+        "rule_dlist": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "RoundedRect",
+      "description": "Draws a rectangle with rounded corners. Commonly used for background panels, container borders, or styled elements.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "drawMode": {},
+        "roundedRectRatio": {},
+        "fill_color": {},
+        "frameWidth": {},
+        "border_color": {},
+        "clip_x": {},
+        "clip_y": {},
+        "clip_w": {},
+        "clip_h": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01WaveEditorContainer",
+      "description": "Container holding a CS01WaveEditor and related controls (e.g., Load button, sensitivity knob). Manages data binding for the waveform.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "target": {},
+        "targets_multi": {},
+        "param": {},
+        "tab_x": {},
+        "tab_y": {},
+        "tab_w": {},
+        "tab_h": {},
+        "tabType": {},
+        "font_size": {},
+        "disabledColor": {},
+        "editorMode": {},
+        "disabled_x": {},
+        "disabled_y": {},
+        "disabled_w": {},
+        "disabled_h": {},
+        "style": {},
+        "backgroundColor": {},
+        "instanceLabelFormat": {},
+        "instanceLabelStartIndexDisplay": {},
+        "sizeLabelFormat": {},
+        "loopIn_x": {},
+        "loopIn_y": {},
+        "loopIn_w": {},
+        "loopIn_h": {},
+        "loopOut_x": {},
+        "loopOut_y": {},
+        "loopOut_w": {},
+        "loopOut_h": {},
+        "font": {},
+        "browserTargetItemLoad": {},
+        "assignmentMapTarget": {},
+        "waveEditorPoolName": {}
+      },
+      "customAttributes": [
+        {
+          "name": "target",
+          "description": "Primary data source/target identifier for the waveform data (e.g., 'com.Plogue.Emulator.MD|0|BA73|0')."
+        },
+        {
+          "name": "targets_multi",
+          "description": "Defines multiple potential data targets, used when the editor can display different samples (e.g., SFC slots A-P)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01WaveEditor",
+      "description": "The core waveform display and editing control. Shows audio data, allows setting loop points.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "waveArea_x": {},
+        "waveArea_y": {},
+        "waveArea_w": {},
+        "waveArea_h": {},
+        "leftMargin": {},
+        "style": {},
+        "xAxisLineStyle": {},
+        "curveWidth": {},
+        "defaultZoomFactor": {},
+        "adjustZoomFactorOnWaveChange": {},
+        "scrollbarHeight": {},
+        "zoomOperation": {},
+        "supportsDrop": {},
+        "fileMaxFramesToDisplay": {},
+        "sectionIndicator_x": {},
+        "sectionIndicator_y": {},
+        "sectionIndicator_w": {},
+        "sectionIndicator_h": {},
+        "sectionIndicatorShape": {},
+        "sectionIndicatorLineWidth": {},
+        "backgroundColor": {},
+        "xAxisColor": {},
+        "scrollbarColor": {},
+        "loopingEnabled": {},
+        "curveColor": {},
+        "sectionIndicatorFillColor": {},
+        "sectionIndicatorFrameColor": {},
+        "sectionIndicatorLineColor": {},
+        "useLoopIndicators": {},
+        "loopIndicatorHandleLeft": {},
+        "loopIndicatorHandleLeft_alignment": {},
+        "loopIndicatorHandleRight": {},
+        "loopIndicatorHandleRight_alignment": {},
+        "loopIndicatorsInvisibleLoopModeValuesI": {},
+        "defaultLoopStart": {},
+        "defaultLoopLength": {},
+        "fixedLoopSection": {},
+        "handle_y": {},
+        "handleColor": {},
+        "loopingHandleColor": {},
+        "loopingVerticalLineColor": {},
+        "verticalLineStyle": {},
+        "frameWidth": {},
+        "frameColor": {},
+        "loopingCurveColor": {},
+        "loopingSectionColor": {},
+        "inactiveSectionColor": {},
+        "activeIndicatorLineWidth": {},
+        "activeIndicator_x": {},
+        "activeIndicator_y": {},
+        "activeIndicator_w": {},
+        "activeIndicator_h": {},
+        "activeIndicatorLineColor": {},
+        "activeIndicatorFillColor": {},
+        "activeIndicatorFrameColor": {},
+        "activeIndicatorShape": {},
+        "drawFades": {},
+        "fadesType": {},
+        "fadesAlpha": {},
+        "verticalLineColor": {},
+        "curveType": {},
+        "handleType": {},
+        "handle_w": {},
+        "handle_h": {},
+        "handle_x": {},
+        "timeWidthDefault": {},
+        "timeMax": {},
+        "mouseEnabled": {},
+        "pointsAddingEnabled": {},
+        "pointsMovingEnabled": {},
+        "lineShapeChangeEnabled": {},
+        "useMusicalTimeValuesI": {},
+        "useScrollbar": {},
+        "textEdit_font_size": {},
+        "textEditRelative_x": {},
+        "textEditRelative_y": {},
+        "textEditRelative_w": {},
+        "textEditRelative_h": {},
+        "textEdit_backColor": {},
+        "textEdit_fontColor": {},
+        "zoomTimeFactor": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01TextButton",
+      "description": "A custom button control that displays text and can trigger actions (via role or command) or reflect parameter states.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "role": {},
+        "text": {},
+        "roundedRatio": {},
+        "style": {},
+        "controlTag": {},
+        "enabledByOnOff": {},
+        "font": {},
+        "enable_keys": {},
+        "virtual_key": {},
+        "command": {},
+        "data0": {},
+        "data1": {},
+        "param": {},
+        "fireValueChanged0": {},
+        "textb": {},
+        "addControl": {},
+        "offColor": {},
+        "color_pushed": {},
+        "color_text": {},
+        "drawTextHint": {},
+        "offColorHL": {},
+        "color_textHL": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "rule_s1": {},
+        "label_x": {},
+        "label_y": {},
+        "label_w": {},
+        "label_h": {},
+        "label_font": {},
+        "labelText": {},
+        "prefs": {},
+        "vdefault": {},
+        "on_value": {},
+        "off_value": {}
+      },
+      "customAttributes": [
+        {
+          "name": "role",
+          "description": "Assigns a specific function, e.g., 'fileBrowser', 'addRow', 'deleteAll' (ModMatrix), 'copyToCB', 'copyFromCB', 'clear', 'zoomIn', 'zoomOut', 'rampUp', 'rampDown' (Seq/Curve Editors), 'setBaseDirSource', 'refresh', 'selectRandomFile' (Browser), 'onOffReversed'."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "Line",
+      "description": "Draws a simple straight line, used for visual separators or connecting elements in diagrams.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "frameWidth": {},
+        "style": {},
+        "border_color": {},
+        "lineStyle": {},
+        "drawMode": {},
+        "reversePoints": {},
+        "lineEnd": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01CheckButtons",
+      "description": "A container for multiple check buttons (defined by child OptionItems), allowing selection of one or more options, typically representing bit flags or exclusive choices.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "vmin": {},
+        "vmax": {},
+        "vdefault": {},
+        "role": {},
+        "controller_name": {},
+        "wantsFocus": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01CurveEditorContainer",
+      "description": "Container for the CS01CurveEditor, used for envelope editing. Manages data binding and related controls.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "tabType": {},
+        "backgroundColor": {},
+        "param": {},
+        "target": {},
+        "disabled_x": {},
+        "disabled_y": {},
+        "disabled_w": {},
+        "disabled_h": {},
+        "enabledByOnOff": {},
+        "dropListener": {}
+      },
+      "customAttributes": [
+        {
+          "name": "target",
+          "description": "Data target identifier for the envelope data being edited (e.g., 'com.Plogue.Emulator.C64|0|C665|0' for EG 1)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01CurveEditor",
+      "description": "The visual editor for creating and modifying multi-segment envelopes or LFO shapes.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "curveArea_x": {},
+        "curveArea_y": {},
+        "curveArea_w": {},
+        "curveArea_h": {},
+        "backgroundColor": {},
+        "xAxisLineStyle": {},
+        "curveWidth": {},
+        "handleType": {},
+        "handle_w": {},
+        "handle_h": {},
+        "handle_x": {},
+        "handle_y": {},
+        "timeWidthDefault": {},
+        "timeMax": {},
+        "verticalLineStyle": {},
+        "vmin": {},
+        "vmax": {},
+        "frameWidth": {},
+        "scrollbarHeight": {},
+        "mouseEnabled": {},
+        "pointsAddingEnabled": {},
+        "pointsMovingEnabled": {},
+        "lineShapeChangeEnabled": {},
+        "loopingEnabled": {},
+        "useLoopIndicators": {},
+        "loopIndicatorsInvisibleLoopModeValuesI": {},
+        "useMusicalTimeValuesI": {},
+        "useScrollbar": {},
+        "textEdit_font_size": {},
+        "textEditRelative_x": {},
+        "textEditRelative_y": {},
+        "textEditRelative_w": {},
+        "textEditRelative_h": {},
+        "handleColor": {},
+        "curveColor": {},
+        "xAxisColor": {},
+        "verticalLineColor": {},
+        "frameColor": {},
+        "scrollbarColor": {},
+        "loopingSectionColor": {},
+        "loopingCurveColor": {},
+        "loopingHandleColor": {},
+        "loopingVerticalLineColor": {},
+        "textEdit_backColor": {},
+        "textEdit_fontColor": {},
+        "curveType": {},
+        "handleColor_1": {},
+        "curveColor_1": {}
+      },
+      "customAttributes": [
+        {
+          "name": "curveType",
+          "description": "Specifies the type of curve, influencing parameter interpretation and available features (e.g., 'MDCurve', 'EGSCurve', 'EGSPitchCurve')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01CurveEditorLoopPointControl",
+      "description": "Logical control representing a loop point (start or end) parameter within a CS01CurveEditorContainer.",
+      "attributes": {
+        "param": {},
+        "out": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ModulationLinksContainer",
+      "description": "Container for the modulation matrix interface, holding the columns and rows defining modulation routings.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "backgroundColor": {},
+        "links_x": {},
+        "links_y": {},
+        "links_w": {},
+        "links_h": {},
+        "font": {},
+        "textEdit_font_size": {},
+        "frameWidth": {},
+        "drawFill": {},
+        "fill_roundedRatio": {},
+        "drawFrame": {},
+        "minRows": {},
+        "maxRows": {},
+        "scrollbarWidth": {},
+        "token0": {},
+        "token1": {},
+        "deleteIconType": {},
+        "dataTarget": {},
+        "tabSelectionViewName": {},
+        "tabSelectionIndex": {},
+        "addIcon_x": {},
+        "addIcon_y": {},
+        "addIcon_w": {},
+        "addIcon_h": {},
+        "addIconType": {},
+        "addIconRoundedRect": {},
+        "addIconLineWidth": {},
+        "rangeSliderMargin_x": {},
+        "rangeSliderMargin_y": {},
+        "rangeSliderDisplay_w": {},
+        "rangeSliderDisplay_h": {},
+        "rangeSliderSpacing": {},
+        "rangeSlider_w": {},
+        "rangeSlider_h": {},
+        "rangeSlider_y": {},
+        "rangeSliderKnob_y": {},
+        "rangeSliderKnob_w": {},
+        "rangeSliderKnob_h": {},
+        "checkBox_x": {},
+        "checkBox_y": {},
+        "checkBox_w": {},
+        "checkBox_h": {},
+        "wantsFocus": {},
+        "style": {},
+        "color_text": {},
+        "color_textHL": {},
+        "fillColor": {},
+        "fillColorHL": {},
+        "scrollbarColor": {},
+        "textEdit_backColor": {},
+        "deleteIconColor": {},
+        "deleteIconColorHL": {},
+        "addIconLineColor": {},
+        "addIconLineColorHL": {},
+        "addIconBackgroundColor": {},
+        "addIconBackgroundColorHL": {},
+        "rangeSliderKnobColor": {},
+        "rangeSliderTrackColor": {},
+        "rangeSliderFillColor": {},
+        "checkBoxOffColor": {},
+        "checkBoxOnColor": {},
+        "frameColor": {},
+        "skipScroll": {}
+      },
+      "customAttributes": [
+        {
+          "name": "dataTarget",
+          "description": "Data target identifier pointing to the modulation link definitions data (e.g., 'com.Plogue.Emulator.C64|0|30D3|0')."
+        },
+        {
+          "name": "token0",
+          "description": "Primary delimiter used in the modulation link data string (often ';')."
+        },
+        {
+          "name": "token1",
+          "description": "Secondary delimiter used in the modulation link data string (often '=')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ModulationLinksColumn",
+      "description": "Defines a single column within the CS01ModulationLinksContainer, specifying its header, data type, control type, and linked data source.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "controltype": {},
+        "entryType": {},
+        "alignment": {},
+        "textMargin": {},
+        "name": {},
+        "colChanged": {},
+        "keyword": {},
+        "keywords": {},
+        "dataSourceType": {},
+        "colAvail": {},
+        "colAvailExFlag": {},
+        "dataSourceFilterFlag": {},
+        "entryDefault": {},
+        "entryDefaultD1": {},
+        "entryDefaultD2": {},
+        "entryDisplayScale": {},
+        "entryDisplayString": {},
+        "entryMin": {},
+        "entryMax": {},
+        "ex1ExFlag": {},
+        "font_size": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The header text displayed for this column (e.g., 'Source', 'Destination', 'Range')."
+        },
+        {
+          "name": "controltype",
+          "description": "The type of UI control used for editing data in this column (e.g., 'dynamicMenu', 'rangeSliderEdit', 'checkBox', 'deleteRow')."
+        },
+        {
+          "name": "entryType",
+          "description": "The data type expected for this column (e.g., 'string', 'double', 'int', 'deleteRow')."
+        },
+        {
+          "name": "keyword",
+          "description": "The keyword used in the modulation link data string to identify the value for this column (e.g., 'SOURCE', 'DESTINATION', 'AMOUNT')."
+        },
+        {
+          "name": "keywords",
+          "description": "Specifies multiple keywords when a single control affects multiple data fields (e.g., 'OFFSET;AMOUNT' for the range slider)."
+        },
+        {
+          "name": "dataSourceType",
+          "description": "Specifies the type of data source populating dropdowns ('dynamicMenu') for this column (e.g., 'source', 'destination', 'func', 'math')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01StepEditorContainer",
+      "description": "Container for the CS01StepEditor and related sequencer controls (loop, sync, timing, etc.).",
+      "attributes": {
+        "param": {},
+        "target": {},
+        "style": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "tab_x": {},
+        "tab_y": {},
+        "tab_w": {},
+        "tab_h": {},
+        "backgroundColor": {},
+        "disabled_x": {},
+        "disabled_y": {},
+        "disabled_w": {},
+        "disabled_h": {},
+        "resizeOnOnOff": {},
+        "resize_w": {},
+        "resize_h": {},
+        "tabType": {},
+        "frameSelectionSubMenus": {},
+        "frameSelectionSubMenusDivider": {},
+        "disabledColor": {}
+      },
+      "customAttributes": [
+        {
+          "name": "target",
+          "description": "Data target identifier for the specific step sequencer instance (e.g., 'com.Plogue.Emulator.C64|0|575A|0' for Step 1)."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01StepEditorLoopPointControl",
+      "description": "Logical control representing a loop point (start or end) parameter within a CS01StepEditorContainer.",
+      "attributes": {
+        "param": {},
+        "out": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01StepEditor",
+      "description": "The core step sequencer editing interface. Allows drawing steps, setting values per step, and defining loop points.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "stepsArea_x": {},
+        "stepsArea_y": {},
+        "stepsArea_w": {},
+        "stepsArea_h": {},
+        "backgroundColor": {},
+        "vmin": {},
+        "vmax": {},
+        "numSteps": {},
+        "minNumSteps": {},
+        "maxNumSteps": {},
+        "loopingEnabled": {},
+        "useKeys": {},
+        "stepDivisionHintCount": {},
+        "stepDivisionHintLuminanceChange": {},
+        "useLoopIndicators": {},
+        "loopIndicatorHandleLeft": {},
+        "loopIndicatorHandleLeft_alignment": {},
+        "loopIndicatorHandleRight": {},
+        "loopIndicatorHandleRight_alignment": {},
+        "loopIndicatorsInvisibleLoopModeValuesI": {},
+        "bitModeNumRows": {},
+        "bitModeRowHeight": {},
+        "bitModeOffBorder": {},
+        "bitModeOnBorder": {},
+        "bitModefont_size": {},
+        "bitModeExclusiveOffBorder": {},
+        "bitModeExclusiveOnBorder": {},
+        "bitModeBitValuePerRow": {},
+        "bitModeNamePerRow": {},
+        "bitModeExclusiveRows": {},
+        "bitModeExclusiveOverwrite": {},
+        "bitModeExclusiveOverwriteReverse": {},
+        "drawRects": {},
+        "xAxisColor": {},
+        "fillColor": {},
+        "activeFillColor": {},
+        "loopingSectionFillColor": {},
+        "loopIndicatorLineColor": {},
+        "loopIndicatorLineColorOut": {},
+        "stepMode0_fillColor": {},
+        "stepMode0_loopingSectionFillColor": {},
+        "stepMode1_fillColor": {},
+        "stepMode1_loopingSectionFillColor": {},
+        "bitModeOffBorderColor": {},
+        "bitModeOffFillColor": {},
+        "bitModeOffLoopingSectionFillColor": {},
+        "bitModeOnBorderColor": {},
+        "bitModeOnFillColor": {},
+        "bitModeOnLoopingSectionFillColor": {},
+        "bitModeFontColor": {},
+        "bitModeExclusiveOffBorderColor": {},
+        "bitModeExclusiveOffFillColor": {},
+        "bitModeExclusiveOffLoopingSectionFillColor": {},
+        "bitModeExclusiveOnBorderColor": {},
+        "bitModeExclusiveOnFillColor": {},
+        "bitModeExclusiveOnLoopingSectionFillColor": {},
+        "bitModeExclusiveFontColor": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ScrollViewPageController",
+      "description": "Control (arrows or dots) for navigating between pages within a ScrollView.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "type": {
+          "description": "Type 0 = Left and Right one-time use arrow style buttons.\n\nRequires an image_1 and image_2 SVG (WARNING: chipsynth WILL CRASH if you use this type without specifying an image_2)\n\nType 1 = Toggle buttons, only image_1 is required."
+        },
+        "frameDraw": {},
+        "scrollViewName": {},
+        "image_1": {},
+        "image_2": {},
+        "image_1HL": {},
+        "image_2HL": {},
+        "disabledLuminanceChange": {},
+        "name": {},
+        "showPageName": {},
+        "showPageNameType": {},
+        "fontColor": {},
+        "font": {},
+        "circleEdit": {},
+        "showPageNameCheckCurrentValue": {},
+        "style": {},
+        "backgroundColor": {},
+        "frameColor": {},
+        "enabledByOnOff": {},
+        "fontColorHL": {},
+        "circleEditColor": {}
+      },
+      "customAttributes": [
+        {
+          "name": "scrollViewName",
+          "description": "The 'name' attribute of the ScrollView element that this controller navigates."
+        }
+      ],
+      "category": "Other",
+      "supported": true
+    },
+    {
+      "element": "PageName",
+      "description": "Defines the text label associated with a specific page index within a ScrollView, used by CS01ScrollViewPageController.",
+      "attributes": {
+        "idx": {},
+        "name": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "ScrollView",
+      "description": "A container that allows scrolling through content wider or taller than its visible area. Used for navigating multiple step/curve editors.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "scrollbarwidth": {},
+        "internalwidth": {},
+        "internalheight": {},
+        "backgroundColor": {},
+        "showScrollbars": {},
+        "name": {},
+        "scrollbarColor": {},
+        "scrollbarBackgroundColor": {},
+        "scrollbarFrameColor": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "Unique name identifier for this ScrollView, referenced by a CS01ScrollViewPageController."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ViewContainerManager",
+      "description": "Coordinates dynamic content loading within associated CS01ViewContainers based on CS01ViewConfigurationSet definitions and potentially linked modulation sources.",
+      "attributes": {
+        "param": {},
+        "dataTarget": {}
+      },
+      "customAttributes": [
+        {
+          "name": "dataTarget",
+          "description": "Data target identifier likely pointing to the modulation link definitions that influence which view configuration is active."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ViewConfigurationSet",
+      "description": "Defines a set of named configurations for dynamically loading content into CS01ViewContainers. Groups CSViewConfiguration elements and supports inheritance/copying.",
+      "attributes": {
+        "name": {},
+        "parentGroupName": {},
+        "createCopies": {},
+        "copiesPrefix": {},
+        "copyOf": {},
+        "containerName": {},
+        "containeeFind": {},
+        "containeeReplace": {},
+        "nameFind": {},
+        "nameReplace": {},
+        "copySkip": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "Unique name for this configuration set (e.g., 'STEP0', 'EG1', '$PATCHNAMEAlgorithms')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CSViewConfiguration",
+      "description": "Defines a specific named configuration within a CS01ViewConfigurationSet, containing associations (CS01ViewAssoc) that link containers to content and define variables.",
+      "attributes": {
+        "name": {},
+        "keepContextual": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The unique name of this specific view configuration (e.g., 'Osc1 PW', 'default'). Often selected via OptionMenus or modulation links."
+        },
+        {
+          "name": "keepContextual",
+          "description": "Flag (0 or 1) likely indicating that contextual views (like operator details) should remain visible even when switching between configurations within this set."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ViewAssoc",
+      "description": "Defines an association within a CSViewConfiguration, linking a target container ('container') with the content ('containee') it should display for this specific configuration, optionally passing definitions.",
+      "attributes": {
+        "container": {},
+        "containee": {},
+        "defines": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "StyleMacro",
+      "description": "Defines a named constant within a styles.xml file. The 'value' can then be referenced by name in <Style> definitions, promoting consistency.",
+      "attributes": {
+        "name": {},
+        "value": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The unique name identifying this macro constant (e.g., 'BG_COLOR')."
+        },
+        {
+          "name": "value",
+          "description": "The literal value (e.g., color code '#DDD9D0FF') assigned to the macro name."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "Style",
+      "description": "Defines a named style grouping multiple visual/behavioral attributes, referenced by UI elements via their 'style' attribute. Can include 'path' and 'aliases' for dynamic content loading in CS01ViewContainers.",
+      "attributes": {
+        "name": {},
+        "path": {},
+        "visible": {},
+        "aliases": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "fill_color": {},
+        "frameColor": {},
+        "backgroundColor": {},
+        "disabledOverlayColor": {},
+        "font": {},
+        "color_text": {},
+        "alignment": {},
+        "color_text_disabled": {},
+        "useImageSize": {},
+        "drawMode": {},
+        "color_selected": {},
+        "color_deselected": {},
+        "disabledColor": {},
+        "roundedRatio": {},
+        "offColor": {},
+        "onColor": {},
+        "mod_margin": {},
+        "mod_onColor": {},
+        "mod_offColor": {},
+        "wantsFocus": {},
+        "knob_x": {},
+        "knob_y": {},
+        "knob_w": {},
+        "knob_h": {},
+        "boxColor": {},
+        "fontColor": {},
+        "stepped": {},
+        "mod_knobMode": {},
+        "border_color": {},
+        "lineStyle": {},
+        "valueTrackColor": {},
+        "valueFillColor": {},
+        "valueTrackWidth": {},
+        "valueTrackOrder": {},
+        "valueIndicatorType": {},
+        "valueIndicatorMargin": {},
+        "knobFillColor": {},
+        "valueIndicatorFillColor": {},
+        "label_fontColor": {},
+        "modTrackColor": {},
+        "modFillColor": {},
+        "textEdit_backColor": {},
+        "mouseIncrementAuto": {},
+        "modTrackMargin": {},
+        "modTrackWidth": {},
+        "label_fontColor_off": {},
+        "label_fontColor_on": {},
+        "label_fontColor_disabled": {},
+        "color_pushed": {},
+        "color_disabled": {},
+        "valueIndicator_x": {},
+        "valueIndicator_y": {},
+        "valueIndicator_w": {},
+        "valueIndicator_h": {},
+        "label_x": {},
+        "label_y": {},
+        "label_w": {},
+        "label_h": {},
+        "value_font_size": {},
+        "label_font": {},
+        "font_size": {},
+        "curveColor": {},
+        "sectionIndicatorFillColor": {},
+        "sectionIndicatorFrameColor": {},
+        "sectionIndicatorLineColor": {},
+        "xAxisColor": {},
+        "scrollbarColor": {},
+        "fillColor": {},
+        "fillColorHL": {},
+        "deleteIconColor": {},
+        "deleteIconColorHL": {},
+        "addIconLineColor": {},
+        "addIconLineColorHL": {},
+        "addIconBackgroundColor": {},
+        "addIconBackgroundColorHL": {},
+        "rangeSliderKnobColor": {},
+        "rangeSliderTrackColor": {},
+        "rangeSliderFillColor": {},
+        "checkBoxOffColor": {},
+        "checkBoxOnColor": {},
+        "activeFillColor": {},
+        "loopingSectionFillColor": {},
+        "loopIndicatorLineColor": {},
+        "loopIndicatorLineColorOut": {},
+        "stepMode0_fillColor": {},
+        "stepMode0_loopingSectionFillColor": {},
+        "stepMode1_fillColor": {},
+        "stepMode1_loopingSectionFillColor": {},
+        "bitModeOffBorderColor": {},
+        "bitModeOffFillColor": {},
+        "bitModeOffLoopingSectionFillColor": {},
+        "bitModeOnBorderColor": {},
+        "bitModeOnFillColor": {},
+        "bitModeOnLoopingSectionFillColor": {},
+        "bitModeFontColor": {},
+        "bitModeExclusiveOffBorderColor": {},
+        "bitModeExclusiveOffFillColor": {},
+        "bitModeExclusiveOffLoopingSectionFillColor": {},
+        "bitModeExclusiveOnBorderColor": {},
+        "bitModeExclusiveOnFillColor": {},
+        "bitModeExclusiveOnLoopingSectionFillColor": {},
+        "bitModeExclusiveFontColor": {},
+        "handleColor": {},
+        "verticalLineColor": {},
+        "loopingCurveColor": {},
+        "loopingHandleColor": {},
+        "loopingVerticalLineColor": {},
+        "textEdit_fontColor": {},
+        "scrollbarBackgroundColor": {},
+        "scrollbarFrameColor": {},
+        "entries_fontColor": {},
+        "selected_fontColor": {},
+        "selected_backgroundColor": {},
+        "hovered_fontColor": {},
+        "hovered_backgroundColor": {},
+        "color_back": {},
+        "textColor": {},
+        "textColorHL": {},
+        "textErrorColor": {},
+        "textErrorColorHL": {},
+        "text_x": {},
+        "text_y": {},
+        "text_h": {},
+        "fontColorHL": {},
+        "circleEditColor": {},
+        "frameWidth": {},
+        "mod_color_text": {},
+        "handleColor_1": {},
+        "curveColor_1": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The unique name identifying this style set."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01ModSourceTextButton",
+      "description": "A specialized text button used within modulation matrix or source selection contexts, linking to a specific modulation source/destination.",
+      "attributes": {
+        "style": {},
+        "codedName": {},
+        "controller": {},
+        "rule": {},
+        "data0": {},
+        "text": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01AssignmentMapTarget",
+      "description": "Defines mappings between data pools, browsers, and file handling logic for drag-and-drop and loading operations.",
+      "attributes": {
+        "assignmentMapTargets": {},
+        "browserTargets": {},
+        "browserTargetItemLoad": {},
+        "targets_multi": {},
+        "fileType": {},
+        "fileSubType": {},
+        "numRows": {},
+        "mappings": {},
+        "dropListenerName": {},
+        "useCommands": {},
+        "target": {},
+        "fileDrop": {},
+        "fileExtensions": {},
+        "fileMulti": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01AssignmentMapContainer",
+      "description": "Container for the CS01AssignmentMap list view, managing its display and interaction context.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "assignmentMapName": {},
+        "target": {},
+        "param": {},
+        "enabledByOnOff": {},
+        "backgroundColor": {},
+        "outsideClearsSelection": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01AssignmentMap",
+      "description": "Displays a list of assignable items (presets, samples) allowing selection, reordering, drag-and-drop, and other list management actions.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "scrollbarSize": {},
+        "drawFrame": {},
+        "frameWidth": {},
+        "col0_w": {},
+        "col0_h": {},
+        "col0_name": {},
+        "col0_format": {},
+        "col0_alignment": {},
+        "startIndexDisplay": {},
+        "col1_w": {},
+        "col1_h": {},
+        "col1_name": {},
+        "col1_format": {},
+        "col1_alignment": {},
+        "assignType": {},
+        "supportsFileDrop": {},
+        "numRows": {},
+        "moveItemOnSelfDragDrop": {},
+        "copyItemOnNotSelfDragDrop": {},
+        "activeSelectionOverlayColor": {},
+        "param": {},
+        "dragEnabled": {},
+        "allowMultipleItemsDrag": {},
+        "dropEnabled": {},
+        "dragType": {},
+        "dndoperations": {},
+        "dropTypes": {},
+        "drag_font_size": {},
+        "deleteIcon_font_size": {},
+        "deleteMultiple": {},
+        "useCommands": {},
+        "useArrowKeys": {},
+        "deleteIcon": {},
+        "rename": {},
+        "backgroundColor": {},
+        "fontColor": {},
+        "frameColor": {},
+        "fontColorError": {},
+        "dragOverOverlayColor": {},
+        "currentSelectionOverlayColor": {},
+        "currentSelectionFontColor": {},
+        "activeSelectionFontColor": {},
+        "font": {},
+        "deleteIconColor": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01RadioButtons",
+      "description": "Container for multiple buttons (defined by child OptionItems with images) where only one can be selected at a time (radio button functionality).",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "vmin": {},
+        "vmax": {},
+        "vdefault": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "ImageHolder",
+      "description": "Placeholder element designed to display an image associated with specific custom data, typically used for showing album art loaded from VGM files.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "target": {},
+        "param": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Picture8Data",
+      "description": "Displays an 8-bit image, often used for visualizing hardware states, memory contents, or custom graphics from files (like VGM metadata).",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "target": {},
+        "param": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01OptionMenuMIDIDevice",
+      "description": "A specialized OptionMenu for selecting available system MIDI input or output devices.",
+      "attributes": {
+        "x": {},
+        "y": {},
+        "w": {},
+        "style": {},
+        "inputs": {},
+        "text_w": {},
+        "h": {},
+        "backgroundColor": {},
+        "alignment": {},
+        "textColor": {},
+        "textColorHL": {},
+        "textErrorColor": {},
+        "textErrorColorHL": {},
+        "text_x": {},
+        "text_y": {},
+        "text_h": {},
+        "enabledByOnOff": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CS01TransportButton",
+      "description": "A button designed for transport controls (play, stop, etc.) used in VGM/SPC player contexts.",
+      "attributes": {
+        "param": {},
+        "type": {},
+        "style": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "command": {},
+        "data0": {},
+        "data1": {}
+      },
+      "customAttributes": [
+        {
+          "name": "type",
+          "description": "Specifies the transport function ('home', 'rewind', 'stop', 'play', 'end', 'open')."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01Knob",
+      "description": "A custom rotary knob control, potentially an alternative implementation or specialized version of CS03Knob.",
+      "attributes": {
+        "style": {},
+        "param": {},
+        "x": {},
+        "y": {},
+        "vdefault": {},
+        "mouseIncrement": {},
+        "vmin": {},
+        "vmax": {},
+        "stepped": {},
+        "unipolar": {},
+        "format": {},
+        "w": {},
+        "h": {},
+        "trackColor": {},
+        "fillColor": {},
+        "trackWidth": {},
+        "fontColor": {},
+        "font_size": {},
+        "textEdit_backColor": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "mod_margin": {},
+        "mod_fillColor": {},
+        "role": {},
+        "value_font": {},
+        "enabledByOnOff": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Label",
+      "description": "Displays dynamic text based on a parameter's value.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "style": {},
+        "format": {},
+        "factor": {},
+        "alignment": {},
+        "text": {},
+        "transparent": {},
+        "font": {},
+        "enabledByOnOff": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "DisplayStringOption",
+      "description": "Displays specific predefined strings based on the range of a parameter's value.",
+      "attributes": {
+        "param": {},
+        "style": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "transparent": {},
+        "format": {},
+        "font": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "DisplayStringOptionItem",
+      "description": "Defines a string to display within a DisplayStringOption when the parameter's value falls within 'value' +/- 'epsilon'.",
+      "attributes": {
+        "name": {},
+        "value": {},
+        "epsilon": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "TextEditor",
+      "description": "A text display area that can be editable or read-only, used for metadata display or potentially patch naming.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "text_x": {},
+        "text_y": {},
+        "text_h": {},
+        "text_w": {},
+        "transparent": {},
+        "alignment": {},
+        "target": {},
+        "tdefault": {},
+        "editable": {},
+        "color_text": {},
+        "style": {},
+        "font": {},
+        "color_back": {},
+        "enabledByOnOff": {}
+      },
+      "customAttributes": [
+        {
+          "name": "target",
+          "description": "Data target identifier ('pluginIdentifier|instance|paramID|subParam') specifying where the text data comes from or is saved to."
+        }
+      ],
+      "category": "Other"
+    },
+    {
+      "element": "CS01CloseButton",
+      "description": "A button styled as an 'X' for closing associated views, linked via controlTag.",
+      "attributes": {
+        "controlTag": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "x_x": {},
+        "x_y": {},
+        "x_w": {},
+        "x_h": {},
+        "x_offColor": {},
+        "xWidth": {},
+        "lineEnd": {},
+        "style": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Shape",
+      "description": "Defines a custom polygon shape using child <Point> elements.",
+      "attributes": {
+        "closeShape": {},
+        "style": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Point",
+      "description": "Defines a vertex (x,y coordinate) within a <Shape> element.",
+      "attributes": {
+        "x": {},
+        "y": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CommandButton",
+      "description": "A button that executes a specific internal command when clicked.",
+      "attributes": {
+        "param": {},
+        "image_off": {},
+        "image_on": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "command": {},
+        "data0": {},
+        "data1": {},
+        "transparent": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "HoldButton",
+      "description": "A button that remains visually pressed while held down, used for drum pads.",
+      "attributes": {
+        "param": {},
+        "image_on": {},
+        "image_off": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "holdMode": {},
+        "manageHLStates": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CustomMouseableArea",
+      "description": "Defines a non-rectangular clickable area for a control (like irregular drum pads) using a polygon defined by child <Point> elements.",
+      "attributes": {},
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "CrossingArea",
+      "description": "Defines a rectangular area potentially used for hit-testing or interaction logic related to a parent control (e.g., drag-over detection). Contains a child <Rect>.",
+      "attributes": {},
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "OnOffButton",
+      "description": "Standard On/Off toggle button, likely using images for states.",
+      "attributes": {
+        "param": {},
+        "image_off": {},
+        "image_on": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "Button",
+      "description": "A generic button element, often image-based, used for simple actions or as part of complex controls like transport.",
+      "attributes": {
+        "param": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "controller": {},
+        "rule": {},
+        "rule_d1": {},
+        "image_off": {},
+        "image_on": {}
+      },
+      "customAttributes": [],
+      "category": "Other"
+    },
+    {
+      "element": "StyleMacro",
+      "description": "Defines a named constant within a styles.xml file, used for easy reference and maintenance of values like colors or dimensions in <Style> definitions.",
+      "attributes": {
+        "name": {},
+        "value": {}
+      },
+      "customAttributes": [
+        {
+          "name": "name",
+          "description": "The unique name identifying this macro constant."
+        },
+        {
+          "name": "value",
+          "description": "The literal value assigned to the macro name."
+        }
+      ],
+      "category": "Other"
+    }
+  ]
+}

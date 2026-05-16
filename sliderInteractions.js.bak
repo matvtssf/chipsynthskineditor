@@ -1,0 +1,515 @@
+// File: cs/sliderInteractions.js
+/**
+ * sliderInteractions.js
+ * Handles user interactions for CS01Slider elements.
+ * ADDED: initializeSliderInstance function for per-slider setup.
+ */
+import * as State from './state.js';
+import * as DomUtils from './domUtils.js';
+
+const SLIDER_SENSITIVITY = 1.0; 
+let activeTextInput = null; 
+let isDraggingKnob = false; 
+let sliderTrackClickInfo = null; 
+
+let lastClientX = 0;
+let lastClientY = 0;
+document.addEventListener('mousemove', (e) => {
+    lastClientX = e.clientX;
+    lastClientY = e.clientY;
+}, { capture: true });
+
+/**
+ * Updates the slider's visual position and text based on a value.
+ * @param {HTMLElement} container - The slider container element.
+ * @param {number} value - The new value to set.
+ * @param {boolean} [updateText=true] - Whether to update the value text.
+ */
+function updateSliderVisuals(container, value, updateText = true) {
+    if (!container || !container.dataset) {
+        console.warn("[updateSliderVisuals] Invalid slider container or missing dataset", container);
+        return;
+    }
+
+    const knob = container.querySelector('.gui-slider-knob');
+    const valueTextElement = container.querySelector('.slider-value-text');
+    const fillTrack = container.querySelector('.gui-slider-fill'); // Optional fill element
+
+    const min = parseFloat(container.dataset.vmin);
+    const max = parseFloat(container.dataset.vmax);
+    const orientation = container.dataset.orientation || 'vertical';
+    const inverted = container.dataset.inverted === 'true';
+
+    if (isNaN(min) || isNaN(max)) {
+        // console.warn("[updateSliderVisuals] Min/max values not found or invalid for slider", container);
+        return;
+    }
+
+    let percent = (value - min) / (max - min);
+    if (isNaN(percent)) percent = 0;
+    percent = Math.max(0, Math.min(1, percent)); // Clamp between 0 and 1
+
+    if (knob) {
+        if (orientation === 'vertical') {
+            const containerHeight = container.clientHeight;
+            const knobHeight = knob.offsetHeight;
+            let knobY = inverted ? (percent * (containerHeight - knobHeight)) : ((1 - percent) * (containerHeight - knobHeight));
+            knob.style.top = `${knobY}px`;
+            knob.style.left = '50%'; // Center horizontally for vertical sliders
+            knob.style.transform = 'translateX(-50%)';
+            if (fillTrack) {
+                fillTrack.style.height = `${percent * 100}%`;
+                fillTrack.style.bottom = '0';
+                fillTrack.style.left = '0';
+                fillTrack.style.width = '100%';
+            }
+        } else { // Horizontal
+            const containerWidth = container.clientWidth;
+            const knobWidth = knob.offsetWidth;
+            let knobX = inverted ? ((1 - percent) * (containerWidth - knobWidth)) : (percent * (containerWidth - knobWidth));
+            knob.style.left = `${knobX}px`;
+            knob.style.top = '50%'; // Center vertically for horizontal sliders
+            knob.style.transform = 'translateY(-50%)';
+            if (fillTrack) {
+                fillTrack.style.width = `${percent * 100}%`;
+                fillTrack.style.left = '0';
+                fillTrack.style.top = '0';
+                fillTrack.style.height = '100%';
+            }
+        }
+    }
+
+    if (updateText && valueTextElement) {
+        const format = container.dataset.valueFormat || '%.2f';
+        const factor = parseFloat(container.dataset.valueFactor || '1');
+        const stepped = container.dataset.stepped === 'true';
+        let displayValue = value * factor;
+        if (stepped) displayValue = Math.round(displayValue);
+        
+        // Basic formatting (can be expanded)
+        if (format.includes('%.')) {
+            const decimals = parseInt(format.split('.')[1]);
+            valueTextElement.textContent = displayValue.toFixed(decimals);
+        } else if (format.includes('%d') || format.includes('%i')) {
+            valueTextElement.textContent = Math.round(displayValue).toString();
+        } else {
+            valueTextElement.textContent = displayValue.toString();
+        }
+    }
+    container.dataset.currentValue = value; // Store raw value
+}
+
+
+/**
+ * Initializes a specific slider instance.
+ * Creates DOM elements for knob, track, text if not already present via XML.
+ * Stores attributes and sets initial visual state.
+ * @param {HTMLElement} container - The main div for the CS01Slider.
+ * @param {Element} xmlNode - The original XML node for the slider.
+ * @param {Object} mergedAttributes - Combined attributes from XML and styles.
+ * @param {number} baseParamOffset - The current parameter offset.
+ */
+export function initializeSliderInstance(container, xmlNode, mergedAttributes, baseParamOffset = 0) {
+    const paramId = DomUtils.getParamValue(xmlNode, baseParamOffset, mergedAttributes['param']);
+    container.dataset.param = paramId;
+
+    container.dataset.vmin = mergedAttributes['vmin'] || '0';
+    container.dataset.vmax = mergedAttributes['vmax'] || '1';
+    container.dataset.vdefault = mergedAttributes['vdefault'] || container.dataset.vmin;
+    container.dataset.stepped = mergedAttributes['stepped'] === '1' ? 'true' : 'false';
+    container.dataset.orientation = mergedAttributes['orientation'] || (parseFloat(mergedAttributes['w']) > parseFloat(mergedAttributes['h']) ? 'horizontal' : 'vertical');
+    container.dataset.inverted = mergedAttributes['inverted'] === '1' ? 'true' : 'false'; // Handle inversion
+    container.dataset.valueFactor = mergedAttributes['valueText_factor'] || '1';
+    container.dataset.valueFormat = mergedAttributes['valueText_format'] || (container.dataset.stepped === 'true' ? '%d' : '%.2f');
+    container.dataset.showValueText = mergedAttributes['showValueText'] || '0'; // 0=never, 1=hover, 2=always
+    container.dataset.clickOnTrack = mergedAttributes['clickOnTrack'] === '1' ? 'true' : 'false';
+    container.dataset.springMode = mergedAttributes['spring_mode'] || '0'; // 0=none, 1=spring to default, 2=spring to middle
+
+    // Create essential parts if not defined by children (more robust than relying on children always)
+    let knob = container.querySelector('.gui-slider-knob');
+    if (!knob) {
+        knob = document.createElement('div');
+        knob.classList.add('gui-slider-knob');
+        container.appendChild(knob);
+        // Basic default styling if XML doesn't provide image/size for knob via style
+        if (!mergedAttributes['knob_w'] && !mergedAttributes['knob_h'] && !mergedAttributes['knobImage']) {
+            if (container.dataset.orientation === 'vertical') {
+                knob.style.width = '100%'; knob.style.height = mergedAttributes['knob_height'] || '10px';
+            } else {
+                knob.style.width = mergedAttributes['knob_width'] || '10px'; knob.style.height = '100%';
+            }
+            knob.style.backgroundColor = '#888'; // Default knob color
+        }
+    }
+     // Apply knob image if specified
+    const knobImage = mergedAttributes['knobImage'] || mergedAttributes['image_knob'];
+    if (knobImage) {
+        const fullKnobPath = State.normalizePath(knobImage, State.getCurrentSkinRoot() || '');
+        const knobBlob = State.getAssetBlobUrl(fullKnobPath);
+        if (knobBlob) {
+            knob.style.backgroundImage = `url('${knobBlob}')`;
+            knob.style.backgroundSize = '100% 100%'; // Or as per XML
+            knob.style.backgroundColor = 'transparent';
+        }
+    }
+
+
+    let valueTextElement = container.querySelector('.slider-value-text');
+    if (!valueTextElement && container.dataset.showValueText !== '0') {
+        valueTextElement = document.createElement('div');
+        valueTextElement.classList.add('slider-value-text');
+        container.appendChild(valueTextElement);
+        valueTextElement.style.position = 'absolute'; // Or styled via CSS
+        valueTextElement.style.textAlign = 'center';
+        valueTextElement.style.pointerEvents = 'none';
+        valueTextElement.style.display = container.dataset.showValueText === '2' ? 'block' : 'none';
+    }
+    if (valueTextElement && container.dataset.showValueText === '0') {
+        valueTextElement.style.display = 'none';
+    }
+
+
+    // Set initial value
+    let initialValue = State.getElementState(paramId, parseFloat(container.dataset.vdefault));
+    if (typeof initialValue !== 'number' || isNaN(initialValue)) {
+        initialValue = parseFloat(container.dataset.vdefault);
+    }
+    updateSliderVisuals(container, initialValue, container.dataset.showValueText === '2');
+
+    // Ensure track allows clicks if clickOnTrack is true
+    if (container.dataset.clickOnTrack === 'true') {
+        const trackElement = container.querySelector('.gui-slider-track') || container; // Use container itself if no specific track
+        trackElement.style.cursor = 'pointer';
+    }
+    console.log(`[sliderInteractions] Initialized slider for param ${paramId}`, container.dataset);
+}
+
+
+function calculateValueFromMouse(container, event) {
+    const rect = container.getBoundingClientRect();
+    const min = parseFloat(container.dataset.vmin);
+    const max = parseFloat(container.dataset.vmax);
+    const orientation = container.dataset.orientation;
+    const inverted = container.dataset.inverted === 'true';
+    let percent;
+
+    if (orientation === 'vertical') {
+        const knobHeight = container.querySelector('.gui-slider-knob')?.offsetHeight || 0;
+        const trackHeight = rect.height - knobHeight;
+        let y = event.clientY - rect.top - (knobHeight / 2);
+        percent = Math.max(0, Math.min(1, y / trackHeight));
+        if (!inverted) percent = 1 - percent;
+    } else { // Horizontal
+        const knobWidth = container.querySelector('.gui-slider-knob')?.offsetWidth || 0;
+        const trackWidth = rect.width - knobWidth;
+        let x = event.clientX - rect.left - (knobWidth / 2);
+        percent = Math.max(0, Math.min(1, x / trackWidth));
+        if (inverted) percent = 1 - percent;
+    }
+    
+    let value = min + percent * (max - min);
+    
+    if (container.dataset.stepped === 'true') {
+        // For stepped sliders, snap to the nearest step.
+        // Assuming steps are integer increments if not otherwise specified.
+        // More complex step logic (e.g., from an attribute) could be added here.
+        value = Math.round(value); 
+    }
+    return Math.max(min, Math.min(max, value)); // Clamp value
+}
+
+function handleTextInput(event) {
+    const input = event.target;
+    const container = input.closest('.gui-slider-container');
+    if (!container || !container.dataset) return;
+
+    if (event.type === 'blur' || (event.type === 'keydown' && event.key === 'Enter')) {
+        let newValue = parseFloat(input.value);
+        const min = parseFloat(container.dataset.vmin);
+        const max = parseFloat(container.dataset.vmax);
+        const factor = parseFloat(container.dataset.valueFactor || '1');
+        newValue /= factor; // Adjust back from display value
+
+        if (!isNaN(newValue)) {
+            newValue = Math.max(min, Math.min(max, newValue)); // Clamp
+            if (container.dataset.stepped === 'true') newValue = Math.round(newValue);
+            
+            updateSliderVisuals(container, newValue, true); // Update visuals and text
+            State.setElementState(container.dataset.param, newValue);
+            DomUtils.triggerGenericChangeEvent(container, newValue);
+        }
+        
+        input.remove(); // Remove input after submission/blur
+        activeTextInput = null;
+        
+        // Check if mouse is still over to re-show hover text if applicable
+        const valueTextElement = container.querySelector('.slider-value-text');
+        if (valueTextElement && container.dataset.showValueText === '1') { // Show on hover
+            const rect = container.getBoundingClientRect();
+            if (lastClientX >= rect.left && lastClientX <= rect.right &&
+                lastClientY >= rect.top && lastClientY <= rect.bottom) {
+                valueTextElement.style.display = 'block';
+            } else {
+                valueTextElement.style.display = 'none';
+            }
+        }
+
+    } else if (event.type === 'keydown' && event.key === 'Escape') {
+        const originalValue = parseFloat(container.dataset.currentValue); // Use stored raw value
+        updateSliderVisuals(container, originalValue, true); // Revert visuals
+        input.remove();
+        activeTextInput = null;
+         // Check hover state for value text
+        const valueTextElement = container.querySelector('.slider-value-text');
+        if (valueTextElement && container.dataset.showValueText === '1') {
+            const rect = container.getBoundingClientRect();
+             if (lastClientX >= rect.left && lastClientX <= rect.right &&
+                lastClientY >= rect.top && lastClientY <= rect.bottom) {
+                valueTextElement.style.display = 'block';
+            } else {
+                 valueTextElement.style.display = 'none';
+            }
+        }
+    }
+}
+
+function handleDoubleClick(event) {
+    if (activeTextInput) return; // Prevent multiple inputs
+
+    const container = event.target.closest('.gui-slider-container');
+    if (!container || !container.dataset || !container.dataset.param) return;
+    
+    // Only allow text edit if showValueText is not "0" (never)
+    if (container.dataset.showValueText === '0') return;
+
+    isDraggingKnob = false; // Ensure dragging stops if it was somehow active
+
+    const valueTextElement = container.querySelector('.slider-value-text');
+    if (valueTextElement) valueTextElement.style.display = 'none'; // Hide text display
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.classList.add('slider-value-input'); // For styling
+
+    const currentValue = parseFloat(container.dataset.currentValue);
+    const factor = parseFloat(container.dataset.valueFactor || '1');
+    const format = container.dataset.valueFormat || '%.2f';
+    let displayValue = currentValue * factor;
+
+    if (container.dataset.stepped === 'true') displayValue = Math.round(displayValue);
+    
+    if (format.includes('%.')) {
+        const decimals = parseInt(format.split('.')[1]);
+        input.value = displayValue.toFixed(decimals);
+    } else {
+        input.value = displayValue.toString();
+    }
+    
+    // Basic styling for the input to overlay the slider (can be enhanced with CSS)
+    input.style.position = 'absolute';
+    const knob = container.querySelector('.gui-slider-knob');
+    if (knob) { // Position near the knob or center of slider
+        input.style.top = knob.style.top; 
+        input.style.left = knob.style.left;
+        input.style.width = `${Math.max(30, knob.offsetWidth)}px`; // Make it wide enough
+    } else { // Fallback positioning
+        input.style.top = '50%'; input.style.left = '50%';
+        input.style.transform = 'translate(-50%, -50%)';
+        input.style.width = '50px';
+    }
+    input.style.zIndex = '10'; // Ensure it's on top
+
+    container.appendChild(input);
+    input.focus();
+    input.select();
+    activeTextInput = input;
+
+    input.addEventListener('blur', handleTextInput);
+    input.addEventListener('keydown', handleTextInput);
+}
+
+
+function handleMouseDown(event) {
+    if (event.button !== 0) return; // Only main mouse button
+    if (activeTextInput && activeTextInput.contains(event.target)) return; // Don't start drag if clicking inside text input
+
+    const sliderElement = event.target.closest('.gui-slider-container');
+    if (!sliderElement || !sliderElement.dataset || !sliderElement.dataset.param) return;
+
+    const targetIsKnob = event.target.classList.contains('gui-slider-knob');
+    const targetIsTrack = event.target.classList.contains('gui-slider-track') || event.target === sliderElement; // Assuming container is track
+
+    if (event.ctrlKey || event.metaKey) { // Ctrl/Cmd + Click to reset
+        const defaultValue = parseFloat(sliderElement.dataset.vdefault);
+        updateSliderVisuals(sliderElement, defaultValue);
+        State.setElementState(sliderElement.dataset.param, defaultValue);
+        DomUtils.triggerGenericChangeEvent(sliderElement, defaultValue);
+        return;
+    }
+    
+    const valueTextElement = sliderElement.querySelector('.slider-value-text');
+    if (valueTextElement && sliderElement.dataset.showValueText !== '0') { // Show on hover or always
+        valueTextElement.style.display = 'block';
+    }
+
+
+    if (targetIsKnob) {
+        isDraggingKnob = true;
+        sliderElement.classList.add('dragging');
+        if (sliderElement.querySelector('.gui-slider-knob')) {
+            sliderElement.querySelector('.gui-slider-knob').classList.add('dragging');
+        }
+
+
+        const initialMouseY = event.clientY;
+        const initialMouseX = event.clientX;
+        const initialValue = parseFloat(sliderElement.dataset.currentValue);
+        const orientation = sliderElement.dataset.orientation;
+        const inverted = sliderElement.dataset.inverted === 'true';
+        const range = parseFloat(sliderElement.dataset.vmax) - parseFloat(sliderElement.dataset.vmin);
+
+        const onMouseMove = (moveEvent) => {
+            if (!isDraggingKnob) return;
+            let delta;
+            if (orientation === 'vertical') {
+                delta = initialMouseY - moveEvent.clientY; // Y increases downwards
+                if (inverted) delta = -delta;
+                // Adjust sensitivity based on track height
+                const trackHeight = sliderElement.clientHeight - (sliderElement.querySelector('.gui-slider-knob')?.offsetHeight || 0);
+                delta *= (range / (trackHeight || sliderElement.clientHeight)) * SLIDER_SENSITIVITY;
+            } else { // Horizontal
+                delta = moveEvent.clientX - initialMouseX;
+                if (inverted) delta = -delta;
+                const trackWidth = sliderElement.clientWidth - (sliderElement.querySelector('.gui-slider-knob')?.offsetWidth || 0);
+                delta *= (range / (trackWidth || sliderElement.clientWidth)) * SLIDER_SENSITIVITY;
+            }
+
+            let newValue = initialValue + delta;
+            newValue = Math.max(parseFloat(sliderElement.dataset.vmin), Math.min(parseFloat(sliderElement.dataset.vmax), newValue));
+            if (sliderElement.dataset.stepped === 'true') {
+                newValue = Math.round(newValue);
+            }
+            updateSliderVisuals(sliderElement, newValue);
+            State.setElementState(sliderElement.dataset.param, newValue); // Update state during drag
+            DomUtils.triggerGenericChangeEvent(sliderElement, newValue);
+        };
+
+        const onMouseUp = () => {
+            isDraggingKnob = false;
+            sliderElement.classList.remove('dragging');
+             if (sliderElement.querySelector('.gui-slider-knob')) {
+                sliderElement.querySelector('.gui-slider-knob').classList.remove('dragging');
+            }
+
+            if (valueTextElement && sliderElement.dataset.showValueText === '1') { // Hide if "show on hover"
+                 // Check if mouse is still over the element before hiding
+                const rect = sliderElement.getBoundingClientRect();
+                if (!(lastClientX >= rect.left && lastClientX <= rect.right &&
+                      lastClientY >= rect.top && lastClientY <= rect.bottom)) {
+                    valueTextElement.style.display = 'none';
+                }
+            }
+            
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+    } else if (targetIsTrack && sliderElement.dataset.clickOnTrack === 'true') {
+        const newValue = calculateValueFromMouse(sliderElement, event);
+        updateSliderVisuals(sliderElement, newValue);
+        State.setElementState(sliderElement.dataset.param, newValue);
+        DomUtils.triggerGenericChangeEvent(sliderElement, newValue);
+
+        // Handle spring mode if applicable
+        const springMode = sliderElement.dataset.springMode;
+        if (springMode !== '0') {
+            let resetValue = parseFloat(sliderElement.dataset.vdefault);
+            if (springMode === '2') { // Spring to middle
+                resetValue = (parseFloat(sliderElement.dataset.vmin) + parseFloat(sliderElement.dataset.vmax)) / 2;
+            }
+            sliderTrackClickInfo = { container: sliderElement, resetValue: resetValue };
+            // Global mouseup will handle the spring back.
+        }
+    }
+}
+
+function handleGlobalMouseUp() {
+    if (sliderTrackClickInfo) {
+        const { container, resetValue } = sliderTrackClickInfo;
+        // Check if mouse is still down on THIS slider (it shouldn't be if this global handler is firing for release)
+        // or if another drag started. For simplicity, just spring back.
+        updateSliderVisuals(container, resetValue);
+        State.setElementState(container.dataset.param, resetValue);
+        DomUtils.triggerGenericChangeEvent(container, resetValue);
+        
+        const valueTextElement = container.querySelector('.slider-value-text');
+        if (valueTextElement && container.dataset.showValueText === '1') { // Hide if "show on hover"
+            valueTextElement.style.display = 'none';
+        }
+        sliderTrackClickInfo = null;
+    }
+     // Also ensure any general dragging state is reset
+    if (isDraggingKnob) { // This is a fallback, specific mouseup should handle it.
+        isDraggingKnob = false;
+        document.querySelectorAll('.gui-slider-container.dragging').forEach(el => el.classList.remove('dragging'));
+        document.querySelectorAll('.gui-slider-knob.dragging').forEach(el => el.classList.remove('dragging'));
+        console.warn("[sliderInteractions] Global mouseup caught a dangling drag state.");
+    }
+}
+
+
+function handleMouseEnter(event) {
+    const container = event.target.closest('.gui-slider-container');
+    if (container && container.dataset && container.dataset.showValueText === '1' && !isDraggingKnob && !activeTextInput) {
+        const valueTextElement = container.querySelector('.slider-value-text');
+        if (valueTextElement) {
+            updateSliderVisuals(container, parseFloat(container.dataset.currentValue), true); // Ensure text is current
+            valueTextElement.style.display = 'block';
+        }
+    }
+}
+
+function handleMouseLeave(event) {
+    const container = event.target.closest('.gui-slider-container');
+    // Check if the relatedTarget (where the mouse entered) is still within the container.
+    // This prevents hiding when moving mouse from slider to its knob or value text.
+    if (container && container.dataset && container.dataset.showValueText === '1' && !isDraggingKnob && !activeTextInput) {
+        if (!container.contains(event.relatedTarget)) {
+            const valueTextElement = container.querySelector('.slider-value-text');
+            if (valueTextElement) {
+                valueTextElement.style.display = 'none';
+            }
+        }
+    }
+}
+
+
+/**
+ * Main function to set up all slider interaction listeners.
+ * This should be called once after the main GUI is built.
+ */
+export function setupSliderListeners() {
+    const guiWrapper = DomUtils.getSkinContainerActual(); 
+    if (!guiWrapper) {
+        console.warn("[sliderInteractions] Cannot attach slider listeners: skin-container-actual not found.");
+        return;
+    }
+
+     if (!guiWrapper.dataset.sliderListenersAttached) {
+        guiWrapper.addEventListener('mousedown', handleMouseDown, { capture: true }); // Use capture for mousedown on track
+        guiWrapper.addEventListener('dblclick', handleDoubleClick);
+        guiWrapper.addEventListener('mouseover', handleMouseEnter);
+        guiWrapper.addEventListener('mouseout', handleMouseLeave);
+
+         if (!document.body.dataset.globalSliderMouseupListenerAttached) {
+            document.body.addEventListener('mouseup', handleGlobalMouseUp, {capture: true}); // Capture on body
+            document.body.dataset.globalSliderMouseupListenerAttached = 'true';
+            console.log("[sliderInteractions] Global mouseup listener for track click spring attached.");
+         }
+        guiWrapper.dataset.sliderListenersAttached = 'true';
+        console.log("[sliderInteractions] Slider listeners attached to skin-container-actual.");
+    }
+}
