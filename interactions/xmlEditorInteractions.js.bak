@@ -1,0 +1,667 @@
+/* File: cs/xmlEditorInteractions.js */
+/**
+ * xmlEditorInteractions.js
+ * Handles specific UI interactions within the XML Editor modal.
+ * REVISED: Ensured fix for "State.getEditorInstanceDomElements is not a function" error
+ * by correctly retrieving the textarea element within handleOverlayIconClick.
+ * MODIFIED: handleOverlayIconClick to focus textarea on non-icon clicks on the overlay.
+ * MODIFIED: handleClickOutsidePicker to simplify event dispatch and improve cleanup.
+ * MODIFIED: handleOverlayIconClick to rely on CSS pointer-events for pass-through; removed else block.
+ * MODIFIED: ACTION_ICON_SVG to use Iconoir CSS class.
+ */
+
+console.log('[xmlEditorInteractions.js] SCRIPT PARSED AND EXECUTED (Top Level Log)');
+
+import * as State from './core/state.js';
+import {
+    getInsertElementXmlBtn,
+    getXmlInsertElementModal, getCloseXmlInsertBtn, getXmlInsertElementList,
+    getPreviewItemModal, getClosePreviewItemModalBtn,
+    getPreviewItemModalContent, getPreviewItemModalTitle,
+    logError,
+    showToast,
+    normalizePath as domNormalizePath
+} from './core/domUtils.js';
+import {
+    insertXmlText,
+    openXmlEditor,
+    getCachedElementReferenceDataForHover,
+    getCachedCommonAttributesForHover,
+    getCachedParamReferenceDataForHover,
+} from './core/xmlEditor.js';
+
+const DEBUG_INTERACTIONS = true;
+
+// MODIFIED: Using Iconoir class now
+const ACTION_ICON_SVG = '<i class="iconoir-arrow-email-forward"></i>';
+const ICON_ACTION_TRIGGER_CLASS = 'icon-action-trigger';
+const ICON_VISIBLE_CLASS = 'visible';
+
+let dynamicColorPicker = null;
+let currentEditingColorContext = null;
+let activeIconTargetSpan = null;
+let activeIconElement = null;
+
+export function setupXmlEditorListeners() {
+    safelyAttachListener(getInsertElementXmlBtn(), 'click', handleOpenXmlInsertModal);
+    safelyAttachListener(getCloseXmlInsertBtn(), 'click', handleCloseXmlInsertModal);
+    const insertList = getXmlInsertElementList();
+    if (insertList) {
+        insertList.removeEventListener('click', handleInsertElementXml); // Ensure no duplicates
+        insertList.addEventListener('click', handleInsertElementXml);
+    }
+}
+
+export function setupInstanceHoverListeners(textareaElement, highlightOverlayElement, instanceId) {
+    if (DEBUG_INTERACTIONS) console.log(`[SETUP INSTANCE HOVER LISTENERS - xmlEditorInteractions.js - ENTRY] instanceId: ${instanceId}`);
+
+    if (!highlightOverlayElement) {
+        logError(`[SETUP INSTANCE HOVER LISTENERS] CRITICAL ERROR: highlightOverlayElement is NULL for instanceId: ${instanceId}.`);
+        return;
+    }
+    if (!textareaElement) {
+        logError(`[SETUP INSTANCE HOVER LISTENERS] CRITICAL ERROR: textareaElement is null for instanceId: ${instanceId}.`);
+        return;
+    }
+
+    if (DEBUG_INTERACTIONS) {
+        console.log(`[SETUP INSTANCE HOVER LISTENERS] Received overlay: ID='${highlightOverlayElement.id}', Tag='${highlightOverlayElement.tagName}', Classes='${highlightOverlayElement.className}'`);
+        const computedStyle = window.getComputedStyle(highlightOverlayElement);
+        console.log(`[SETUP INSTANCE HOVER LISTENERS] Overlay computed pointer-events: '${computedStyle.pointerEvents}', z-index: '${computedStyle.zIndex}'`);
+    }
+
+    textareaElement.dataset.highlightOverlayId = highlightOverlayElement.id;
+    textareaElement.dataset.instanceId = instanceId;
+    highlightOverlayElement.dataset.instanceId = instanceId;
+
+    if (DEBUG_INTERACTIONS) console.log(`[SETUP INSTANCE HOVER LISTENERS] ATTACHING mouseover, mouseout, click to overlay: ${highlightOverlayElement.id}`);
+
+    highlightOverlayElement.removeEventListener('mouseover', handleOverlayMouseOver);
+    highlightOverlayElement.removeEventListener('mouseout', handleOverlayMouseOut);
+    highlightOverlayElement.removeEventListener('click', handleOverlayIconClick);
+
+    highlightOverlayElement.addEventListener('mouseover', handleOverlayMouseOver);
+    highlightOverlayElement.addEventListener('mouseout', handleOverlayMouseOut);
+    highlightOverlayElement.addEventListener('click', handleOverlayIconClick);
+
+    if (DEBUG_INTERACTIONS) console.log(`[SETUP INSTANCE HOVER LISTENERS] Listeners ATTACHMENT ATTEMPTED for overlay: ${highlightOverlayElement.id}.`);
+}
+
+function showActionIconForSpan(targetSpan) {
+    if (!targetSpan) return;
+    if (targetSpan === activeIconTargetSpan && activeIconElement && activeIconElement.classList.contains(ICON_VISIBLE_CLASS)) return;
+
+    if (activeIconElement && activeIconTargetSpan !== targetSpan) {
+        if (DEBUG_INTERACTIONS) console.log("[showActionIconForSpan] Hiding PREVIOUS icon for", activeIconTargetSpan?.className.split(' ')[0]);
+        activeIconElement.classList.remove(ICON_VISIBLE_CLASS);
+        activeIconElement.innerHTML = '';
+    }
+
+    const iconTrigger = targetSpan.querySelector('.' + ICON_ACTION_TRIGGER_CLASS);
+    if (iconTrigger) {
+        activeIconTargetSpan = targetSpan;
+        activeIconElement = iconTrigger;
+        // Check if it needs the icon HTML (it might already have it if quickly mousing over, or if it's not an <i> tag)
+        if (!iconTrigger.querySelector('i.iconoir-arrow-email-forward') && iconTrigger.innerHTML.trim() === '') {
+            iconTrigger.innerHTML = ACTION_ICON_SVG;
+        }
+        iconTrigger.classList.add(ICON_VISIBLE_CLASS);
+        if (DEBUG_INTERACTIONS) console.log("[showActionIconForSpan] Class '.visible' ADDED to icon for", targetSpan.className.split(' ')[0]);
+    } else {
+        if (activeIconTargetSpan === targetSpan) {
+            activeIconTargetSpan = null;
+            activeIconElement = null;
+        }
+    }
+}
+
+function hideActiveActionIcon() {
+    if (activeIconElement) {
+        activeIconElement.classList.remove(ICON_VISIBLE_CLASS);
+        if (DEBUG_INTERACTIONS) console.log("[hideActiveActionIcon] Class '.visible' REMOVED from icon for", activeIconTargetSpan?.className.split(' ')[0]);
+    }
+    activeIconTargetSpan = null;
+    activeIconElement = null;
+}
+
+function handleOverlayMouseOver(event) {
+    const qualifiedSpan = event.target.closest('.hl-color-box-wrapper, .hl-color-rgb-warning-box, .hl-filepath');
+    if (qualifiedSpan) {
+        if (qualifiedSpan !== activeIconTargetSpan) {
+            showActionIconForSpan(qualifiedSpan);
+        }
+    } else {
+        if (activeIconTargetSpan && (!event.relatedTarget || !activeIconTargetSpan.contains(event.relatedTarget))) {
+            hideActiveActionIcon();
+        }
+    }
+}
+
+function handleOverlayMouseOut(event) {
+    if (activeIconTargetSpan) {
+        const isLeavingActiveArea = !event.relatedTarget || !activeIconTargetSpan.contains(event.relatedTarget);
+        if (isLeavingActiveArea) {
+            hideActiveActionIcon();
+        }
+    }
+}
+
+function handleOverlayIconClick(event) {
+    if (DEBUG_INTERACTIONS) console.log(`[HANDLE OVERLAY ICON CLICK - START] Type: ${event.type}, Actual Target:`, event.target.id || event.target.tagName, `Current Target (Overlay):`, event.currentTarget.id);
+
+    const iconTrigger = event.target.closest('.' + ICON_ACTION_TRIGGER_CLASS);
+
+    if (!iconTrigger || !iconTrigger.classList.contains(ICON_VISIBLE_CLASS)) {
+        if (DEBUG_INTERACTIONS) {
+            if (iconTrigger) console.log("[HANDLE OVERLAY ICON CLICK] Click was on an icon trigger, but it wasn't visible. Ignoring.");
+            else console.log("[HANDLE OVERLAY ICON CLICK] Click did not originate from a visible icon trigger. Letting event pass.");
+        }
+        return;
+    }
+
+    if (DEBUG_INTERACTIONS) console.log("[IconClick] Action icon was clicked:", iconTrigger);
+    event.preventDefault();
+    event.stopPropagation();
+
+    const highlightOverlay = event.currentTarget;
+    const instanceId = highlightOverlay.dataset.instanceId;
+    if (!instanceId) {
+        logError("[xmlEditorInteractions IconClick] CRITICAL: instanceId not found on overlay for icon click.", highlightOverlay);
+        return;
+    }
+
+    const editorInstance = State.getEditorInstance(instanceId);
+    if (!editorInstance || !editorInstance.modalElement) {
+        logError(`[xmlEditorInteractions IconClick] Editor instance or modalElement not found for instanceId: ${instanceId}`);
+        return;
+    }
+    const textarea = editorInstance.modalElement.querySelector(`#xml-editor-textarea-${instanceId}`);
+    if (!textarea) {
+        logError(`[xmlEditorInteractions IconClick] Textarea #xml-editor-textarea-${instanceId} not found in modal for instanceId: ${instanceId}`);
+        return;
+    }
+
+    const parentSpan = iconTrigger.parentElement;
+    if (!parentSpan) {
+        logError("[xmlEditorInteractions IconClick] Icon has no parent element.", iconTrigger);
+        return;
+    }
+
+    if (parentSpan.classList.contains('hl-color-box-wrapper') || parentSpan.classList.contains('hl-color-rgb-warning-box')) {
+        if (DEBUG_INTERACTIONS) console.log("[IconClick] Parent is a color box.");
+        const colorHex = parentSpan.dataset.color;
+        const rawQuoteStartStr = parentSpan.dataset.attrQuoteRawStart;
+        const rawQuoteEndStr = parentSpan.dataset.attrQuoteRawEnd;
+
+        if (DEBUG_INTERACTIONS) console.log(`[IconClick] Color data: hex=${colorHex}, rawStart=${rawQuoteStartStr}, rawEnd=${rawQuoteEndStr}`);
+
+        if (!colorHex || !rawQuoteStartStr || !rawQuoteEndStr) {
+            logError("[xmlEditorInteractions IconClick] Color box missing data attributes.", parentSpan.dataset);
+            return;
+        }
+
+        const rawText = textarea.value;
+        const rawQuoteStartIndex = parseInt(rawQuoteStartStr, 10);
+        const rawQuoteEndIndex = parseInt(rawQuoteEndStr, 10);
+
+        if (isNaN(rawQuoteStartIndex) || isNaN(rawQuoteEndIndex) || rawQuoteStartIndex < 0 || rawQuoteEndIndex <= rawQuoteStartIndex || rawQuoteStartIndex >= rawText.length || rawQuoteEndIndex > rawText.length) {
+            logError("[xmlEditorInteractions IconClick] Invalid or out-of-bounds raw quote indices for color.", {rawQuoteStartIndex, rawQuoteEndIndex, rawTextLength: rawText.length });
+            return;
+        }
+
+        const attributeValueContent = rawText.substring(rawQuoteStartIndex + 1, rawQuoteEndIndex - 1);
+        let colorStartIndexInValue = attributeValueContent.indexOf(colorHex);
+        let colorStartRaw, colorEndRaw, activeColorHex;
+
+        if (colorStartIndexInValue !== -1) {
+            colorStartRaw = rawQuoteStartIndex + 1 + colorStartIndexInValue;
+            colorEndRaw = colorStartRaw + colorHex.length;
+            activeColorHex = colorHex;
+        } else {
+            // Fallback 1: Check for case-insensitive match inside the attribute value
+            colorStartIndexInValue = attributeValueContent.toLowerCase().indexOf(colorHex.toLowerCase());
+            if (colorStartIndexInValue !== -1) {
+                colorStartRaw = rawQuoteStartIndex + 1 + colorStartIndexInValue;
+                colorEndRaw = colorStartRaw + colorHex.length;
+                activeColorHex = attributeValueContent.substring(colorStartIndexInValue, colorStartIndexInValue + colorHex.length);
+            } else {
+                // Fallback 2: The text has been modified manually. Safely use the color currently written inside the quotes.
+                const hexMatch = attributeValueContent.match(/#[0-9a-fA-F]{3,8}/);
+                if (hexMatch) {
+                    activeColorHex = hexMatch[0];
+                    colorStartRaw = rawQuoteStartIndex + 1 + hexMatch.index;
+                    colorEndRaw = colorStartRaw + activeColorHex.length;
+                } else {
+                    // Fallback 3: Stale layout coordinates, search for the original color code globally in the file
+                    const globalIndex = rawText.indexOf(colorHex);
+                    if (globalIndex !== -1) {
+                        colorStartRaw = globalIndex;
+                        colorEndRaw = globalIndex + colorHex.length;
+                        activeColorHex = colorHex;
+                    } else {
+                        logError(`[xmlEditorInteractions IconClick] Hex ${colorHex} not found in "${attributeValueContent}" or globally.`);
+                        showToast(`Error: Color mismatch in text view.`, "error");
+                        return;
+                    }
+                }
+            }
+        }
+
+        currentEditingColorContext = {
+            textarea,
+            start: colorStartRaw,
+            end: colorEndRaw,
+            instanceId
+        };
+        if (DEBUG_INTERACTIONS) console.log("[IconClick] Launching color picker. Context:", currentEditingColorContext);
+
+        const picker = createDynamicColorPicker(
+            activeColorHex,
+            (newColor) => {
+                if (!currentEditingColorContext) return;
+                const { textarea: ctxTextarea, start: ctxStart } = currentEditingColorContext;
+                const currentText = ctxTextarea.value;
+                const oldColorLength = currentEditingColorContext.end - currentEditingColorContext.start;
+                const effectiveOldEnd = currentEditingColorContext.start + oldColorLength;
+
+                ctxTextarea.value = currentText.substring(0, ctxStart) + newColor + currentText.substring(effectiveOldEnd);
+                currentEditingColorContext.end = ctxStart + newColor.length;
+
+                State.updateEditorInstance(currentEditingColorContext.instanceId, { currentContent: ctxTextarea.value });
+                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                ctxTextarea.dispatchEvent(inputEvent);
+            },
+            (finalColor) => {
+                if (!currentEditingColorContext) return;
+                const { textarea: ctxTextarea } = currentEditingColorContext;
+                State.updateEditorInstance(currentEditingColorContext.instanceId, { currentContent: ctxTextarea.value });
+                const keyupEvent = new Event('keyup', { bubbles: true, cancelable: true });
+                ctxTextarea.dispatchEvent(keyupEvent);
+                const mouseupEvent = new Event('mouseup', { bubbles: true, cancelable: true });
+                ctxTextarea.dispatchEvent(mouseupEvent);
+            }
+        );
+        const rect = iconTrigger.getBoundingClientRect();
+        picker.style.left = `${rect.right + 5}px`;
+        picker.style.top = `${rect.top}px`;
+
+    } else if (parentSpan.classList.contains('hl-filepath')) {
+        if (DEBUG_INTERACTIONS) console.log("[IconClick] Parent is a filepath span.");
+        const filePath = parentSpan.dataset.filepath;
+        if (DEBUG_INTERACTIONS) console.log(`[IconClick] FilePath from dataset: ${filePath}`);
+
+        if (!filePath) {
+            logError("[xmlEditorInteractions IconClick] Filepath span missing data-filepath.", parentSpan.dataset);
+            return;
+        }
+        const lowerFilePath = filePath.toLowerCase();
+        const fileNameForTitle = filePath.substring(filePath.lastIndexOf('/') + 1);
+
+        if (lowerFilePath.endsWith('.xml')) {
+             if (DEBUG_INTERACTIONS) console.log(`[IconClick] Opening XML: ${filePath}`);
+            openXmlEditor(filePath);
+        } else if (lowerFilePath.endsWith('.svg')) {
+            if (DEBUG_INTERACTIONS) console.log(`[IconClick] Previewing SVG: ${filePath}`);
+            const svgContent = State.getFileContent(filePath);
+            if (svgContent) {
+                const img = document.createElement('img');
+                try {
+                    img.src = 'data:image/svg+xml;base64,' + btoa(svgContent);
+                    updatePreviewModal(img, `Preview: ${fileNameForTitle}`);
+                } catch (e) {
+                    logError(`[xmlEditorInteractions IconClick] Error encoding SVG ${filePath}:`, e);
+                    showToast(`Could not display SVG: ${fileNameForTitle}`, "error");
+                }
+            } else {
+                showToast(`Could not load content for SVG: ${fileNameForTitle}`, "error");
+            }
+        } else if (/\.(png|jpg|jpeg|gif)$/i.test(lowerFilePath)) {
+            if (DEBUG_INTERACTIONS) console.log(`[IconClick] Previewing Image: ${filePath}`);
+            const blobUrl = State.getAssetBlobUrl(filePath);
+            if (blobUrl) {
+                const img = document.createElement('img');
+                img.src = blobUrl;
+                updatePreviewModal(img, `Preview: ${fileNameForTitle}`);
+            } else {
+                const fileData = State.getFileContent(filePath);
+                if (fileData && fileData.startsWith('data:image')) {
+                    const img = document.createElement('img');
+                    img.src = fileData;
+                    updatePreviewModal(img, `Preview: ${fileNameForTitle}`);
+                } else {
+                    showToast(`Could not load image preview for: ${fileNameForTitle}`, "error");
+                }
+            }
+        } else {
+            showToast(`Preview for this file type (${filePath.split('.').pop()}) not implemented.`, "info");
+        }
+    } else {
+         if (DEBUG_INTERACTIONS) console.warn("[IconClick] Icon clicked, but parent is not a recognized color or filepath span.", parentSpan);
+    }
+}
+
+
+function createDynamicColorPicker(initialColor, onColorChangeCallback, onColorPickEndCallback) {
+    if (dynamicColorPicker) {
+        dynamicColorPicker.remove();
+        dynamicColorPicker = null;
+    }
+    dynamicColorPicker = document.createElement('div');
+    dynamicColorPicker.style.position = 'absolute';
+    dynamicColorPicker.style.zIndex = '10001';
+    dynamicColorPicker.style.border = '1px solid #ccc';
+    dynamicColorPicker.style.background = '#fff';
+    dynamicColorPicker.style.padding = '10px';
+    dynamicColorPicker.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    dynamicColorPicker.classList.add('dynamic-color-picker-popup');
+
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = initialColor.substring(0, 7);
+
+    const alphaSlider = document.createElement('input');
+    alphaSlider.type = 'range';
+    alphaSlider.min = '0';
+    alphaSlider.max = '255';
+    const initialAlpha = initialColor.length === 9 ? parseInt(initialColor.substring(7, 9), 16) : 255;
+    alphaSlider.value = String(initialAlpha);
+    alphaSlider.style.width = '100%';
+    alphaSlider.style.marginTop = '5px';
+
+    const alphaValueSpan = document.createElement('span');
+    alphaValueSpan.textContent = ` Alpha: ${initialAlpha}`;
+    alphaValueSpan.style.fontSize = '12px';
+    alphaValueSpan.style.display = 'block';
+    alphaValueSpan.style.textAlign = 'center';
+
+    const updateColor = () => {
+        const alphaHex = parseInt(alphaSlider.value).toString(16).padStart(2, '0');
+        onColorChangeCallback(input.value + alphaHex);
+        alphaValueSpan.textContent = ` Alpha: ${alphaSlider.value}`;
+    };
+
+    input.addEventListener('input', updateColor);
+    alphaSlider.addEventListener('input', updateColor);
+
+    input.addEventListener('change', () => {
+         if (onColorPickEndCallback) {
+            const alphaHex = parseInt(alphaSlider.value).toString(16).padStart(2, '0');
+            onColorPickEndCallback(input.value + alphaHex);
+        }
+    });
+    alphaSlider.addEventListener('change', () => {
+         if (onColorPickEndCallback) {
+            const alphaHex = parseInt(alphaSlider.value).toString(16).padStart(2, '0');
+            onColorPickEndCallback(input.value + alphaHex);
+        }
+    });
+
+    dynamicColorPicker.appendChild(input);
+    dynamicColorPicker.appendChild(alphaSlider);
+    dynamicColorPicker.appendChild(alphaValueSpan);
+    document.body.appendChild(dynamicColorPicker);
+
+    setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutsidePicker, { once: true, capture: true });
+    }, 0);
+
+    return dynamicColorPicker;
+}
+
+function handleClickOutsidePicker(event) {
+    if (DEBUG_INTERACTIONS) console.log(`[handleClickOutsidePicker] Event target:`, event.target.id || event.target.tagName);
+
+    if (dynamicColorPicker && !dynamicColorPicker.contains(event.target)) {
+        if (activeIconElement && activeIconElement.contains(event.target)) {
+            if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Click was on the opening icon. Re-arming listener.');
+            document.addEventListener('mousedown', handleClickOutsidePicker, { once: true, capture: true });
+            return;
+        }
+
+        if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Click detected OUTSIDE color picker and not on its opening icon.');
+
+        if (currentEditingColorContext && currentEditingColorContext.textarea) {
+            const colorInputValue = dynamicColorPicker.querySelector('input[type="color"]').value;
+            const alphaSliderValue = dynamicColorPicker.querySelector('input[type="range"]').value;
+            const finalAlphaHex = parseInt(alphaSliderValue).toString(16).padStart(2, '0');
+            const finalColorWithAlpha = colorInputValue + finalAlphaHex;
+
+            const { textarea: ctxTextarea, start: ctxStart, instanceId: ctxInstanceId } = currentEditingColorContext;
+            const currentText = ctxTextarea.value;
+            const oldColorLength = currentEditingColorContext.end - currentEditingColorContext.start;
+            const effectiveOldEnd = currentEditingColorContext.start + oldColorLength;
+            const currentColorInText = currentText.substring(ctxStart, effectiveOldEnd);
+
+            if (finalColorWithAlpha !== currentColorInText) {
+                if (DEBUG_INTERACTIONS) console.log(`[handleClickOutsidePicker] Applying final color. Old: '${currentColorInText}', New: '${finalColorWithAlpha}'`);
+                ctxTextarea.value = currentText.substring(0, ctxStart) + finalColorWithAlpha + currentText.substring(effectiveOldEnd);
+                State.updateEditorInstance(ctxInstanceId, { currentContent: ctxTextarea.value });
+                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                ctxTextarea.dispatchEvent(inputEvent);
+            } else {
+                 if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Color not changed, but ensuring UI updates.');
+                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                ctxTextarea.dispatchEvent(inputEvent);
+            }
+            const keyupEvent = new Event('keyup', { bubbles: true, cancelable: true });
+            ctxTextarea.dispatchEvent(keyupEvent);
+        }
+
+        dynamicColorPicker.remove();
+        dynamicColorPicker = null;
+        currentEditingColorContext = null;
+        if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Color picker removed and context cleared.');
+
+    } else if (dynamicColorPicker && dynamicColorPicker.contains(event.target)) {
+        if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Click detected INSIDE color picker. Re-arming outside click listener.');
+        document.addEventListener('mousedown', handleClickOutsidePicker, { once: true, capture: true });
+    } else {
+        if (DEBUG_INTERACTIONS) console.log('[handleClickOutsidePicker] Listener fired but picker was null or target context was unexpected.');
+    }
+}
+
+
+function updatePreviewModal(contentElement, titleText) {
+    const modal = getPreviewItemModal();
+    const modalContentArea = getPreviewItemModalContent();
+    const modalTitle = getPreviewItemModalTitle();
+
+    if (modal && modalContentArea && modalTitle) {
+        modalTitle.textContent = titleText || "Preview";
+        modalContentArea.innerHTML = '';
+        modalContentArea.appendChild(contentElement);
+        modal.classList.add('visible');
+    } else {
+        logError("[xmlEditorInteractions] Could not display item in preview modal - modal elements not found.");
+        showToast("Could not open preview modal.", "error");
+    }
+}
+
+function handleOpenXmlInsertModal() {
+    const modal = getXmlInsertElementModal();
+    const list = getXmlInsertElementList();
+    if (!modal || !list) return;
+    const elements = getCachedElementReferenceDataForHover();
+    if (!elements || elements.length === 0) {
+        list.innerHTML = '<li>No element data loaded.</li>';
+        modal.classList.add('visible');
+        return;
+    }
+    list.innerHTML = "";
+    const categorizedElements = {};
+    elements.forEach(el => {
+        const category = el.category || 'Other';
+        if (!categorizedElements[category]) categorizedElements[category] = [];
+        categorizedElements[category].push(el);
+    });
+    Object.keys(categorizedElements).sort().forEach(category => {
+        const header = document.createElement('li');
+        header.className = 'element-category-header p-1 mt-2 mb-1 text-xs font-semibold text-gray-500 uppercase';
+        header.textContent = category;
+        list.appendChild(header);
+        categorizedElements[category].sort((a, b) => a.element.localeCompare(b.element))
+            .forEach(el => {
+                const listItem = document.createElement('li');
+                listItem.dataset.elementName = el.element;
+                listItem.className = 'p-1 hover:bg-gray-200 cursor-pointer rounded';
+                listItem.textContent = el.element;
+                list.appendChild(listItem);
+            });
+    });
+    modal.classList.add('visible');
+}
+
+function handleCloseXmlInsertModal() {
+    const modal = getXmlInsertElementModal();
+    if (modal) modal.classList.remove('visible');
+}
+
+function handleInsertElementXml(event) {
+    const targetLi = event.target.closest('li[data-element-name]');
+    if (!targetLi || !targetLi.dataset.elementName) return;
+    const elementName = targetLi.dataset.elementName;
+    const elementData = getCachedElementReferenceDataForHover().find(el => el.element === elementName);
+    if (!elementData) {
+        showToast(`Could not find data for element: ${elementName}`, 'error');
+        return;
+    }
+    let attributesString = "";
+    const commonAttrs = getCachedCommonAttributesForHover();
+    let addedAttrs = new Set();
+    if (elementData.usesCommonAttributes !== false) {
+        const commonAttrsToAddDefault = ['x', 'y', 'w', 'h'];
+        commonAttrsToAddDefault.forEach(attrName => {
+            if (commonAttrs[attrName]) {
+                attributesString += ` ${attrName}="${commonAttrs[attrName].defaultValue || ''}"`;
+            } else {
+                 attributesString += ` ${attrName}=""`;
+            }
+            addedAttrs.add(attrName);
+        });
+    }
+    if (elementData.attributes) {
+        for (const attrName in elementData.attributes) {
+            if (addedAttrs.has(attrName)) continue;
+            const attrDef = elementData.attributes[attrName];
+            let defaultValue = (attrDef && attrDef.defaultValue !== undefined) ? attrDef.defaultValue :
+                               (commonAttrs[attrName] && commonAttrs[attrName].defaultValue !== undefined) ? commonAttrs[attrName].defaultValue : "";
+            attributesString += ` ${attrName}="${defaultValue}"`;
+        }
+    }
+    insertXmlText(`<${elementName}${attributesString}></${elementName}>`);
+    handleCloseXmlInsertModal();
+}
+
+function findElementDescription(elementName) {
+    const elementRefData = getCachedElementReferenceDataForHover();
+    if (!elementRefData) return `Element: ${elementName}`;
+    const elementData = elementRefData.find(el => el && el.element === elementName);
+    return elementData?.description || `Element: ${elementName}`;
+}
+
+function findAttributeDescription(attrName) {
+    const commonAttrs = getCachedCommonAttributesForHover();
+    if (commonAttrs && commonAttrs[attrName] && commonAttrs[attrName].description) {
+        return commonAttrs[attrName].description;
+    }
+    const elementRefData = getCachedElementReferenceDataForHover();
+    if (elementRefData) {
+        for (const el of elementRefData) {
+            if (el && el.attributes && el.attributes[attrName] && el.attributes[attrName].description) {
+                return el.attributes[attrName].description;
+            }
+        }
+    }
+    return `Attribute: ${attrName}`;
+}
+
+function findParamDescriptionInCachedData(paramID) {
+    const cachedParamData = getCachedParamReferenceDataForHover();
+    if (!cachedParamData || typeof cachedParamData !== 'object') return `Parameter ID: ${paramID}`;
+    const searchID = String(paramID).trim();
+    for (const productKey in cachedParamData) {
+        const productData = cachedParamData[productKey];
+        if (productData && typeof productData === 'object') {
+            for (const categoryKey in productData) {
+                 const paramsInCategory = productData[categoryKey];
+                 if (Array.isArray(paramsInCategory)) {
+                    for (const param of paramsInCategory) {
+                        if (param && String(param.paramID).trim() === searchID) {
+                            let desc = `Parameter ID: ${paramID}`;
+                            if (param.name) desc += ` (${param.name})`;
+                            if (param.description) desc = `${param.description} [ID: ${paramID}]`;
+                            return desc;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return `Parameter ID: ${paramID}`;
+}
+
+export function updateStatusBarDescription(instanceId) {
+    const editorInstance = State.getEditorInstance(instanceId);
+    if (!editorInstance || !editorInstance.modalElement) return;
+    const modal = editorInstance.modalElement;
+    const textarea = modal.querySelector(`#xml-editor-textarea-${instanceId}`);
+    const highlightOverlay = modal.querySelector(`#xml-editor-highlight-overlay-${instanceId}`);
+    const statusBar = modal.querySelector('#xml-editor-status-bar');
+    const descriptionSpan = statusBar ? statusBar.querySelector('.status-description') : null;
+    if (!textarea || !highlightOverlay || !statusBar || !descriptionSpan) {
+        if (descriptionSpan) descriptionSpan.textContent = '';
+        return;
+    }
+    const caretPos = textarea.selectionStart;
+    let description = '';
+    let foundSpan = null;
+    let smallestRange = Infinity;
+    const relevantSpans = highlightOverlay.querySelectorAll('[data-raw-start][data-raw-end][data-name]');
+    relevantSpans.forEach(span => {
+        if (!span.classList.contains('hl-known-tag') &&
+            !span.classList.contains('hl-tag') &&
+            !span.classList.contains('hl-attr-name') &&
+            !span.classList.contains('hl-param-value')) {
+            return;
+        }
+        const rawStart = parseInt(span.dataset.rawStart, 10);
+        const rawEnd = parseInt(span.dataset.rawEnd, 10);
+        if (!isNaN(rawStart) && !isNaN(rawEnd) && caretPos >= rawStart && caretPos <= rawEnd) {
+             const rangeLength = rawEnd - rawStart;
+             if (rangeLength < smallestRange) {
+                 smallestRange = rangeLength; foundSpan = span;
+             } else if (rangeLength === smallestRange) {
+                 const currentPriority = foundSpan ? (foundSpan.classList.contains('hl-param-value') ? 3 : (foundSpan.classList.contains('hl-attr-name') ? 2 : 1 ) ) : 0;
+                 const newPriority = span.classList.contains('hl-param-value') ? 3 : (span.classList.contains('hl-attr-name') ? 2 : 1 );
+                 if (newPriority > currentPriority) foundSpan = span;
+             }
+        }
+    });
+    if (foundSpan) {
+        const itemName = foundSpan.dataset.name;
+        if (foundSpan.classList.contains('hl-known-tag') || foundSpan.classList.contains('hl-tag')) description = findElementDescription(itemName);
+        else if (foundSpan.classList.contains('hl-attr-name')) description = findAttributeDescription(itemName);
+        else if (foundSpan.classList.contains('hl-param-value')) description = findParamDescriptionInCachedData(itemName);
+    }
+    descriptionSpan.textContent = description;
+    descriptionSpan.title = description;
+}
+
+function safelyAttachListener(elementGetter, eventName, handler, options = {}) {
+    if (!elementGetter) return false;
+    const element = typeof elementGetter === 'function' ? elementGetter() : document.getElementById(elementGetter);
+    let elementName = "UnknownOrInvalid";
+    if (typeof elementGetter === 'function') { elementName = elementGetter.name || 'anonymousGetter'; }
+    else if (typeof elementGetter === 'string') { elementName = `#${elementGetter}`; }
+
+    if (!element) {
+        return false;
+    }
+    try {
+        if (!options.once) {
+            element.removeEventListener(eventName, handler, options.capture || false);
+        }
+        element.addEventListener(eventName, handler, options);
+        return true;
+    } catch (e) { console.error(`[xmlEditorInteractions safelyAttachListener] Error attaching listener ${eventName} to ${element.id || element.tagName}`, e); return false; }
+}

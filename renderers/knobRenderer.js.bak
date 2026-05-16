@@ -1,0 +1,493 @@
+// File: cs/renderers/knobRenderer.js
+import * as DomUtils from '../domUtils.js';
+import * as State from '../state.js';
+
+const DRAG_SENSITIVITY = 0.5;
+const SCROLL_SENSITIVITY = 0.05;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const guiAttributes = State.getGlobalGuiDefaults();
+
+    const paramId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
+    let hasNaN = false;
+
+    const springMode = mergedAttributes['spring_mode'] === '1';
+    const spring_default_to_center = mergedAttributes['spring_default_to_center'] === '1';
+
+    const w = parseFloat(mergedAttributes['w'] || 40);
+    const h = parseFloat(mergedAttributes['h'] || 50);
+    const labelText = mergedAttributes['labelText'] || '';
+    const vmin = parseFloat(mergedAttributes['vmin'] || 0);
+    const vmax = parseFloat(mergedAttributes['vmax'] || 1);
+
+    const vdefault_from_xml_attr = mergedAttributes['vdefault'];
+    let true_xml_default_value;
+    const parsed_vdefault_from_xml = parseFloat(vdefault_from_xml_attr);
+
+    if (isNaN(parsed_vdefault_from_xml)) {
+        true_xml_default_value = vmin;
+    } else {
+        true_xml_default_value = DomUtils.clamp(parsed_vdefault_from_xml, vmin, vmax);
+    }
+
+    let initial_display_value_and_ctrl_click_target = true_xml_default_value;
+    if (springMode && spring_default_to_center && vmin < 0 && vmax > 0) {
+        initial_display_value_and_ctrl_click_target = 0;
+    }
+    initial_display_value_and_ctrl_click_target = DomUtils.clamp(initial_display_value_and_ctrl_click_target, vmin, vmax);
+
+    const stepped = parseFloat(mergedAttributes['stepped'] || 0);
+    const valueTextFormat = mergedAttributes['valueText_format'] || '';
+    const knob_x = parseFloat(mergedAttributes['knob_x'] || w * 0.1);
+    const knob_y = parseFloat(mergedAttributes['knob_y'] || h * 0.1);
+    const knob_w = parseFloat(mergedAttributes['knob_w'] || w * 0.8);
+    const knob_h = parseFloat(mergedAttributes['knob_h'] || h * 0.8);
+    const parsedValueTrackWidth = parseFloat(mergedAttributes['valueTrackWidth'] || 3);
+    const actualStrokeWidth = parsedValueTrackWidth;
+    const valueIndicatorMargin = parseFloat(mergedAttributes['valueIndicatorMargin'] || 0);
+
+    const valueIndicator_w_attr = mergedAttributes['valueIndicator_w'];
+    const valueIndicator_h_attr = mergedAttributes['valueIndicator_h'];
+
+    const label_x = parseFloat(mergedAttributes['label_x'] || 0);
+    const label_y = parseFloat(mergedAttributes['label_y'] || h * 0.8);
+    const label_w = parseFloat(mergedAttributes['label_w'] || w);
+    const label_h = parseFloat(mergedAttributes['label_h'] || h * 0.2);
+    const label_alignment_attr = mergedAttributes['label_alignment'] || 'center';
+
+    const valueIndicatorType = parseInt(mergedAttributes['valueIndicatorType'] || 3, 10);
+    const valueTrackOrder = parseInt(mergedAttributes['valueTrackOrder'] || 0, 10);
+
+    const knobImagePath = mergedAttributes['knob'];
+    const valueIndicatorSvgPath = mergedAttributes['valueIndicator'];
+
+    const valueIndicatorImageOriginalAngle = parseFloat(mergedAttributes['valueindicatorimageoriginalangle'] || 0);
+    const textEditBackColor = mergedAttributes['textEdit_backColor'];
+    const textEditBackColorTransparentMode = mergedAttributes['textEdit_backColorTransparentMode'] === '1';
+    
+    const isUnipolar = (mergedAttributes['unipolar'] !== '0');
+
+    const requiredNumericAttrsList = { w, h, vmin, vmax, stepped, knob_x, knob_y, knob_w, knob_h, parsedValueTrackWidth, valueIndicatorMargin, label_x, label_y, label_w, label_h, valueIndicatorImageOriginalAngle };
+    for (const key in requiredNumericAttrsList) {
+        if (isNaN(requiredNumericAttrsList[key])) {
+            DomUtils.logError(`[CS03Knob ${paramId}] Invalid NaN for core attribute '${key}' (Raw: '${mergedAttributes[key]}') value: ${requiredNumericAttrsList[key]}`, null);
+            hasNaN = true;
+        }
+    }
+    if (isNaN(valueIndicatorType)) { DomUtils.logError(`[CS03Knob ${paramId}] Invalid valueIndicatorType: ${mergedAttributes['valueIndicatorType']}`, null); hasNaN = true; }
+    if (isNaN(valueTrackOrder)) { DomUtils.logError(`[CS03Knob ${paramId}] Invalid valueTrackOrder: ${mergedAttributes['valueTrackOrder']}`, null); hasNaN = true; }
+
+    if (hasNaN) {
+        const errorPlaceholder = DomUtils.createErrorPlaceholder(`Knob Err: ${paramId || 'NaN'}`);
+        errorPlaceholder.style.width = `${w}px`; errorPlaceholder.style.height = `${h}px`;
+        return { htmlElement: errorPlaceholder, mainElementForAttributes: errorPlaceholder, requiresRecursiveRender: false, postProcessFunction: null };
+    }
+
+    const knobBodyVisualCenterX = knob_x + knob_w / 2;
+    const knobBodyVisualCenterY = knob_y + knob_h / 2;
+    const knobBodyVisualRadius = Math.min(knob_w, knob_h) / 2;
+    const trackVisualRadius = knobBodyVisualRadius + 1.5 * parsedValueTrackWidth - 0.5;
+
+    const proceduralIndicatorW = parseFloat(valueIndicator_w_attr || knob_w / 2);
+    const proceduralIndicatorH = parseFloat(valueIndicator_h_attr || knob_h / 2);
+    let proceduralIndicatorVisualRadius = (valueIndicatorType === 1) ? proceduralIndicatorH / 2 : Math.min(proceduralIndicatorW, proceduralIndicatorH) / 2;
+    if(isNaN(proceduralIndicatorVisualRadius)) proceduralIndicatorVisualRadius = 5;
+    const proceduralIndicatorOrbitRadius = knobBodyVisualRadius - proceduralIndicatorVisualRadius - valueIndicatorMargin;
+
+    const safeParseColor = (colorAttr, defaultColor, colorNameForLog) => {
+        const rawColor = mergedAttributes[colorAttr] || defaultColor;
+        let parsedColor = DomUtils.parseColor(rawColor);
+        if (!parsedColor || typeof parsedColor !== 'string' || parsedColor.trim() === '') {
+            DomUtils.logError(`[CS03Knob ${paramId}] DomUtils.parseColor for ${colorNameForLog} ('${rawColor}') returned invalid '${parsedColor}'. Using fallback.`, null);
+            if (colorNameForLog.includes("Fill")) return '#A0A0A0FF';
+            return '#707070FF';
+        }
+        return parsedColor;
+    };
+
+    const valueTrackColorData = safeParseColor('valueTrackColor', '#00000080', 'valueTrackColor');
+    const valueFillColorData = safeParseColor('valueFillColor', '#828bdeD0', 'valueFillColor');
+    const valueIndicatorFillColorData = safeParseColor('valueIndicatorFillColor', '#000000a0', 'valueIndicatorFillColor');
+    const knobFillColorData = safeParseColor('knobFillColor', '#FFFFFFa0', 'knobFillColor');
+
+    const label_fontAlias = mergedAttributes['label_font'];
+    const label_fontColorHex = mergedAttributes['label_fontColor'];
+    const label_fontColor = label_fontColorHex ? DomUtils.parseColor(label_fontColorHex) : (guiAttributes.color_text || '#FFFFFFFF');
+    const showValueTextOnHL = (mergedAttributes['showValueTextOnHL'] === '1');
+    const value_fontAlias = mergedAttributes['value_font'];
+    const value_fontColorHex = mergedAttributes['value_fontColor'];
+    const value_fontColor = value_fontColorHex ? DomUtils.parseColor(value_fontColorHex) : (guiAttributes.color_text || '#FFFFFFFF');
+
+    const container = document.createElement('div');
+    container.className = 'knob-container';
+    container.setAttribute('data-param-id', paramId);
+    for (const key in mergedAttributes) { container.dataset[`xmlAttr_${key.replace(/[^a-z0-9-_]/gi, '_')}`] = mergedAttributes[key]; }
+
+    container.style.overflow = 'visible';
+    if (valueTrackOrder === 0) {
+        container.style.zIndex = '10';
+    } else if (valueTrackOrder === 2) {
+        container.style.zIndex = '0';
+    } else {
+        container.style.zIndex = '1';
+    }
+
+    const labelElement = document.createElement('div');
+    labelElement.className = 'knob-label';
+
+    let justifyContentStyle = 'center';
+    if (label_alignment_attr === 'left') {
+        justifyContentStyle = 'flex-start';
+    } else if (label_alignment_attr === 'right') {
+        justifyContentStyle = 'flex-end';
+    }
+
+    Object.assign(labelElement.style, {
+        position: 'absolute',
+        left: `${label_x}px`,
+        top: `${label_y}px`,
+        width: `${label_w}px`,
+        height: `${label_h}px`,
+        textAlign: label_alignment_attr,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: justifyContentStyle,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        color: label_fontColor,
+        zIndex: '3'
+    });
+    DomUtils.applyFont(labelElement, label_fontAlias);
+    labelElement.textContent = labelText; labelElement.dataset.originalText = labelText;
+    labelElement.title = mergedAttributes['tooltip'] || `${labelText} (${paramId})`;
+
+    const svgDrawingLayer = document.createElementNS(SVG_NS, "svg");
+    Object.assign(svgDrawingLayer.style, {
+        width: '100%', height: '100%', position: 'absolute',
+        left: '0px', top: '0px', pointerEvents: 'none', zIndex: '1',
+        overflow: 'visible !important'
+    });
+    svgDrawingLayer.setAttribute('class', 'knob-svg-drawing-layer');
+    svgDrawingLayer.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+    let htmlKnobBodyImageElement = null;
+    let svgProceduralKnobBody = null;
+
+    if (knobImagePath && typeof knobImagePath === 'string' && knobImagePath.trim() !== '') {
+        const blobUrl = State.getAssetBlobUrl(knobImagePath);
+        if (blobUrl) {
+            htmlKnobBodyImageElement = document.createElement('img');
+            htmlKnobBodyImageElement.className = 'knob-body-html-img';
+            htmlKnobBodyImageElement.src = blobUrl;
+            Object.assign(htmlKnobBodyImageElement.style, {
+                position: 'absolute', left: `${knob_x}px`, top: `${knob_y}px`,
+                width: `${knob_w}px`, height: `${knob_h}px`,
+                pointerEvents: 'none', zIndex: '0'
+            });
+            htmlKnobBodyImageElement.onerror = () => {
+                console.error(`[CS03Knob ${paramId}] Knob Body HTML <img> ONERROR: ${knobImagePath}. Will try to use procedural.`);
+                if(htmlKnobBodyImageElement.parentNode) htmlKnobBodyImageElement.parentNode.removeChild(htmlKnobBodyImageElement);
+                htmlKnobBodyImageElement = null;
+                if (!svgProceduralKnobBody && svgDrawingLayer) {
+                    svgProceduralKnobBody = document.createElementNS(SVG_NS, "circle");
+                    svgProceduralKnobBody.setAttribute('cx', String(knobBodyVisualCenterX));
+                    svgProceduralKnobBody.setAttribute('cy', String(knobBodyVisualCenterY));
+                    svgProceduralKnobBody.setAttribute('r', String(knobBodyVisualRadius));
+                    svgProceduralKnobBody.setAttribute('fill', knobFillColorData);
+                    svgProceduralKnobBody.dataset.originalFill = knobFillColorData;
+                    svgDrawingLayer.appendChild(svgProceduralKnobBody);
+                }
+            };
+        } else {
+            DomUtils.logError(`[CS03Knob ${paramId}] Knob Body HTML <img>: No blobUrl for ${knobImagePath}. Procedural fallback.`, null);
+        }
+    }
+
+    if (!htmlKnobBodyImageElement) {
+        svgProceduralKnobBody = document.createElementNS(SVG_NS, "circle");
+        svgProceduralKnobBody.setAttribute('cx', String(knobBodyVisualCenterX));
+        svgProceduralKnobBody.setAttribute('cy', String(knobBodyVisualCenterY));
+        svgProceduralKnobBody.setAttribute('r', String(knobBodyVisualRadius));
+        svgProceduralKnobBody.setAttribute('fill', knobFillColorData);
+        svgProceduralKnobBody.dataset.originalFill = knobFillColorData;
+        svgDrawingLayer.appendChild(svgProceduralKnobBody);
+    }
+
+    const trackBg = document.createElementNS(SVG_NS, "path");
+    trackBg.setAttribute('fill', 'none'); trackBg.setAttribute('stroke', valueTrackColorData);
+    trackBg.setAttribute('stroke-width', String(actualStrokeWidth)); trackBg.dataset.originalStroke = valueTrackColorData;
+
+    const trackFill = document.createElementNS(SVG_NS, "path");
+    trackFill.setAttribute('fill', 'none'); trackFill.setAttribute('stroke', valueFillColorData);
+    trackFill.setAttribute('stroke-width', String(actualStrokeWidth)); trackFill.setAttribute('stroke-linecap', 'butt');
+    trackFill.dataset.originalStroke = valueFillColorData;
+
+    svgDrawingLayer.appendChild(trackBg);
+    svgDrawingLayer.appendChild(trackFill);
+
+    let indicatorElementTransformTarget = null;
+    let isIndicatorHTML = false;
+
+    function createProceduralIndicatorShape() {
+        let procIndicator;
+        let p_ind_w = proceduralIndicatorW; if(isNaN(p_ind_w)) p_ind_w = 10;
+        let p_ind_h = proceduralIndicatorH; if(isNaN(p_ind_h)) p_ind_h = 10;
+
+        if (valueIndicatorType === 1) {
+            procIndicator = document.createElementNS(SVG_NS, "rect");
+            procIndicator.setAttribute('width', String(p_ind_w)); procIndicator.setAttribute('height', String(p_ind_h));
+            procIndicator.setAttribute('x', String(-p_ind_w / 2)); procIndicator.setAttribute('y', String(-p_ind_h / 2));
+        } else {
+            procIndicator = document.createElementNS(SVG_NS, "circle");
+            procIndicator.setAttribute('r', String(Math.min(p_ind_w, p_ind_h) / 2));
+            procIndicator.setAttribute('cx', '0'); procIndicator.setAttribute('cy', '0');
+        }
+        procIndicator.setAttribute('fill', valueIndicatorFillColorData);
+        return procIndicator;
+    }
+    
+    if (valueIndicatorSvgPath && typeof valueIndicatorSvgPath === 'string' && valueIndicatorSvgPath.trim() !== '') {
+        const indicatorBlobUrl = State.getAssetBlobUrl(valueIndicatorSvgPath);
+        if (indicatorBlobUrl) {
+            isIndicatorHTML = true;
+            indicatorElementTransformTarget = document.createElement('div');
+            indicatorElementTransformTarget.className = 'knob-indicator-wrapper-html';
+            Object.assign(indicatorElementTransformTarget.style, {
+                position: 'absolute',
+                width: `${knob_w}px`,
+                height: `${knob_h}px`,
+                pointerEvents: 'none',
+                zIndex: '2',
+                overflow: 'visible'
+            });
+
+            const htmlIndicatorImage = document.createElement('img');
+            htmlIndicatorImage.className = 'knob-indicator-html-img';
+            htmlIndicatorImage.src = indicatorBlobUrl;
+            Object.assign(htmlIndicatorImage.style, {
+                position: 'absolute', width: `100%`, height: `100%`,
+                left: `0px`, top: `0px`, pointerEvents: 'none'
+            });
+            htmlIndicatorImage.onerror = () => {
+                console.error(`[CS03Knob ${paramId}] Indicator HTML <img> ONERROR: ${valueIndicatorSvgPath}. Fallback to procedural.`);
+                if (indicatorElementTransformTarget && indicatorElementTransformTarget.parentNode) {
+                    indicatorElementTransformTarget.parentNode.removeChild(indicatorElementTransformTarget);
+                }
+                indicatorElementTransformTarget = document.createElementNS(SVG_NS, "g");
+                indicatorElementTransformTarget.setAttribute('class', 'knob-indicator-group-svg-fallback');
+                const proceduralShape = createProceduralIndicatorShape();
+                proceduralShape.dataset.originalFill = valueIndicatorFillColorData;
+                indicatorElementTransformTarget.appendChild(proceduralShape);
+                svgDrawingLayer.appendChild(indicatorElementTransformTarget);
+                isIndicatorHTML = false;
+            };
+            indicatorElementTransformTarget.appendChild(htmlIndicatorImage);
+            container.appendChild(indicatorElementTransformTarget);
+        } else {
+            DomUtils.logError(`[CS03Knob ${paramId}] Indicator HTML <img>: No blobUrl for ${valueIndicatorSvgPath}. Procedural fallback.`, null);
+        }
+    }
+
+    if (!indicatorElementTransformTarget) {
+        indicatorElementTransformTarget = document.createElementNS(SVG_NS, "g");
+        indicatorElementTransformTarget.setAttribute('class', 'knob-indicator-group-svg');
+        const proceduralShape = createProceduralIndicatorShape();
+        proceduralShape.dataset.originalFill = valueIndicatorFillColorData;
+        indicatorElementTransformTarget.appendChild(proceduralShape);
+        svgDrawingLayer.appendChild(indicatorElementTransformTarget);
+        isIndicatorHTML = false;
+    }
+
+    if (htmlKnobBodyImageElement) container.appendChild(htmlKnobBodyImageElement);
+    container.appendChild(svgDrawingLayer);
+    container.appendChild(labelElement);
+
+    let currentValue = initial_display_value_and_ctrl_click_target;
+    let isDragging = false;
+    let startY_coord = 0;
+    let startValue = 0;
+
+    const elementsToHighlight = [];
+    if (svgProceduralKnobBody) elementsToHighlight.push(svgProceduralKnobBody);
+    elementsToHighlight.push(trackBg, trackFill);
+    if (!isIndicatorHTML && indicatorElementTransformTarget && indicatorElementTransformTarget.firstChild) {
+         elementsToHighlight.push(indicatorElementTransformTarget.firstChild);
+    }
+
+    function updateVisuals(value) {
+        const angle = DomUtils.mapValueToAngle(value, vmin, vmax);
+        if (isNaN(angle)) { console.error(`[CS03Knob updateVisuals ${paramId}] Calculated angle is NaN for value ${value}`); return; }
+
+        let actualStartAngleForFill = DomUtils.KNOB_START_ANGLE;
+        let actualEndAngleForFill = angle;
+
+        if (!isUnipolar && vmin < 0.0 && vmax > 0.0) { 
+            const zeroAngle = DomUtils.mapValueToAngle(0, vmin, vmax);
+            if (isNaN(zeroAngle)) {
+                 console.warn(`[CS03Knob updateVisuals ${paramId}] Calculated zeroAngle is NaN for bipolar track. vmin=${vmin}, vmax=${vmax}. Track may not draw correctly from center.`);
+            } else {
+                if (value >= 0) { 
+                    actualStartAngleForFill = zeroAngle;
+                } else { 
+                    actualStartAngleForFill = angle; 
+                    actualEndAngleForFill = zeroAngle;
+                }
+            }
+        }
+        
+        const trackArcD = DomUtils.describeArc(knobBodyVisualCenterX, knobBodyVisualCenterY, trackVisualRadius, actualStartAngleForFill, actualEndAngleForFill);
+        trackFill.setAttribute('d', trackArcD || "");
+        trackFill.style.display = trackArcD ? '' : 'none';
+        
+        const trackBgArcD = DomUtils.describeArc(knobBodyVisualCenterX, knobBodyVisualCenterY, trackVisualRadius, DomUtils.KNOB_START_ANGLE, DomUtils.KNOB_START_ANGLE + DomUtils.KNOB_ANGLE_RANGE);
+        trackBg.setAttribute('d', trackBgArcD || "");
+
+        const orbitCenter = { x: knobBodyVisualCenterX, y: knobBodyVisualCenterY };
+        let currentOrbitRadius;
+        if (isIndicatorHTML) {
+            currentOrbitRadius = 0 - valueIndicatorMargin;
+        } else {
+            currentOrbitRadius = proceduralIndicatorOrbitRadius;
+        }
+
+        const indicatorPos = DomUtils.polarToCartesian(orbitCenter.x, orbitCenter.y, currentOrbitRadius, angle);
+
+        if (isNaN(indicatorPos.x) || isNaN(indicatorPos.y)) { console.error(`[CS03Knob ${paramId}] indicatorPos NaN`); return; }
+
+        let finalAngle = angle + valueIndicatorImageOriginalAngle + 90; 
+
+        if (indicatorElementTransformTarget) {
+            if (isIndicatorHTML) {
+                indicatorElementTransformTarget.style.left = `${(indicatorPos.x - knob_w / 2).toFixed(3)}px`;
+                indicatorElementTransformTarget.style.top = `${(indicatorPos.y - knob_h / 2).toFixed(3)}px`;
+                indicatorElementTransformTarget.style.transform = `rotate(${finalAngle.toFixed(3)}deg)`;
+            } else {
+                let svgRotation = 0;
+                if (valueIndicatorSvgPath && indicatorElementTransformTarget.firstChild && indicatorElementTransformTarget.firstChild.tagName === 'image') {
+                    svgRotation = finalAngle;
+                } else if (valueIndicatorType === 1) {
+                    svgRotation = finalAngle;
+                }
+                indicatorElementTransformTarget.setAttribute('transform', `translate(${indicatorPos.x.toFixed(3)}, ${indicatorPos.y.toFixed(3)}) rotate(${svgRotation.toFixed(3)})`);
+            }
+        }
+
+        if (container.matches(':hover') && showValueTextOnHL && !isDragging && !container.querySelector('input.knob-value-input')) {
+            updateLabelTextWithValue(value);
+        }
+    }
+    
+    function updateLabelTextWithValue(value) {
+        if (showValueTextOnHL) {
+            labelElement.textContent = DomUtils.formatDisplayValue(value, valueTextFormat, vmin, vmax);
+            DomUtils.applyFont(labelElement, value_fontAlias || label_fontAlias);
+            labelElement.style.color = value_fontColor || label_fontColor;
+            labelElement.style.justifyContent = justifyContentStyle;
+        }
+    }
+
+    function resetLabelTextToOriginal() {
+        if (showValueTextOnHL) {
+            labelElement.textContent = labelElement.dataset.originalText;
+            DomUtils.applyFont(labelElement, label_fontAlias);
+            labelElement.style.color = label_fontColor;
+            labelElement.style.justifyContent = justifyContentStyle;
+        }
+    }
+
+    function setValue(newValue, triggerUpdate = true) {
+        let clampedInput = DomUtils.clamp(newValue, vmin, vmax);
+        if(isNaN(clampedInput)) { clampedInput = currentValue; }
+        let finalValue = DomUtils.clamp(DomUtils.quantizeValue(clampedInput, stepped, vmin), vmin, vmax);
+        if(isNaN(finalValue)) { finalValue = currentValue; }
+
+        if (finalValue !== currentValue || triggerUpdate) {
+            currentValue = finalValue;
+            container.dataset.currentValue = currentValue;
+            labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
+            if (triggerUpdate) updateVisuals(currentValue);
+            container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
+        }
+    }
+
+    function setValueFromTextInput(newValueString) {
+        const numValue = parseFloat(newValueString);
+        if (isNaN(numValue) || numValue < vmin || numValue > vmax) {
+            DomUtils.showToast(`Value for ${paramId} must be num between ${vmin}-${vmax}.`, 'warning', 2500);
+            return;
+        }
+        currentValue = DomUtils.clamp(numValue, vmin, vmax);
+        container.dataset.currentValue = currentValue;
+        labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
+        updateVisuals(currentValue);
+        container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
+        if (showValueTextOnHL) updateLabelTextWithValue(currentValue);
+    }
+
+    function applyHighlightLocal(doHighlight) { DomUtils.applyHighlight(doHighlight, elementsToHighlight, mergedAttributes); }
+
+    container.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.ctrlKey || e.metaKey) {
+            setValue(initial_display_value_and_ctrl_click_target);
+            if (showValueTextOnHL) { updateLabelTextWithValue(currentValue); clearTimeout(container.resetTimeout); container.resetTimeout = setTimeout(resetLabelTextToOriginal, 500); }
+            return;
+        }
+        isDragging = true; startY_coord = e.clientY; startValue = currentValue;
+        container.style.cursor = 'grabbing'; document.body.style.cursor = 'grabbing';
+        if (!container.matches(':hover')) applyHighlightLocal(true);
+        document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+        e.preventDefault(); e.stopPropagation();
+    });
+
+    function onMouseMove(e) {
+        if (!isDragging) return;
+        const dv = (startY_coord - e.clientY) * DRAG_SENSITIVITY * (vmax - vmin || 1) / 150;
+        setValue(startValue + dv);
+        if (showValueTextOnHL) updateLabelTextWithValue(currentValue);
+    }
+
+    function onMouseUp(e) {
+        if (!isDragging) return;
+        isDragging = false; container.style.cursor = 'grab'; document.body.style.cursor = '';
+        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
+        if (springMode) setValue((spring_default_to_center && vmin < 0 && vmax > 0) ? 0 : true_xml_default_value);
+        if (!container.matches(':hover')) { applyHighlightLocal(false); if(!container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }
+        e.stopPropagation();
+    }
+
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const sa = stepped > 0 ? stepped * Math.sign(-e.deltaY) : Math.sign(-e.deltaY) * SCROLL_SENSITIVITY * (vmax-vmin||1);
+        setValue(currentValue + sa * (e.shiftKey ? 0.1 : 1.0));
+        if (showValueTextOnHL) {
+            updateLabelTextWithValue(currentValue); clearTimeout(container.scrollTimeout);
+            container.scrollTimeout = setTimeout(() => { if (!container.matches(':hover') && !isDragging && !container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }, 1000);
+        }
+    }, { passive: false });
+
+    container.addEventListener('mouseenter', () => { if (!isDragging) { applyHighlightLocal(true); if (showValueTextOnHL && !container.querySelector('input.knob-value-input')) updateLabelTextWithValue(currentValue); }});
+    container.addEventListener('mouseleave', () => { if (!isDragging) { applyHighlightLocal(false); if (!container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }});
+
+    container.addEventListener('dblclick', (e) => {
+        e.preventDefault(); e.stopPropagation(); if (document.querySelector('.knob-value-input')) return;
+        const input = document.createElement('input'); input.type = 'text'; input.className = 'knob-value-input';
+        const infSym = (typeof DomUtils.INFINITY_SYMBOL === 'string' && DomUtils.INFINITY_SYMBOL) ? DomUtils.INFINITY_SYMBOL : "∞";
+        input.value = DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax).replace(' dB','').replace(infSym, String(vmin));
+        Object.assign(input.style, { position:'absolute', left:labelElement.style.left, top:labelElement.style.top, width:labelElement.style.width, height:labelElement.style.height, textAlign:'center', zIndex:'100', border:'1px solid #888', boxSizing:'border-box', color:value_fontColor||label_fontColor });
+        DomUtils.applyFont(input, value_fontAlias||label_fontAlias);
+        const tbgColor = DomUtils.parseColor(textEditBackColor);
+        input.style.backgroundColor = textEditBackColorTransparentMode && tbgColor.startsWith('rgb(') ? tbgColor.replace('rgb','rgba').replace(')','.8)') : (textEditBackColorTransparentMode ? 'rgba(51,51,51,0.8)' : tbgColor || 'rgba(51,51,51,0.9)');
+        labelElement.style.visibility = 'hidden'; container.appendChild(input); input.focus(); input.select();
+        const rmIn = () => { if(input.parentNode) input.parentNode.removeChild(input); labelElement.style.visibility='visible'; if(container.matches(':hover')&&showValueTextOnHL)updateLabelTextWithValue(currentValue); else if(showValueTextOnHL)resetLabelTextToOriginal();};
+        input.addEventListener('blur', rmIn);
+        input.addEventListener('keydown', (ev) => { if(ev.key==='Enter'){setValueFromTextInput(input.value);rmIn();} else if(ev.key==='Escape')rmIn(); ev.stopPropagation();});
+    });
+
+    updateVisuals(currentValue);
+
+    return { htmlElement: container, mainElementForAttributes: container, requiresRecursiveRender: false, postProcessFunction: null };
+}

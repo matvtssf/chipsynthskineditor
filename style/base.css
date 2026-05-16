@@ -1,0 +1,59 @@
+/* File: style/base.css */
+
+/* --- Custom Resets & Base Styles --- */
+html { box-sizing: border-box; }
+*, *:before, *:after { box-sizing: inherit; }
+
+body { 
+    font-family: 'Inter', Helvetica, Arial, sans-serif; 
+    padding: 0; 
+    margin: 0; 
+    background-color: #f3f4f6; 
+    overflow: hidden; 
+    height: 100vh; 
+    position: relative; 
+}
+
+b, strong { font-weight: bold; }
+
+/* --- Global Icon Style --- */
+.iconoir {
+    stroke-width: 1.5;
+}
+
+/* --- Scrollbar Styles --- */
+::-webkit-scrollbar {
+    width: 10px; /* Width of vertical scrollbar */
+    height: 10px; /* Height of horizontal scrollbar */
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1); 
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3); 
+    border-radius: 5px;
+    border: 2px solid transparent; /* Creates padding around thumb */
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5); 
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-track:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+::-webkit-scrollbar-corner {
+    background: rgba(0, 0, 0, 0.05); 
+}
+
+/* For Firefox */
+* {
+    scrollbar-width: thin; 
+    scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1); 
+}

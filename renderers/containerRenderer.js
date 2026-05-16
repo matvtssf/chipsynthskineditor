@@ -3,8 +3,8 @@
  * containerRenderer.js
  * Handles rendering for layout and structural container elements.
  */
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 function generateSimpleId() {
     return Math.random().toString(36).substring(2, 9);

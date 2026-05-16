@@ -1,0 +1,123 @@
+/* File: style/xml-editor.css */
+
+/* --- Editor Container & Core Layout --- */
+#xml-editor-textarea-container { 
+    border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; 
+    background-color: #ffffff; position: relative; overflow: hidden; 
+    flex-grow: 1; display: flex; 
+}
+
+#xml-editor-line-numbers { 
+    flex-shrink: 0; min-width: 40px; height: 100%; background-color: #f3f4f6; color: #6b7280; 
+    padding: 8px 4px 15px 8px; text-align: right; overflow: hidden !important; user-select: none; 
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; 
+    font-size: 13px !important; line-height: 21px !important; box-sizing: border-box; 
+    border-right: 1px solid #d1d5db; position: relative; white-space: pre; 
+}
+#xml-editor-line-numbers .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; }
+
+#xml-editor-textarea-container > .xml-text-wrapper { 
+    flex-grow: 1; height: 100%; overflow: hidden; position: relative; min-width: 0; 
+}
+
+/* --- The Textarea and Overlay Matrix --- */
+#xml-editor-textarea, .xml-highlight-overlay-instance { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; margin: 0; border: 0; 
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; 
+    font-size: 13px !important; line-height: 21px !important; padding: 8px 8px 15px 8px; 
+    box-sizing: border-box; tab-size: 4; -moz-tab-size: 4; white-space: pre; overflow: auto; 
+}
+
+#xml-editor-textarea { 
+    z-index: 2; color: transparent; caret-color: #333; background-color: transparent; 
+    pointer-events: auto !important; user-select: text !important; resize: none; outline: none; 
+}
+
+/* --- Syntax Highlighting Overlay --- */
+.xml-highlight-overlay-instance {
+    z-index: 3 !important; pointer-events: none; user-select: none; 
+    color: #333; background-color: transparent;
+    -ms-overflow-style: none; scrollbar-width: none; 
+}
+.xml-highlight-overlay-instance::-webkit-scrollbar { display: none; }
+
+.xml-highlight-overlay-instance .hl-tag { color: #1e40af; }
+.xml-highlight-overlay-instance .hl-known-tag { font-weight: bold; }
+.xml-highlight-overlay-instance .hl-attr-name { color: #991b1b; }
+.xml-highlight-overlay-instance .hl-known-attr-name { font-weight: bold; }
+.xml-highlight-overlay-instance .hl-attr-value { color: #065f46; }
+.xml-highlight-overlay-instance .hl-param-value { font-weight: bold; color: #6d28d9; }
+.xml-highlight-overlay-instance .hl-comment { color: #6b7280; font-style: italic; }
+
+/* Interactive syntax elements */
+.xml-highlight-overlay-instance .hl-filepath,
+.hl-color-box-wrapper,
+.hl-color-rgb-warning-box {
+    position: relative; pointer-events: auto;
+}
+.xml-highlight-overlay-instance .hl-filepath { color: #2563eb; text-decoration: underline; }
+.xml-highlight-overlay-instance .hl-filepath:hover { color: #1d4ed8; }
+
+/* Inline Color Boxes in XML */
+.hl-color-box-wrapper { display: inline; vertical-align: baseline; padding: 0; margin: 0; line-height: inherit; }
+.hl-color-box-wrapper::before { content: ''; position: absolute; left: -1px; right: -1px; top: -1px; bottom: -1px; background-color: var(--box-bg-color, transparent); border-radius: 4px; z-index: -2; transition: opacity 0.3s ease-in-out; }
+.hl-color-box-wrapper::after { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; border: 2px solid var(--box-border-color, transparent); border-radius: 4px; z-index: -1; transition: opacity 0.3s ease-in-out; }
+.hl-color-box-wrapper.color-text-focused::before,
+.hl-color-box-wrapper.color-text-focused::after { opacity: 0.2; }
+.hl-color-rgba-text { text-decoration: underline; text-decoration-style: solid; text-decoration-color: currentColor; padding: 0px; position: relative; z-index: 0; }
+
+.hl-color-rgb-warning-box { display: inline; vertical-align: baseline; padding: 0; margin: 0; line-height: inherit; }
+.hl-color-rgb-warning-box::before { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; background-image: var(--box-bg-image-warning, repeating-linear-gradient( 45deg, rgba(255, 192, 203, 0.5), rgba(255, 192, 203, 0.5) 4px, rgba(255, 192, 203, 0.3) 4px, rgba(255, 192, 203, 0.3) 8px )); border-radius: 4px; z-index: -2; transition: opacity 0.3s ease-in-out; }
+.hl-color-rgb-warning-box::after { content: ''; position: absolute; left: -2px; right: -2px; top: -2px; bottom: -2px; border: 2px solid var(--box-border-color-warning, red); border-radius: 4px; z-index: -1; transition: opacity 0.3s ease-in-out; }
+.hl-color-rgb-warning-box.color-text-focused::before,
+.hl-color-rgb-warning-box.color-text-focused::after { opacity: 0.2; }
+.hl-color-rgb-warning-text { color: #000000 !important; font-style: italic; text-decoration: underline; text-decoration-style: solid; text-decoration-color: #cc0000; padding: 0px; position: relative; z-index: 0; }
+
+/* --- Floating Action Elements inside Editor --- */
+.icon-action-trigger { 
+    display: flex; align-items: center; justify-content: center; position: absolute; top: -10px; right: -5px; 
+    width: 16px; height: 16px; background-color: rgba(229, 231, 235, 0.85); border: 1px solid rgba(156, 163, 175, 0.7); 
+    border-radius: 50%; cursor: pointer; z-index: 10; opacity: 0; transform: scale(0.3) translate(50%, -50%); 
+    transform-origin: center; pointer-events: none; transition: opacity 0.15s ease-out, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1); 
+}
+.icon-action-trigger.visible { opacity: 1; transform: scale(1) translate(0, 0); pointer-events: auto; }
+.icon-action-trigger:hover { background-color: rgba(209, 213, 219, 0.95); border-color: rgba(107, 114, 128, 0.9); }
+.icon-action-trigger svg { width: 10px; height: 10px; stroke: #1f2937; fill: none; display: block; }
+
+#copy-xml-content-btn { 
+    position: absolute; top: 10px; right: 25px; padding: 0.25rem; border: none; background-color: transparent; 
+    color: #4B5563; border-radius: 0.25rem; cursor: pointer; z-index: 4; opacity: 0.6; 
+    transition: opacity 0.2s, background-color 0.2s, color 0.2s; 
+}
+#copy-xml-content-btn:hover { opacity: 1; background-color: rgba(209, 213, 219, 0.7); color: #1F2937; }
+#copy-xml-content-btn i.iconoir-copy { display: block; font-size: 1.25rem; }
+
+#xml-editor-resize-handle { position: absolute; bottom: 0px; right: 0px; width: 16px; height: 16px; cursor: se-resize; z-index: 5; }
+
+/* --- Editor Toolbar / Status Bar --- */
+#xml-editor-buttons button { cursor: pointer; }
+#close-xml-editor-btn { cursor: pointer; }
+#insert-element-xml-btn { margin-left: 0.5rem; }
+
+#xml-editor-status-bar { 
+    user-select: none; display: flex; align-items: center; flex-wrap: nowrap; 
+    justify-content: space-between; gap: 8px; padding: 2px 8px; min-height: 24px; 
+    border-right: 1px solid rgba(0,0,0,0.1);
+}
+#xml-editor-status-bar > div { display: flex; align-items: center; gap: 8px; }
+#xml-editor-status-bar .status-left { flex-shrink: 0; }
+#xml-editor-status-bar .status-center { flex-grow: 1; min-width: 0; overflow: hidden; text-align: left; }
+#xml-editor-status-bar .status-right { flex-shrink: 0; }
+#xml-editor-status-bar .original-status { white-space: nowrap; color: #6b7280; flex-shrink: 0; }
+#xml-editor-status-bar .status-separator { color: #cbd5e1; margin: 0 4px; flex-shrink: 0; }
+#xml-editor-status-bar .status-description { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #374151; font-style: italic; flex-grow: 1; min-width: 50px; }
+#xml-editor-status-bar .status-warning { color: #ef4444; font-weight: bold; white-space: nowrap; flex-shrink: 0; margin-left: 8px;}
+#xml-editor-status-bar .status-color-hover-info { color: #1d4ed8; font-style: italic; margin-left: 8px; white-space: nowrap; }
+
+/* --- Debug Overlays --- */
+#debug-overlay { 
+    position: fixed; background-color: rgba(0, 0, 0, 0.7); color: white; 
+    padding: 5px; font-size: 10px; font-family: monospace; border-radius: 3px; 
+    z-index: 8000; pointer-events: none; white-space: pre; 
+} 
+.debug-highlight { outline: 1px dashed red; outline-offset: -1px; }

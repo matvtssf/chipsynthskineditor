@@ -1,6 +1,6 @@
 // File: cs/renderers/expandViewButtonRenderer.js
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 function generateSimpleId(length = 5) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

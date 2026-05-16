@@ -1,0 +1,361 @@
+/**
+ * attributeEditorInteractions.js
+ * Handles all interactions specific to the Attribute Editor modal.
+ * FIXED: Removed local getAttributeCategory, added import from domUtils.
+ * FIXED: Added call to makeModalDraggable.
+ * FIXED: Removed unused import for getCancelAttributeEditBtn.
+ */
+import * as Refs from './core/references.js'; // Import reference data functions
+import { makeModalDraggable } from './managers/modalManager.js';
+import {
+    // Getters for Attribute Editor Modal elements
+    getAttributeEditorModal, getCloseAttributeEditorBtn, getAttributeEditorTitle,
+    getEditAttributeCategoriesBtnAttr, getAttributeEditorList, getAddNewAttributeBtn,
+    getAttributeEditorOriginalName, getAttributeEditorTypeFlag,
+    getAttributeEditorNameInput, getAttributeEditorDescriptionTextarea, getAttributeEditorTypeSelect,
+    getAttributeEditorDefaultInput, getAttributeEditorRequiredCheckbox, getAttributeEditorCategorySelect,
+    // Removed: getCancelAttributeEditBtn (Button removed)
+    getAttributeEditorModalContent, getAttributeEditorModalHeader,
+    // Utility functions
+    logError, showToast, getAttributeCategory
+} from './core/domUtils.js';
+// TODO: Replace direct toggle logic with import from modalManager.js later
+// import { toggleModalVisibility } from './modalManager.js';
+
+// --- Module State ---
+let attributeEditorChanged = false;
+let currentSelectedAttributeDefinitionItem = null;
+let attributeEditMode = 'view'; // 'view', 'edit', 'add'
+let isAttrEditorDraggable = false; // Flag for dragging setup
+
+// --- Constants ---
+const ATTRIBUTE_CATEGORIES = ['Layout & Position', 'Value & Parameter', 'Appearance & Style', 'Text & Font', 'Interaction & Behavior', 'Timing & Mode', 'Structure & System', 'Other'];
+const ATTRIBUTE_TYPES = ['string', 'integer', 'float', 'boolean', 'color', 'font-alias', 'path', 'other'];
+
+// --- Initialization ---
+
+/**
+ * Sets up all event listeners for the Attribute Editor modal.
+ */
+export function setupAttributeEditorModalListeners() {
+    console.log("[attributeEditor] Setting up Attribute Editor listeners...");
+    // Assumes the button to open this modal (#manage-attribute-definitions-btn) is handled elsewhere
+    safelyAttachListener(getCloseAttributeEditorBtn, 'click', () => handleAttributeEditorToggle(false));
+    safelyAttachListener(getEditAttributeCategoriesBtnAttr, 'click', handleEditAttributeCategories);
+    safelyAttachListener(getAddNewAttributeBtn, 'click', handleAddNewAttribute);
+    const attrList = getAttributeEditorList();
+    if (attrList) {
+        // Click listener handles selection AND delete button clicks inside list items
+        attrList.addEventListener('click', handleAttributeEditorListClick);
+        // Add hover listeners for delete icons
+        attrList.addEventListener('mouseover', handleAttributeEditorListItemHover);
+        attrList.addEventListener('mouseout', handleAttributeEditorListItemHoverOut);
+    }
+    // Input listeners trigger auto-save logic
+    const nameInput = getAttributeEditorNameInput();
+    const descInput = getAttributeEditorDescriptionTextarea();
+    const typeSelect = getAttributeEditorTypeSelect();
+    const defaultInput = getAttributeEditorDefaultInput();
+    const requiredCheck = getAttributeEditorRequiredCheckbox();
+    const categorySelect = getAttributeEditorCategorySelect();
+
+    const autoSaveHandler = () => handleAttributeDefinitionChange(); // No event needed for auto-save trigger
+
+    if(nameInput) nameInput.addEventListener('input', autoSaveHandler);
+    if(descInput) descInput.addEventListener('input', autoSaveHandler);
+    if(typeSelect) typeSelect.addEventListener('change', autoSaveHandler);
+    if(defaultInput) defaultInput.addEventListener('input', autoSaveHandler);
+    if(requiredCheck) requiredCheck.addEventListener('change', autoSaveHandler);
+    if(categorySelect) categorySelect.addEventListener('change', autoSaveHandler);
+
+    // --- Make Modal Draggable ---
+    if (!isAttrEditorDraggable) {
+        const modalContent = getAttributeEditorModalContent(); // Use new getter
+        const modalHeader = getAttributeEditorModalHeader(); // Use new getter
+        if (modalContent && modalHeader) {
+            makeModalDraggable(modalContent, modalHeader);
+            isAttrEditorDraggable = true; // Set flag
+        } else {
+            console.error("[attributeEditor] Could not find content or header to make Attr Editor draggable.");
+        }
+    }
+    // --- End Make Modal Draggable ---
+}
+
+// --- Core UI Logic ---
+
+/**
+ * Toggles the visibility of the Attribute Editor modal.
+ * @param {boolean} isOpen - Explicitly show (true) or hide (false) the modal.
+ * @param {boolean} assignMode - Flag indicating if opened to assign an attribute to an element (future use).
+ */
+export function handleAttributeEditorToggle(isOpen, assignMode = false) {
+    const modal = getAttributeEditorModal();
+    if (!modal) { logError("Attribute Editor Modal element not found!", null); return; }
+    const show = !!isOpen;
+    console.log(`[attributeEditor] handleAttributeEditorToggle called. Should show: ${show}`);
+
+    if (!show && attributeEditorChanged) {
+        if (!confirm("You have unsaved changes in the attribute definitions. Close anyway? (Changes are saved automatically, use Export in Element Ref modal to save file)")) {
+            console.log("[attributeEditor] Close cancelled due to unsaved changes.");
+            return;
+        }
+    }
+
+    modal.classList.toggle('visible', show);
+    console.log(`[attributeEditor] 'visible' class toggled to: ${show}`);
+    if (show) {
+        console.log("[attributeEditor] Calling loadAttributeEditorUI...");
+        loadAttributeEditorUI();
+        setAttributeEditorChanged(false); // Reset changed state on open
+        console.log(`[attributeEditor] Attribute editor opened, assignMode=${assignMode}`);
+    } else {
+        currentSelectedAttributeDefinitionItem = null;
+        attributeEditMode = 'view';
+        console.log("[attributeEditor] Closed.");
+    }
+}
+
+// ... (rest of the functions remain the same: setAttributeEditorChanged, loadAttributeEditorUI, handleAttributeEditorListClick, populateAttributeEditorForm, clearAttributeEditorForm, handleEditAttributeCategories, handleAddNewAttribute, handleRemoveSelectedAttribute, handleAttributeDefinitionChange, handleAttributeEditorListItemHover, handleAttributeEditorListItemHoverOut, safelyAttachListener) ...
+
+/** Sets the internal changed flag and updates the main reference export button state */
+function setAttributeEditorChanged(changed) {
+    attributeEditorChanged = changed;
+    // Update the main Element Reference Export button state as changes here affect that data
+    if (window.setElementUnsavedChanges) { // Check if global function exists (temporary)
+        window.setElementUnsavedChanges(changed);
+    } else {
+        console.warn("setElementUnsavedChanges function not found globally. Unsaved status might not reflect correctly on Element Ref modal export button.");
+    }
+    console.log("Attribute editor changed state:", changed);
+}
+
+/** Loads attribute definitions and populates the UI */
+function loadAttributeEditorUI() {
+    const attrList = getAttributeEditorList();
+    const categorySelect = getAttributeEditorCategorySelect(); // Form category select
+    if (!attrList || !categorySelect) { logError("Missing UI elements for Attribute Editor.", null); return; }
+
+    attrList.innerHTML = ''; // Clear list
+    clearAttributeEditorForm(); // Clear form details
+
+    // Populate category dropdown in the FORM
+    categorySelect.innerHTML = ''; // Clear existing options
+    ATTRIBUTE_CATEGORIES.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        categorySelect.appendChild(option);
+    });
+
+    // Fetch attribute definitions (using globalAttributes for now)
+    const allAttrs = Refs.getCommonAttributes();
+    const categorizedAttrs = {};
+
+    Object.entries(allAttrs).forEach(([attrName, attrData]) => {
+        // Use the category stored in the attribute data if available, otherwise guess
+        const category = attrData.category || getAttributeCategory(attrName) || 'Other'; // <<< USES IMPORTED FUNCTION
+        if (!categorizedAttrs[category]) categorizedAttrs[category] = [];
+        categorizedAttrs[category].push({ name: attrName, data: attrData });
+    });
+
+    // Populate the attribute LIST
+    ATTRIBUTE_CATEGORIES.forEach(category => {
+        if (categorizedAttrs[category]) {
+            const headerLi = document.createElement('li');
+            headerLi.className = 'attribute-category-header';
+            headerLi.textContent = category;
+            attrList.appendChild(headerLi);
+
+            categorizedAttrs[category].sort((a, b) => a.name.localeCompare(b.name));
+            categorizedAttrs[category].forEach(attr => {
+                const li = document.createElement('li');
+                li.dataset.attributeName = attr.name;
+                li.classList.add('common-attribute'); // All definitions are considered "common" here
+                li.innerHTML = `<span>${attr.name}</span>`; // Add span for content alignment
+                // Delete button added on hover
+                attrList.appendChild(li);
+            });
+        }
+    });
+    // Add 'Other' category last
+    const otherAttrs = categorizedAttrs['Other'] || [];
+    Object.keys(categorizedAttrs).forEach(cat => { if (!ATTRIBUTE_CATEGORIES.includes(cat) && cat !== 'Other') { otherAttrs.push(...categorizedAttrs[cat]); } });
+    if (otherAttrs.length > 0) {
+        const headerLi = document.createElement('li');
+        headerLi.className = 'attribute-category-header';
+        headerLi.textContent = 'Other';
+        attrList.appendChild(headerLi);
+        otherAttrs.sort((a, b) => a.name.localeCompare(b.name));
+        otherAttrs.forEach(attr => {
+            const li = document.createElement('li');
+            li.dataset.attributeName = attr.name;
+            li.classList.add('common-attribute');
+            li.innerHTML = `<span>${attr.name}</span>`;
+            attrList.appendChild(li);
+        });
+    }
+
+    if (Object.keys(allAttrs).length === 0) {
+        attrList.innerHTML = '<li class="text-gray-500 italic">No attributes defined. Use Add New.</li>';
+    }
+}
+
+/** Handles clicks within the attribute definition list */
+function handleAttributeEditorListClick(event){
+    // Check if click was on the delete icon
+    const deleteButton = event.target.closest('.delete-item-btn');
+    if (deleteButton) {
+        // Delete logic handled by the button's own listener via hover handler
+        return; // Stop further processing
+    }
+
+    // Handle list item selection
+    let targetLi = event.target.closest('li');
+    if (!targetLi || !targetLi.dataset.attributeName || targetLi.classList.contains('attribute-category-header')) {
+         clearAttributeEditorForm(); // Clear form if clicking invalid item or header
+        return;
+    }
+
+    const attributeName = targetLi.dataset.attributeName;
+
+    if (currentSelectedAttributeDefinitionItem && currentSelectedAttributeDefinitionItem !== targetLi) {
+        currentSelectedAttributeDefinitionItem.classList.remove('selected');
+    }
+    targetLi.classList.add('selected');
+    currentSelectedAttributeDefinitionItem = targetLi;
+    attributeEditMode = 'edit'; // Selecting an existing item puts us in edit mode
+
+    populateAttributeEditorForm(attributeName);
+}
+
+/** Populates the attribute editor form with data for the selected attribute */
+function populateAttributeEditorForm(attributeName) {
+    const nameInput = getAttributeEditorNameInput(); const descInput = getAttributeEditorDescriptionTextarea(); const typeSelect = getAttributeEditorTypeSelect(); const defaultInput = getAttributeEditorDefaultInput(); const requiredCheck = getAttributeEditorRequiredCheckbox(); const categorySelect = getAttributeEditorCategorySelect(); const title = getAttributeEditorTitle(); const originalNameInput = getAttributeEditorOriginalName();
+    if (!nameInput || !descInput || !typeSelect || !defaultInput || !requiredCheck || !categorySelect || !title || !originalNameInput) { logError("Missing attribute editor form elements", null); return; }
+
+    const attributeData = Refs.getCommonAttributes()[attributeName]; // Get data from common attributes store
+    if (!attributeData) { showToast(`Attribute definition "${attributeName}" not found.`, 'error'); clearAttributeEditorForm(); return; }
+
+    title.textContent = `Edit Attribute: ${attributeName}`;
+    nameInput.value = attributeName; nameInput.readOnly = true; // Cannot rename existing attributes easily yet
+    descInput.value = attributeData.description || '';
+    typeSelect.value = ATTRIBUTE_TYPES.includes(attributeData.type) ? attributeData.type : 'other'; // Ensure type exists in options
+    defaultInput.value = attributeData.default !== undefined ? String(attributeData.default) : '';
+    requiredCheck.checked = !!attributeData.required;
+    categorySelect.value = ATTRIBUTE_CATEGORIES.includes(attributeData.category) ? attributeData.category : getAttributeCategory(attributeName) || 'Other'; // Ensure category exists // <<< USES IMPORTED FUNCTION
+    originalNameInput.value = attributeName; // Store original name for saving
+
+     // Enable fields for editing
+     descInput.disabled = false; typeSelect.disabled = false; defaultInput.disabled = false; requiredCheck.disabled = false; categorySelect.disabled = false;
+     setAttributeEditorChanged(false); // Reset changed state when selecting an item
+}
+
+/** Clears and disables the attribute editor form */
+function clearAttributeEditorForm() {
+    const nameInput = getAttributeEditorNameInput(); const descInput = getAttributeEditorDescriptionTextarea(); const typeSelect = getAttributeEditorTypeSelect(); const defaultInput = getAttributeEditorDefaultInput(); const requiredCheck = getAttributeEditorRequiredCheckbox(); const categorySelect = getAttributeEditorCategorySelect(); const title = getAttributeEditorTitle(); const originalNameInput = getAttributeEditorOriginalName(); const typeFlagInput = getAttributeEditorTypeFlag();
+    if (currentSelectedAttributeDefinitionItem) { currentSelectedAttributeDefinitionItem.classList.remove('selected'); currentSelectedAttributeDefinitionItem = null; }
+    if (title) title.textContent = "Attribute Editor"; if (nameInput) { nameInput.value = ''; nameInput.readOnly = true; nameInput.placeholder = "Select or Add Attribute"; }
+    if (descInput) { descInput.value = ''; descInput.disabled = true; } if (typeSelect) { typeSelect.value = 'string'; typeSelect.disabled = true; }
+    if (defaultInput) { defaultInput.value = ''; defaultInput.disabled = true; } if (requiredCheck) { requiredCheck.checked = false; requiredCheck.disabled = true; }
+    if (categorySelect) { categorySelect.value = 'Other'; categorySelect.disabled = true; } if (originalNameInput) originalNameInput.value = ''; if (typeFlagInput) typeFlagInput.value = '';
+    attributeEditMode = 'view'; setAttributeEditorChanged(false);
+}
+
+/** Placeholder for category editing UI */
+function handleEditAttributeCategories() { showToast("TODO: Implement Attribute Category Editor UI.", "info"); }
+
+/** Prepares the form for adding a new attribute definition */
+function handleAddNewAttribute() {
+     clearAttributeEditorForm(); attributeEditMode = 'add';
+     const nameInput = getAttributeEditorNameInput(); const descInput = getAttributeEditorDescriptionTextarea(); const typeSelect = getAttributeEditorTypeSelect(); const defaultInput = getAttributeEditorDefaultInput(); const requiredCheck = getAttributeEditorRequiredCheckbox(); const categorySelect = getAttributeEditorCategorySelect(); const title = getAttributeEditorTitle(); const originalNameInput = getAttributeEditorOriginalName(); const typeFlagInput = getAttributeEditorTypeFlag();
+     if (title) title.textContent = "Add New Attribute"; if (nameInput) { nameInput.readOnly = false; nameInput.placeholder = "Enter new attribute name"; nameInput.focus();}
+     if (descInput) descInput.disabled = false; if (typeSelect) typeSelect.disabled = false; if (defaultInput) defaultInput.disabled = false;
+     if (requiredCheck) requiredCheck.disabled = false; if (categorySelect) categorySelect.disabled = false; if (originalNameInput) originalNameInput.value = ''; if (typeFlagInput) typeFlagInput.value = '';
+     setAttributeEditorChanged(false);
+}
+
+/** Handles removing the selected attribute definition */
+function handleRemoveSelectedAttribute(attributeNameToRemove = null) {
+    const nameToRemove = attributeNameToRemove || getAttributeEditorOriginalName()?.value;
+    if (!nameToRemove) { showToast("Select an attribute from the list to delete.", "info"); return; }
+    if (!confirm(`Are you sure you want to permanently delete the definition for attribute "${nameToRemove}"? This might affect elements using it if not properly updated.`)) { return; }
+    if (Refs.deleteAttributeDefinition(nameToRemove)) { // Assumes Refs.deleteAttributeDefinition exists
+        showToast(`Attribute definition "${nameToRemove}" deleted.`, 'info'); setAttributeEditorChanged(true);
+        loadAttributeEditorUI(); clearAttributeEditorForm();
+    } else { showToast(`Attribute definition "${nameToRemove}" not found or could not be deleted.`, 'error'); }
+}
+
+/** Handles changes in the form fields for auto-saving attribute definitions */
+function handleAttributeDefinitionChange() {
+    const nameInput = getAttributeEditorNameInput(); const descInput = getAttributeEditorDescriptionTextarea(); const typeSelect = getAttributeEditorTypeSelect(); const defaultInput = getAttributeEditorDefaultInput(); const requiredCheck = getAttributeEditorRequiredCheckbox(); const categorySelect = getAttributeEditorCategorySelect(); const originalNameInput = getAttributeEditorOriginalName();
+    if (!nameInput || !descInput || !typeSelect || !defaultInput || !requiredCheck || !categorySelect || !originalNameInput) { logError("Cannot auto-save attribute, form elements missing.", null); return; }
+    const attributeName = nameInput.value.trim(); const originalName = originalNameInput.value;
+    if (!attributeName) { return; } // Don't save if name is empty
+    if (attributeEditMode === 'add' && Refs.getCommonAttributes()[attributeName]) { showToast(`Attribute "${attributeName}" already exists. Choose a different name.`, "error"); nameInput.focus(); return; }
+
+    const attributeData = { description: descInput.value.trim(), type: typeSelect.value, default: defaultInput.value.trim() || undefined, required: requiredCheck.checked, category: categorySelect.value || 'Other' };
+    if (attributeData.default === undefined) { delete attributeData.default; }
+
+    // Assumes Refs.addOrUpdateAttributeDefinition exists and handles rename logic via originalName if necessary
+    if (Refs.addOrUpdateAttributeDefinition(attributeName, attributeData, originalName)) {
+         setAttributeEditorChanged(true); console.log(`Attribute definition "${attributeName}" auto-saved.`);
+         if (attributeEditMode === 'add') {
+             attributeEditMode = 'edit'; nameInput.readOnly = true; originalNameInput.value = attributeName;
+             loadAttributeEditorUI(); // Refresh list
+             setTimeout(() => { // Reselect after list refresh
+                  const listItems = getAttributeEditorList()?.querySelectorAll('li');
+                  listItems?.forEach(li => { if (li.dataset.attributeName === attributeName) { li.classList.add('selected'); currentSelectedAttributeDefinitionItem = li; } });
+             }, 0);
+         }
+    } else { showToast(`Failed to auto-save attribute definition "${attributeName}".`, "error"); }
+}
+
+// --- Hover handlers for Attribute Editor delete icons ---
+function handleAttributeEditorListItemHover(event) {
+    const li = event.target.closest('li');
+    // console.log("[Attr Hover In] Event on:", event.target, "Closest LI:", li);
+    if (li && li.dataset.attributeName && !li.classList.contains('attribute-category-header')) {
+        let deleteBtn = li.querySelector('.delete-item-btn');
+        // console.log("[Attr Hover In] Found delete btn?:", deleteBtn);
+        if (!deleteBtn) {
+            deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-item-btn';
+            deleteBtn.innerHTML = '<i class="iconoir-bin-minus-in"></i>'; deleteBtn.title = 'Delete Attribute Definition';
+            deleteBtn.dataset.targetName = li.dataset.attributeName;
+            // console.log("[Attr Hover In] Creating delete btn for:", li.dataset.attributeName);
+            deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); handleRemoveSelectedAttribute(e.currentTarget.dataset.targetName); });
+            li.appendChild(deleteBtn);
+        }
+        deleteBtn.style.display = 'inline-flex';
+        // console.log("[Attr Hover In] Showing delete btn for:", li.dataset.attributeName);
+    }
+}
+
+function handleAttributeEditorListItemHoverOut(event) {
+    const li = event.target.closest('li');
+    // console.log("[Attr Hover Out] Event on:", event.target, "Closest LI:", li);
+    if (li) {
+        const deleteBtn = li.querySelector('.delete-item-btn');
+        if (deleteBtn && !li.contains(event.relatedTarget)) {
+            // console.log("[Attr Hover Out] Hiding delete btn for:", li.dataset.attributeName);
+            deleteBtn.style.display = 'none';
+        }
+    }
+    const listContainer = event.target.closest('ul#attribute-editor-list');
+    if (listContainer && !listContainer.contains(event.relatedTarget)) {
+        // console.log("[Attr Hover Out] Mouse left list container, hiding all delete buttons.");
+        listContainer.querySelectorAll('.delete-item-btn').forEach(btn => btn.style.display = 'none');
+    }
+}
+// --- END Attribute Editor Modal Handlers ---
+
+// --- Utility (safe internal listener) ---
+function safelyAttachListener(elementGetter, eventName, handler, options = {}) {
+    const element = typeof elementGetter === 'function' ? elementGetter() : document.getElementById(elementGetter);
+    let elementName = "Unknown";
+    if (typeof elementGetter === 'function') { elementName = elementGetter.name; }
+    else if (typeof elementGetter === 'string') { elementName = `#${elementGetter}`; }
+    if (!element) { console.warn(`[attributeEditor safelyAttachListener] Element not found for listener: ${elementName}`); return false; }
+    try { if (!options.once) { element.removeEventListener(eventName, handler, options); } element.addEventListener(eventName, handler, options); return true; }
+    catch (e) { console.error(`[attributeEditor safelyAttachListener] Error attaching listener ${eventName} to ${element.id || element.tagName}`, e); return false; }
+}

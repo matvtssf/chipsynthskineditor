@@ -1,6 +1,6 @@
 // File: cs/renderers/knobRenderer.js
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 const DRAG_SENSITIVITY = 0.5;
 const SCROLL_SENSITIVITY = 0.05;

@@ -1,5 +1,5 @@
 // File: cs/renderers/sliderRenderer.js
-import * as DomUtils from '../domUtils.js';
+import * as DomUtils from '../core/domUtils.js';
 
 export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('div');

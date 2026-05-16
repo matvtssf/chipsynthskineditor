@@ -1,0 +1,664 @@
+// File: cs/renderers/containerRenderer.js
+/**
+ * containerRenderer.js
+ * Handles rendering for layout and structural container elements.
+ */
+import * as DomUtils from '../domUtils.js';
+import * as State from '../state.js';
+
+function generateSimpleId() {
+    return Math.random().toString(36).substring(2, 9);
+}
+
+function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCallback, currentParams, sourcePath) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-view-container');
+    if (tagName === 'CS01ViewContainer1') {
+        htmlElement.classList.add('gui-view-container1');
+    }
+
+    if (mergedAttributes['visibilitychangename']) {
+        htmlElement.dataset.visibilityChangeName = mergedAttributes['visibilitychangename'];
+        htmlElement.style.display = 'none'; // Default to hidden until VisibilityController updates it
+    }
+
+    // Handle background image or fill color specifically for containers
+    const imgRelPath = mergedAttributes['image'];
+    if (imgRelPath) {
+        const currentSkinRoot = State.getCurrentSkinRoot() || '';
+        const imgFullPath = State.normalizePath(imgRelPath, currentSkinRoot);
+        const blobUrl = State.getAssetBlobUrl(imgFullPath);
+        if (blobUrl) {
+            htmlElement.style.backgroundImage = `url('${blobUrl}')`;
+            htmlElement.style.backgroundRepeat = 'no-repeat';
+            htmlElement.style.backgroundPosition = 'top left';
+            // Do NOT set backgroundSize here; let DomUtils.applyStyles handle 'stretch' or 'tile' if needed, or default to original size.
+        }
+    }
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+function renderVisibilityContainer(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-visibility-container');
+    
+    if (mergedAttributes['visibilitychangename']) {
+        htmlElement.dataset.visibilityChangeName = mergedAttributes['visibilitychangename'];
+        // Note: Initial visibility is handled by visibilityController.js
+    }
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+function renderStandalonePane(xmlNode, mergedAttributes, sourcePath, renderElementCallback, currentParams) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-pane');
+    
+    // Ensure the pane occupies the full content frame area of its parent tab view content slot
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.top = '0';
+    htmlElement.style.left = '0';
+    htmlElement.style.width = '100%';
+    htmlElement.style.height = '100%';
+    
+    // Pass attributes down using explicit multi-case support so the tab view can extract them reliably
+    htmlElement.dataset.xmlAttr_name = mergedAttributes['name'] || '';
+    htmlElement.dataset.xmlAttr_image = mergedAttributes['image'] || '';
+    htmlElement.dataset.xmlAttr_imageb = mergedAttributes['imageb'] || '';
+    htmlElement.dataset.xmlAttr_imagehl = mergedAttributes['imageHL'] || mergedAttributes['imagehl'] || '';
+    htmlElement.dataset.xmlAttr_imageblank = mergedAttributes['imagebHL'] || mergedAttributes['imagebhl'] || mergedAttributes['imagehlb'] || '';
+
+    // Panes often act as simple groupers or background blocks
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+function renderTabView(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback) {
+    const container = document.createElement('div');
+    container.classList.add('gui-tab-view');
+    container.style.position = 'absolute';
+
+    // Rule 7 explicitly allows flex container layout structures for TabView elements
+    container.style.display = 'flex';
+
+    // The param attribute usually dictates which tab is active
+    const tabParam = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
+    container.dataset.param = tabParam;
+
+    const tabBar = document.createElement('div');
+    tabBar.classList.add('gui-tab-bar');
+    tabBar.style.zIndex = '10';
+    tabBar.style.display = 'flex';
+    tabBar.style.boxSizing = 'border-box';
+    
+    // Position handling via directional flex alignment adjustments
+    const pos = mergedAttributes['position'] || 'top';
+    if (pos === 'bottom') {
+        container.style.flexDirection = 'column';
+        tabBar.style.width = '100%';
+        tabBar.style.flexDirection = 'row';
+    } else if (pos === 'left') {
+        container.style.flexDirection = 'row-reverse';
+        tabBar.style.height = '100%';
+        tabBar.style.flexDirection = 'column';
+    } else if (pos === 'right') {
+        container.style.flexDirection = 'row';
+        tabBar.style.height = '100%';
+        tabBar.style.flexDirection = 'column';
+    } else { // default 'top'
+        container.style.flexDirection = 'column-reverse';
+        tabBar.style.width = '100%';
+        tabBar.style.flexDirection = 'row';
+    }
+
+    // Alignment handling
+    const align = mergedAttributes['alignment'] || 'left';
+    if (pos === 'left' || pos === 'right') {
+        if (align === 'bottom' || align === 'right') {
+            tabBar.style.justifyContent = 'flex-end';
+        } else if (align === 'center') {
+            tabBar.style.justifyContent = 'center';
+        } else {
+            tabBar.style.justifyContent = 'flex-start';
+        }
+    } else {
+        if (align === 'right') {
+            tabBar.style.justifyContent = 'flex-end';
+        } else if (align === 'center') {
+            tabBar.style.justifyContent = 'center';
+        } else {
+            tabBar.style.justifyContent = 'flex-start';
+        }
+    }
+    
+    // Handle alignment-based margin_x padding interpretation
+    const marginX = parseFloat(mergedAttributes['margin_x'] || '0');
+    if (!isNaN(marginX) && marginX > 0) {
+        if (align === 'right') {
+            tabBar.style.paddingRight = marginX + 'px';
+        } else if (align === 'left') {
+            tabBar.style.paddingLeft = marginX + 'px';
+        }
+    }
+
+    // Read styling for the tab bar from attributes
+    if (mergedAttributes['tabBarHeight']) {
+        tabBar.style.height = mergedAttributes['tabBarHeight'] + 'px';
+    }
+    
+    const contentArea = document.createElement('div');
+    contentArea.classList.add('gui-tab-content-area');
+    contentArea.style.position = 'relative'; // Coordinate anchor for nested absolute child controls
+    contentArea.style.flexGrow = '1';
+    contentArea.style.zIndex = '1';
+
+    if (pos === 'left' || pos === 'right') {
+        contentArea.style.height = '100%';
+    } else {
+        contentArea.style.width = '100%';
+    }
+
+    container.appendChild(contentArea);
+    container.appendChild(tabBar);
+
+    // Provide a postProcessFunction to construct the tabs *after* the Panes have been rendered
+    const postProcessFunction = (element, attrs, params, sourceXmlNode, styleNameString) => {
+        let activePaneIndex = 0; // Default to the first pane
+        const panes = Array.from(contentArea.children);
+        const tabButtonsList = [];
+
+        // Fetch style definitions for font colors from state
+        const stylesMap = State.getStyles();
+        const styleName = attrs['style'];
+        const styleData = (styleName && stylesMap[styleName]) ? stylesMap[styleName] : {};
+
+        const normalColor = styleData.color_text || styleData.color_deselected || attrs['color_deselected'] || attrs['color_text'] || '#FFFFFFFF';
+        const activeColor = styleData.color_textHL || styleData.color_selected || attrs['color_selected'] || attrs['color_textHL'] || '#FFFFFFFF';
+        
+        panes.forEach((pane, index) => {
+            if (pane.classList.contains('gui-pane')) {
+                const paneName = pane.dataset.xmlAttr_name || `Tab ${index + 1}`;
+                 
+                const tabButton = document.createElement('button');
+                tabButton.classList.add('gui-tab-button');
+                tabButton.textContent = paneName;
+                tabButton.dataset.targetIndex = index;
+                 
+                tabButton.style.backgroundColor = 'transparent';
+                tabButton.style.border = 'none';
+                tabButton.style.cursor = 'pointer';
+                tabButton.style.display = 'inline-flex';
+                tabButton.style.alignItems = 'center';
+                tabButton.style.justifyContent = 'center';
+                tabButton.style.padding = '0';
+
+                if (attrs['font']) {
+                    DomUtils.applyFont(tabButton, attrs['font']);
+                }
+
+                // Resolve image asset paths with mixed-case and lower-case property lookups safely
+                const normalImgRel = pane.dataset.xmlAttr_imageb || pane.dataset.xmlAttr_image || attrs['imageb'] || attrs['image'];
+                const hlImgRel = pane.dataset.xmlAttr_imageblank || pane.dataset.xmlAttr_imagehl || attrs['imagebHL'] || attrs['imageHL'] || attrs['imagebhl'] || attrs['imagehl'];
+                
+                const currentSkinRoot = State.getCurrentSkinRoot() || '';
+                const normalBlobUrl = normalImgRel ? State.getAssetBlobUrl(State.normalizePath(normalImgRel, currentSkinRoot)) : null;
+                const hlBlobUrl = hlImgRel ? State.getAssetBlobUrl(State.normalizePath(hlImgRel, currentSkinRoot)) : null;
+
+                const itemContext = {
+                    button: tabButton,
+                    pane: pane,
+                    index: index,
+                    isHovered: false,
+                    normalBlobUrl: normalBlobUrl,
+                    hlBlobUrl: hlBlobUrl,
+                    normalWidth: 0,
+                    normalHeight: 0,
+                    hlWidth: 0,
+                    hlHeight: 0
+                };
+
+                itemContext.updateVisuals = () => {
+                    const isActive = itemContext.index === activePaneIndex;
+                    const isHovered = itemContext.isHovered;
+
+                    // Text color switching based on state style colors
+                    if (isActive) {
+                        itemContext.button.style.color = DomUtils.parseColor(activeColor);
+                        itemContext.button.classList.add('active');
+                    } else {
+                        itemContext.button.style.color = DomUtils.parseColor(normalColor);
+                        itemContext.button.classList.remove('active');
+                    }
+
+                    // Completely swap images between normal and highlight tracks
+                    const blobUrl = isHovered ? (itemContext.hlBlobUrl || itemContext.normalBlobUrl) : itemContext.normalBlobUrl;
+                    const naturalHeight = isHovered ? (itemContext.hlHeight || itemContext.normalHeight) : itemContext.normalHeight;
+                    const naturalWidth = isHovered ? (itemContext.hlWidth || itemContext.normalWidth) : itemContext.normalWidth;
+
+                    if (blobUrl) {
+                        itemContext.button.style.backgroundImage = `url('${blobUrl}')`;
+                        itemContext.button.style.backgroundRepeat = 'no-repeat';
+                        itemContext.button.style.backgroundSize = `${naturalWidth}px ${naturalHeight}px`;
+                        
+                        if (naturalHeight > 0) {
+                            const btnW = naturalWidth;
+                            const btnH = naturalHeight / 2;
+                            itemContext.button.style.width = btnW + 'px';
+                            itemContext.button.style.height = btnH + 'px';
+                            
+                            if (isActive) {
+                                itemContext.button.style.backgroundPosition = `0px -${btnH}px`;
+                            } else {
+                                itemContext.button.style.backgroundPosition = '0px 0px';
+                            }
+                        }
+                    }
+                };
+
+                // Pre-cache dimensions to enable pure synchronous state rendering on action events
+                if (normalBlobUrl) {
+                    const img = new Image();
+                    img.onload = () => {
+                        itemContext.normalWidth = img.naturalWidth;
+                        itemContext.normalHeight = img.naturalHeight;
+                        itemContext.updateVisuals();
+                    };
+                    img.src = normalBlobUrl;
+                }
+                if (hlBlobUrl) {
+                    const img = new Image();
+                    img.onload = () => {
+                        itemContext.hlWidth = img.naturalWidth;
+                        itemContext.hlHeight = img.naturalHeight;
+                        itemContext.updateVisuals();
+                    };
+                    img.src = hlBlobUrl;
+                }
+
+                tabButton.addEventListener('mouseenter', () => {
+                    itemContext.isHovered = true;
+                    itemContext.updateVisuals();
+                });
+
+                tabButton.addEventListener('mouseleave', () => {
+                    itemContext.isHovered = false;
+                    itemContext.updateVisuals();
+                });
+
+                tabButton.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) { // Select immediately on left click mouse down
+                        activePaneIndex = itemContext.index;
+                        refreshTabs();
+                        console.log(`[TabView] Selected tab: ${itemContext.button.textContent} (Index: ${itemContext.index})`);
+                    }
+                });
+
+                tabButtonsList.push(itemContext);
+            }
+        });
+
+        const refreshTabs = () => {
+            tabButtonsList.forEach(item => {
+                const isActive = item.index === activePaneIndex;
+                if (isActive) {
+                    item.pane.style.display = 'block'; 
+                } else {
+                    item.pane.style.display = 'none';
+                }
+                item.updateVisuals();
+            });
+        };
+
+        tabButtonsList.forEach(item => {
+            tabBar.appendChild(item.button);
+        });
+
+        refreshTabs();
+    };
+
+    return {
+        htmlElement: container, // Append root container to parent
+        childAppendElement: contentArea, // Append inner Panes to contentArea
+        mainElementForAttributes: container, // Apply main styles to the outer container
+        requiresRecursiveRender: true,
+        postProcessFunction: postProcessFunction
+    };
+}
+
+function renderScrollViewWrapper(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback) {
+    const outerContainer = document.createElement('div');
+    outerContainer.classList.add('gui-scroll-view-container');
+    outerContainer.style.position = 'absolute'; 
+    outerContainer.style.overflow = 'hidden'; 
+
+    const innerScrollArea = document.createElement('div');
+    innerScrollArea.classList.add('gui-scroll-view');
+    innerScrollArea.style.position = 'absolute';
+    innerScrollArea.style.top = '0';
+    innerScrollArea.style.left = '0';
+    innerScrollArea.style.width = '100%';
+    innerScrollArea.style.height = '100%';
+    innerScrollArea.style.overflow = 'scroll'; 
+    innerScrollArea.classList.add('hide-scrollbars'); 
+
+    // Specific dimensions for the scrollable content area
+    const contentW = parseFloat(mergedAttributes['content_w']);
+    const contentH = parseFloat(mergedAttributes['content_h']);
+
+    const contentHolder = document.createElement('div');
+    contentHolder.classList.add('gui-scroll-content-holder');
+    contentHolder.style.position = 'relative';
+
+    if (!isNaN(contentW)) {
+        contentHolder.style.width = `${contentW}px`;
+        innerScrollArea.style.overflowX = 'scroll';
+    } else {
+        innerScrollArea.style.overflowX = 'hidden';
+    }
+
+    if (!isNaN(contentH)) {
+        contentHolder.style.height = `${contentH}px`;
+        innerScrollArea.style.overflowY = 'scroll';
+    } else {
+        innerScrollArea.style.overflowY = 'hidden';
+    }
+
+    innerScrollArea.appendChild(contentHolder);
+    outerContainer.appendChild(innerScrollArea);
+
+    const scrollViewName = mergedAttributes['name'];
+    if (scrollViewName) {
+        outerContainer.dataset.scrollViewName = scrollViewName;
+    }
+
+    return {
+        htmlElement: outerContainer, // Root appended to DOM
+        childAppendElement: contentHolder, // Children appended to content wrapper
+        mainElementForAttributes: outerContainer, // Apply layout to outer boundary
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+function renderScrollViewPageController(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const globalDefaults = State.getGlobalGuiDefaults();
+
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-scrollview-pagecontroller');
+    const mainElementForAttributes = htmlElement;
+
+    const controllerType = mergedAttributes['type']; 
+    const targetScrollViewName = mergedAttributes['scrollViewName'];
+    const img1Path_relative = mergedAttributes['image_1']; 
+    const img1HLPath_relative = mergedAttributes['image_1HL'];
+    const img2Path_relative = mergedAttributes['image_2']; 
+    const img2HLPath_relative = mergedAttributes['image_2HL'];
+    const currentSkinRoot = State.getCurrentSkinRoot() || '';
+
+    const img1Path = img1Path_relative ? State.normalizePath(img1Path_relative, currentSkinRoot) : null;
+    const img1HLPath = img1HLPath_relative ? State.normalizePath(img1HLPath_relative, currentSkinRoot) : null;
+    const img2Path = img2Path_relative ? State.normalizePath(img2Path_relative, currentSkinRoot) : null;
+    const img2HLPath = img2HLPath_relative ? State.normalizePath(img2HLPath_relative, currentSkinRoot) : null;
+    
+    const showPageNameAttr = mergedAttributes['showPageName']; 
+    const pageNameFont = mergedAttributes['font'];
+    const circleEdit = mergedAttributes['circleEdit'] === '1'; 
+    const circleColorStr = mergedAttributes['circleEditColor'] || '#00000000';
+
+    const pageNames = new Map();
+    xmlNode.querySelectorAll('PageName').forEach(pnNode => {
+        const idx = pnNode.getAttribute('idx');
+        const name = pnNode.getAttribute('name');
+        if (idx && name) pageNames.set(idx, name);
+    });
+
+    htmlElement.dataset.scrollViewName = targetScrollViewName || '';
+    htmlElement.dataset.controllerType = controllerType || '1'; 
+    htmlElement.dataset.pageNames = JSON.stringify(Object.fromEntries(pageNames)); 
+    
+    // Explicit non-flex fallback structure as demanded by Rule 7
+    htmlElement.style.display = 'block';
+    htmlElement.style.whiteSpace = 'nowrap';
+    
+    const createButton = (action, imgP, imgHLP, fallbackText) => {
+        const button = document.createElement('button');
+        button.classList.add('scroll-page-button', `${action}-page-button`);
+        button.dataset.action = action;
+        let hasImage = false;
+
+        if (imgP) {
+            const img = document.createElement('img');
+            const blobUrl = State.getAssetBlobUrl(imgP);
+            if (blobUrl) {
+                img.src = blobUrl;
+                img.style.display = 'block'; 
+                if (imgHLP) {
+                    const hlBlobUrl = State.getAssetBlobUrl(imgHLP);
+                    if(hlBlobUrl) img.dataset.hlSrc = hlBlobUrl;
+                } else {
+                    img.dataset.hlSrc = blobUrl; 
+                }
+                img.dataset.normalSrc = blobUrl;
+
+                img.onerror = () => { button.textContent = fallbackText; img.remove(); };
+                const setSize = () => { 
+                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        button.style.width = `${img.naturalWidth}px`;
+                        button.style.height = `${img.naturalHeight}px`;
+                        img.style.width = '100%'; img.style.height = '100%';
+                    }
+                };
+                img.onload = setSize;
+                if (img.complete && img.naturalWidth > 0) setSize(); 
+
+                button.appendChild(img);
+                hasImage = true;
+            }
+        }
+        if (!hasImage) button.textContent = fallbackText;
+        
+        button.style.background = 'transparent';
+        button.style.border = 'none';
+        button.style.padding = '0';
+        button.style.cursor = 'pointer';
+        
+        button.style.display = 'inline-block';
+        button.style.verticalAlign = 'middle';
+        button.style.lineHeight = '0'; 
+        return button;
+    };
+
+    let prevButton = null;
+    let nextButton = null;
+    let pageNameElement = null;
+    let circleElement = null; 
+
+    const stylesMap = State.getStyles();
+    const styleName = mergedAttributes['style'];
+    const styleData = (styleName && stylesMap[styleName]) ? stylesMap[styleName] : {}; 
+    
+    const derivedFontColor = styleData.fontColor || styleData.color_text || mergedAttributes['color_text'] || globalDefaults.color_text; 
+    const derivedFontColorHL = styleData.fontColorHL || mergedAttributes['color_textHL'] || globalDefaults.color_text;
+
+    if (controllerType === '1') { 
+        prevButton = createButton('toggle', img1Path, img1HLPath, 'Toggle');
+    } else if (controllerType === '0') { 
+        prevButton = createButton('prev', img1Path, img1HLPath, '‹');
+        if (img2Path) {
+            nextButton = createButton('next', img2Path, img2HLPath, '›');
+        } else {
+            DomUtils.showToast(`WARNING: ScrollViewPageController type='0' for '${targetScrollViewName}' is missing image_2.`, 'warn', 8000);
+            State.addConsoleLogEntry(`ScrollViewPageController (ScrollView: '${targetScrollViewName}') type='0' missing 'image_2'.`, 'error');
+        }
+    }
+
+    if (showPageNameAttr === '0') { 
+        pageNameElement = document.createElement('div');
+        pageNameElement.classList.add('scroll-page-name-display');
+        pageNameElement.style.minWidth = '0'; 
+        pageNameElement.style.textAlign = 'center';
+        pageNameElement.style.overflow = 'hidden'; pageNameElement.style.whiteSpace = 'nowrap';
+        pageNameElement.style.textOverflow = 'ellipsis';
+        pageNameElement.style.padding = '0 5px'; 
+        pageNameElement.style.lineHeight = '1.2'; 
+        pageNameElement.style.height = '100%'; 
+        
+        pageNameElement.style.display = 'inline-block'; 
+        pageNameElement.style.verticalAlign = 'middle';
+        
+        if (pageNameFont) DomUtils.applyFont(pageNameElement, pageNameFont);
+        if (derivedFontColor) pageNameElement.style.color = DomUtils.parseColor(derivedFontColor);
+        if (derivedFontColorHL) pageNameElement.dataset.fontColorHl = DomUtils.parseColor(derivedFontColorHL); 
+        pageNameElement.textContent = pageNames.get('0') || 'Page 1'; 
+        pageNameElement.dataset.currentPageIdx = '0';
+    } else if (showPageNameAttr === '1') { 
+        pageNameElement = document.createElement('select');
+        pageNameElement.classList.add('scroll-page-name-select');
+        pageNameElement.style.minWidth = '0';
+        pageNameElement.style.textAlign = 'center'; 
+        pageNameElement.style.margin = '0 5px';
+        pageNameElement.style.cursor = 'pointer';
+        
+        pageNameElement.style.display = 'inline-block';
+        pageNameElement.style.verticalAlign = 'middle';
+        
+        if (pageNameFont) DomUtils.applyFont(pageNameElement, pageNameFont);
+        if (derivedFontColor) pageNameElement.style.color = DomUtils.parseColor(derivedFontColor);
+        pageNameElement.style.appearance = 'none'; pageNameElement.style.mozAppearance = 'none'; pageNameElement.style.webkitAppearance = 'none';
+        pageNameElement.style.border = 'none'; pageNameElement.style.background = 'transparent';
+        pageNameElement.style.padding = '2px 5px';
+        if (derivedFontColorHL) pageNameElement.dataset.fontColorHl = DomUtils.parseColor(derivedFontColorHL);
+
+        pageNames.forEach((name, idx) => {
+            const option = document.createElement('option');
+            option.value = idx;
+            option.textContent = name;
+            if (idx === '0') option.selected = true;
+            pageNameElement.appendChild(option);
+        });
+    }
+    
+    if (circleEdit) {
+        const parsedCircleColor = DomUtils.parseColor(circleColorStr);
+        if (parsedCircleColor !== 'rgba(0,0,0,0)' && parsedCircleColor !== 'none') { 
+            circleElement = document.createElementNS(DomUtils.SVG_NS, "svg"); 
+            circleElement.setAttribute('width', '10'); 
+            circleElement.setAttribute('height', '10');
+            
+            circleElement.style.display = 'inline-block';
+            circleElement.style.verticalAlign = 'middle';
+            
+            circleElement.style.marginLeft = '5px'; circleElement.style.marginRight = '5px';
+            const circle = document.createElementNS(DomUtils.SVG_NS, 'circle');
+            circle.setAttribute('cx', '5'); circle.setAttribute('cy', '5');
+            circle.setAttribute('r', '4'); 
+            circle.setAttribute('fill', parsedCircleColor);
+            circleElement.appendChild(circle);
+        }
+    }
+
+    if (prevButton) htmlElement.appendChild(prevButton);
+    if (pageNameElement) htmlElement.appendChild(pageNameElement);
+    if (circleElement) htmlElement.appendChild(circleElement); 
+    if (nextButton) htmlElement.appendChild(nextButton);
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: mainElementForAttributes,
+        requiresRecursiveRender: false, 
+        postProcessFunction: null
+    };
+}
+
+function renderPopupOverlay(xmlNode, mergedAttributes, renderElementCallback) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-popup-overlay');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.top = '0';
+    htmlElement.style.left = '0';
+    htmlElement.style.width = '100%';
+    htmlElement.style.height = '100%';
+    htmlElement.style.zIndex = '1000'; 
+    htmlElement.style.display = 'none'; // Hidden by default
+    htmlElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Typical overlay shading
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+function renderSplash(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-splash');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.top = '0';
+    htmlElement.style.left = '0';
+    htmlElement.style.width = '100%';
+    htmlElement.style.height = '100%';
+    htmlElement.style.zIndex = '2000';
+    htmlElement.style.display = 'none'; // Initially hidden
+    
+    // Splash screens often define a background image
+    const imgRelPath = mergedAttributes['image'];
+    if (imgRelPath) {
+        const currentSkinRoot = State.getCurrentSkinRoot() || '';
+        const imgFullPath = State.normalizePath(imgRelPath, currentSkinRoot);
+        const blobUrl = State.getAssetBlobUrl(imgFullPath);
+        if (blobUrl) {
+            htmlElement.style.backgroundImage = `url('${blobUrl}')`;
+            htmlElement.style.backgroundRepeat = 'no-repeat';
+            htmlElement.style.backgroundPosition = 'center';
+            htmlElement.style.backgroundSize = 'contain';
+        }
+    }
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: true,
+        postProcessFunction: null
+    };
+}
+
+export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourcePath, mergedAttributes, renderElementCallback) {
+    switch (tagName) {
+        case 'CS01ViewContainer':
+        case 'CS01ViewContainer1':
+            return renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCallback, currentParams, sourcePath);
+        case 'VisibilityContainer':
+            return renderVisibilityContainer(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback);
+        case 'Pane': 
+            return renderStandalonePane(xmlNode, mergedAttributes, sourcePath, renderElementCallback, currentParams);
+        case 'TabView':
+            return renderTabView(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback);
+        case 'ScrollView':
+            return renderScrollViewWrapper(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback);
+        case 'CS01ScrollViewPageController':
+            return renderScrollViewPageController(xmlNode, mergedAttributes, currentParams, sourcePath); 
+        case 'PopupOverlay':
+            return renderPopupOverlay(xmlNode, mergedAttributes, renderElementCallback); 
+        case 'Splash':
+            return renderSplash(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback);
+        default:
+            console.warn(`[containerRenderer] Attempted to render unhandled tag: ${tagName} from ${sourcePath}`);
+            return { htmlElement: null, mainElementForAttributes: null, requiresRecursiveRender: true, postProcessFunction: null };
+    }
+}

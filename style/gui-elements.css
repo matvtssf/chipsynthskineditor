@@ -1,0 +1,79 @@
+/* File: style/gui-elements.css */
+
+/* --- GUI Element Base Styles --- */
+.gui-element { position: absolute; box-sizing: border-box; overflow: hidden; }
+.gui-knob-container { overflow: visible !important; }
+.gui-visibility-container { position: absolute; overflow: visible; }
+.gui-view-container { position: absolute; overflow: hidden; background-color: transparent; }
+.gui-error-placeholder { z-index: 100; }
+
+/* --- Specific Elements --- */
+.gui-staticimage { image-rendering: pixelated; display: block; }
+.gui-statictext { padding: 0 2px; white-space: nowrap; text-overflow: ellipsis; }
+.gui-rect, .gui-rounded-rect { }
+
+/* --- Inputs & Buttons --- */
+.gui-optionmenu { font-size: 11px; background-color: #eee; color: #333; cursor: pointer; z-index: 20; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none; }
+.gui-optionmenu option { background-color: #fff; color: #000; text-align: left; }
+.gui-option-disabled { font-weight: bold; color: #666; background-color: #ddd; }
+
+.gui-onoff-button { cursor: pointer; border: 1px solid #888; background-color: #ccc; transition: background-color 0.2s ease; text-indent: -9999px; color: transparent; font-size: 1px; }
+.gui-onoff-button:hover { border-color: #555; }
+.gui-onoff-button.active { background-color: #60a5fa; border-color: #3b82f6; }
+
+/* --- Sliders --- */
+.gui-slider-container { background-color: rgba(35,35,35,0); overflow: hidden; }
+.gui-slider-knob { position: absolute; background-color: #696969; cursor: grab; display: flex; align-items: center; justify-content: center; }
+.gui-slider-knob.dragging { cursor: grabbing; }
+.slider-value-text { color: #fff; font-size: 9px; font-family: sans-serif; user-select: none; pointer-events: none; }
+.slider-value-text.slider-value-hidden { display: none; }
+.slider-value-input { position: absolute; width: 90%; height: 80%; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1; border: 1px solid #ccc; border-radius: 2px; font-size: 10px; padding: 0; box-sizing: border-box; }
+
+/* --- Knobs --- */
+.knob-container { position: absolute; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; cursor: grab; transform-origin: center center; overflow: visible !important; } 
+.knob-container:active { cursor: grabbing; } 
+.knob-container.centered { transform: scale(6); z-index: 100 !important; box-shadow: 0 0 15px rgba(0,0,0,0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%; } 
+.knob-label { position: absolute; display: flex; justify-content: left; align-items: center; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 10; font-size: 10px; color: #fff; } 
+.knob-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; } 
+.knob-svg circle[data-original-fill], .knob-svg path[data-original-stroke], .knob-svg rect[data-original-fill] { transition: fill 0.1s ease-in-out, stroke 0.1s ease-in-out; }
+
+/* --- Overlays & Splashes --- */
+.gui-popup-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 500; pointer-events: none; } 
+.gui-splash { position: absolute; z-index: 501; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: auto; } 
+.gui-splash .gui-staticimage { position: relative !important; left: auto !important; top: auto !important; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+
+/* --- Scroll Views & Presets --- */
+.gui-scrollview-pagecontroller { gap: 5px; } 
+.scroll-page-button:hover img { filter: brightness(1.1); } 
+.scroll-page-button:active img { filter: brightness(0.9); } 
+.scroll-page-name-display { cursor: default; padding: 0 5px; }
+.scroll-page-name-select { background-color: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 20px 2px 5px; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 5px center; background-size: 8px 8px; }
+.scroll-page-name-select:focus { outline: 1px solid #3b82f6; border-color: #3b82f6; } 
+
+.gui-presetmenu { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; }
+.preset-menu-button { width: 16px; height: 16px; flex-shrink: 0; border: none; background-color: transparent; background-repeat: no-repeat; cursor: pointer; padding: 0; background-size: 100% 200%; background-position: center 100%; transition: background-position 0.1s ease-in-out; font-size: 0; line-height: 0; }
+.preset-menu-button:hover { background-position: center 0%; }
+.preset-menu-label { flex-grow: 1; flex-shrink: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+
+/* --- Keyboard --- */
+.gui-keyboard-container { position: relative; }
+.gui-key { position: absolute; image-rendering: pixelated; }
+.gui-key-inactive-overlay { pointer-events: none; }
+
+/* --- Tab Views --- */
+.gui-tabview-container { display: flex; position: relative; z-index: 1; overflow: hidden; }
+.gui-tabview-container.tab-position-top, .gui-tabview-container.tab-position-bottom { flex-direction: column; }
+.gui-tabview-container.tab-position-left, .gui-tabview-container.tab-position-right { flex-direction: row; }
+
+.gui-tab-bar { display: flex; flex-shrink: 0; position: relative; z-index: 10; }
+.gui-tabview-container.tab-position-top .gui-tab-bar, .gui-tabview-container.tab-position-bottom .gui-tab-bar { flex-direction: row; width: 100%; }
+.gui-tabview-container.tab-position-left .gui-tab-bar, .gui-tabview-container.tab-position-right .gui-tab-bar { flex-direction: column; height: 100%; }
+
+.gui-tab-button { cursor: pointer; border: none; background-color: transparent; display: flex; align-items: center; justify-content: center; position: relative; user-select: none; line-height: normal; box-sizing: border-box; }
+.gui-tab-button .gui-tab-label { pointer-events: none; white-space: nowrap; display: inline-block; color: inherit; }
+
+.gui-pane-content-area { flex-grow: 1; position: relative; overflow: hidden; background-color: transparent !important; z-index: 1; }
+.gui-pane-content-item { width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; position: absolute; top: 0; left: 0; background-color: transparent !important; }
+
+/* Dynamic Styles Placeholder */
+#dynamic-styles { }

@@ -1,0 +1,968 @@
+/* File: cs/xmlEditor.js */
+/**
+ * xmlEditor.js
+ * Handles the XML editor modal functionality.
+ * REVISED: Ensured all necessary functions like openXmlEditor, initializeXmlEditor,
+ * getCachedCommonAttributesForHover, etc., are correctly exported.
+ * Ensured all local utility functions are defined before use.
+ * Contains detailed logging in openXmlEditor and updateLineNumbersForInstance.
+ * Ensures correct icon placeholder placement.
+ * MODIFIED: updateLineNumbersForInstance to wrap each number in a DIV with a class and dynamically adjust column width.
+ * MODIFIED: checkAndRerender to correctly compare against main skin file path and add verbose debug logs.
+ */
+import * as State from './state.js';
+import {
+    getXmlEditorModal as getXmlEditorModalTemplate,
+    showToast,
+    logError,
+    normalizePath as domNormalizePath
+} from './domUtils.js';
+import { loadSkin } from './skinManager.js';
+import { makeModalDraggable, makeModalResizable } from './managers/modalManager.js';
+import {
+    setupXmlEditorListeners as setupSharedXmlEditorInteractionListeners,
+    setupInstanceHoverListeners,
+    updateStatusBarDescription
+} from './xmlEditorInteractions.js';
+
+const DEBUG_OPEN_EDITOR = true;
+const DEBUG_LINE_NUMBERS = true;
+
+const instanceDomElements = new Map();
+const instanceEventHandlers = new Map();
+
+let knownElementNamesSet = null;
+let cachedElementReferenceData = [];
+let knownAttributeNamesSet = null;
+let cachedCommonAttributes = {};
+let cachedParamReferenceData = {};
+let initialCachesPopulated = false;
+
+// --- Utility Functions (Defined early to ensure availability) ---
+
+function getParentDirectory(filePath) {
+    if (!filePath) return '';
+    const normalized = domNormalizePath(filePath);
+    const lastSlash = normalized.lastIndexOf('/');
+    return lastSlash === -1 ? '' : normalized.substring(0, lastSlash);
+}
+
+function resolveXmlFilePath(baseXmlPath, relativePath) {
+    if (!relativePath) return '';
+    if (!baseXmlPath || relativePath.startsWith('/') || relativePath.includes('://')) {
+        return domNormalizePath(relativePath);
+    }
+    const baseDir = getParentDirectory(baseXmlPath);
+    return domNormalizePath(baseDir ? `${baseDir}/${relativePath}` : relativePath);
+}
+
+function populateCaches() {
+    if (initialCachesPopulated && knownElementNamesSet !== null && knownAttributeNamesSet !== null && Object.keys(cachedCommonAttributes).length > 0 && Object.keys(cachedParamReferenceData).length > 0) {
+        return;
+    }
+    initialCachesPopulated = false;
+    const refDataArray = State.getElementReferenceData();
+    cachedElementReferenceData = Array.isArray(refDataArray) ? [...refDataArray] : [];
+    knownElementNamesSet = new Set((cachedElementReferenceData.map(el => el && el.element).filter(Boolean)));
+
+    const commonAttrsFromState = State.getCommonAttributes();
+    cachedCommonAttributes = typeof commonAttrsFromState === 'object' && commonAttrsFromState !== null ? { ...commonAttrsFromState } : {};
+
+    const tempAttrNames = new Set(Object.keys(cachedCommonAttributes));
+    if (Array.isArray(cachedElementReferenceData)) {
+        cachedElementReferenceData.forEach(el => {
+            if (el && typeof el.attributes === 'object' && el.attributes !== null) {
+                Object.keys(el.attributes).forEach(attrName => tempAttrNames.add(attrName));
+            }
+        });
+    }
+    knownAttributeNamesSet = tempAttrNames;
+
+    const paramsFromState = State.getParamReferenceData();
+    cachedParamReferenceData = typeof paramsFromState === 'object' && paramsFromState !== null ? { ...paramsFromState } : {};
+    initialCachesPopulated = true;
+}
+
+// --- Exported Cache Getter Functions ---
+export function getCachedElementReferenceDataForHover() { if (!initialCachesPopulated) populateCaches(); return cachedElementReferenceData; }
+export function getCachedCommonAttributesForHover() { if (!initialCachesPopulated) populateCaches(); return cachedCommonAttributes; }
+export function getCachedParamReferenceDataForHover() { if (!initialCachesPopulated) populateCaches(); return cachedParamReferenceData; }
+
+// --- Internal Cache Getter Functions ---
+function getKnownElementNames() { if (knownElementNamesSet === null) populateCaches(); return knownElementNamesSet; }
+function getKnownAttributeNames() { if (knownAttributeNamesSet === null) populateCaches(); return knownAttributeNamesSet; }
+
+function getBrightness(hexColor) { const hex = hexColor.replace('#', ''); if (hex.length < 6) return 128; const r = parseInt(hex.substring(0, 2), 16); const g = parseInt(hex.substring(2, 4), 16); const b = parseInt(hex.substring(4, 6), 16); return 0.299 * r + 0.587 * g + 0.114 * b; }
+function containsRgbWithoutAlpha(text) { const rgbRegex = /#([0-9a-fA-F]{6})\b(?!([0-9a-fA-F]{2}))/g; return rgbRegex.test(text); }
+function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+// --- Editor Instance UI Update Functions (defined before use in event handlers or openXmlEditor) ---
+
+function updateStatusBarForInstance(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements || !elements.textarea || !elements.statusBar) {
+        return;
+    }
+    try {
+        const { value: text, selectionStart: cursorPos } = elements.textarea;
+        const line = (text.substring(0, cursorPos).match(/\n/g) || []).length + 1;
+        const prevNewline = text.lastIndexOf('\n', cursorPos - 1);
+        const col = cursorPos - (prevNewline === -1 ? 0 : prevNewline + 1) + 1;
+
+        let originalStatusSpan = elements.statusBar.querySelector('.original-status');
+        if (!originalStatusSpan) {
+            elements.statusBar.innerHTML = '';
+            originalStatusSpan = document.createElement('span');
+            originalStatusSpan.className = 'original-status';
+            elements.statusBar.appendChild(originalStatusSpan);
+
+            if (!elements.statusBar.querySelector('.status-warning')) {
+                const warningSpan = document.createElement('span');
+                warningSpan.className = 'status-warning';
+                elements.statusBar.appendChild(warningSpan);
+            }
+            if (!elements.statusBar.querySelector('.status-color-hover-info')) {
+                 const colorHoverSpan = document.createElement('span');
+                 colorHoverSpan.className = 'status-color-hover-info';
+                 elements.statusBar.appendChild(colorHoverSpan);
+            }
+            if (!elements.statusBar.querySelector('.status-description')) {
+                const descSpan = document.createElement('span');
+                descSpan.className = 'status-description';
+                descSpan.title = '';
+                elements.statusBar.appendChild(descSpan);
+            }
+        }
+        originalStatusSpan.textContent = `Ln ${line}, Col ${col}`;
+    } catch (e) {
+        if (elements.statusBar) {
+            elements.statusBar.innerHTML = '<span class="original-status">Ln ?, Col ?</span><span class="status-warning"></span><span class="status-color-hover-info"></span><span class="status-description" title=""></span>';
+        }
+        logError(`[updateStatusBarForInstance] Error for instance ${instanceId}:`, e);
+    }
+}
+
+function checkAndUpdateHexWarnings(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements || !elements.textarea || !elements.statusBar) return;
+    const warningSpan = elements.statusBar.querySelector('.status-warning');
+    if (warningSpan) {
+        warningSpan.textContent = containsRgbWithoutAlpha(elements.textarea.value) ? " Warning: Hex RGB requires Alpha!" : "";
+    }
+}
+
+function updateLineNumbersForInstance(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements || !elements.textarea || !elements.lineNumbers) {
+        if (DEBUG_LINE_NUMBERS) console.warn(`[updateLineNumbers] Missing elements for instance ${instanceId}. Textarea: ${!!elements?.textarea}, LineNumbersDiv: ${!!elements?.lineNumbers}`);
+        return;
+    }
+    try {
+        const lineCount = elements.textarea.value.split('\n').length;
+
+        elements.lineNumbers.innerHTML = ''; // Clear previous numbers
+        if (lineCount > 0 && lineCount < 50000) { // Sanity check for extreme line counts
+            const fragment = document.createDocumentFragment();
+            for (let i = 1; i <= lineCount; i++) {
+                const div = document.createElement('div');
+                div.className = 'lineNumberEntry'; // Add class for specific styling
+                div.textContent = i;
+                // div.style.display = 'block'; // Rely on CSS for .lineNumberEntry
+                fragment.appendChild(div);
+            }
+            elements.lineNumbers.appendChild(fragment);
+        } else if (lineCount === 0) { // Handle empty file
+            const div = document.createElement('div');
+            div.className = 'lineNumberEntry';
+            div.textContent = '1';
+            elements.lineNumbers.appendChild(div);
+        } else if (lineCount >= 50000) { // Fallback for extremely large files
+            elements.lineNumbers.textContent = `1\n...\n${lineCount}`; // Simple text fallback
+             if (DEBUG_LINE_NUMBERS) console.warn(`[updateLineNumbers] Extremely large file (${lineCount} lines), using simple text fallback for line numbers.`);
+        }
+
+
+        // Dynamically adjust width of the line number column
+        if (lineCount > 0) {
+            const tempSpan = document.createElement('span');
+            // Apply relevant styles for accurate measurement
+            tempSpan.style.fontFamily = getComputedStyle(elements.lineNumbers).fontFamily;
+            tempSpan.style.fontSize = getComputedStyle(elements.lineNumbers).fontSize;
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.whiteSpace = 'pre'; // Important for measuring single line width
+
+            tempSpan.textContent = String(lineCount); // Measure the widest number (last line number)
+            document.body.appendChild(tempSpan);
+            const textWidth = tempSpan.offsetWidth;
+            document.body.removeChild(tempSpan);
+
+            const style = getComputedStyle(elements.lineNumbers);
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            const borderRightWidth = parseFloat(style.borderRightWidth) || 0;
+
+            const safetyBuffer = 10; // A bit more buffer for safety / aesthetics
+            const newColumnWidth = textWidth + paddingLeft + paddingRight + borderRightWidth + safetyBuffer;
+            const minOverallWidth = 40; // Ensure it's not too narrow for small numbers
+            elements.lineNumbers.style.width = `${Math.max(minOverallWidth, Math.ceil(newColumnWidth))}px`; // Use ceil for pixel values
+
+            if (DEBUG_LINE_NUMBERS) {
+                console.log(`[updateLineNumbers] Instance: ${instanceId}, Line count: ${lineCount}, TextW: ${textWidth}, PadL: ${paddingLeft}, PadR: ${paddingRight}, BorderR: ${borderRightWidth}, NewColW: ${elements.lineNumbers.style.width}`);
+            }
+        } else {
+            // Fallback for 0 lines (or revert to CSS min-width if set)
+            elements.lineNumbers.style.width = ''; // Let CSS min-width take over
+             if (DEBUG_LINE_NUMBERS) console.log(`[updateLineNumbers] Instance: ${instanceId}, Line count is 0, reverting width to CSS default.`);
+        }
+
+    } catch (e) {
+        if (elements.lineNumbers) elements.lineNumbers.textContent = 'Err';
+        logError(`[updateLineNumbers] Error for instance ${instanceId}:`, e);
+        if (elements.lineNumbers) elements.lineNumbers.style.width = ''; // Revert to CSS default on error
+    }
+}
+
+
+function updateColorBoxFocusEffect(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements?.textarea || !elements.highlightOverlay) return;
+    const caretPos = elements.textarea.selectionStart;
+    elements.highlightOverlay.querySelectorAll('.hl-color-box-wrapper, .hl-color-rgb-warning-box').forEach(wrapper => {
+        const rawQuoteStart = parseInt(wrapper.dataset.attrQuoteRawStart, 10);
+        const rawQuoteEnd = parseInt(wrapper.dataset.attrQuoteRawEnd, 10);
+        if (!isNaN(rawQuoteStart) && !isNaN(rawQuoteEnd) && caretPos > rawQuoteStart && caretPos < rawQuoteEnd) {
+            if (!wrapper.classList.contains('color-text-focused')) {
+                wrapper.classList.add('color-text-focused');
+            }
+        } else {
+            if (wrapper.classList.contains('color-text-focused')) {
+                wrapper.classList.remove('color-text-focused');
+            }
+        }
+    });
+}
+
+function updateXmlEditorHighlightsForInstance(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements || !elements.textarea || !elements.highlightOverlay) return;
+    try {
+        const rawText = elements.textarea.value;
+        const highlightedHtml = highlightXmlSyntax(rawText, instanceId);
+        if (elements.highlightOverlay.innerHTML !== highlightedHtml) {
+            elements.highlightOverlay.innerHTML = highlightedHtml;
+        }
+    } catch (e) {
+        logError(`[xmlEditor] Error updating syntax highlights for instance ${instanceId}:`, e);
+        elements.highlightOverlay.innerHTML = escapeHtml(elements.textarea.value) + '\n\n';
+    }
+}
+
+function updateUIDisplay(instanceId) {
+    requestAnimationFrame(() => {
+        updateLineNumbersForInstance(instanceId);
+        updateStatusBarForInstance(instanceId);
+        checkAndUpdateHexWarnings(instanceId);
+        updateXmlEditorHighlightsForInstance(instanceId);
+        updateColorBoxFocusEffect(instanceId);
+        updateStatusBarDescription(instanceId);
+        handleEditorScroll(instanceId);
+    });
+}
+
+// --- Save, Render, Close Functions (Defined before being called by event handlers) ---
+function saveChanges(instanceId) {
+    const instance = State.getEditorInstance(instanceId);
+    const elements = instanceDomElements.get(instanceId);
+
+    if (!instance || !elements || !elements.textarea) {
+        logError(`[saveChanges] Failed to save: Missing instance or elements for ${instanceId}.`);
+        showToast('Failed to apply changes. See console.', 'error');
+        return false;
+    }
+
+    const newContent = elements.textarea.value;
+    try {
+        State.addFile(instance.filePath, newContent);
+        State.updateEditorInstance(instanceId, {
+            originalContent: newContent,
+            currentContent: newContent
+        });
+        if (DEBUG_OPEN_EDITOR) console.log(`[saveChanges] Content saved for ${instance.filePath}`);
+        showToast(`Changes to ${instance.filePath} applied.`, 'info');
+        return true;
+    } catch (e) {
+        logError(`[saveChanges] Error saving content for ${instance.filePath}:`, e);
+        showToast(`Error applying changes to ${instance.filePath}. See console.`, 'error');
+        return false;
+    }
+}
+
+function checkAndRerender(instanceId) {
+    const instance = State.getEditorInstance(instanceId);
+    if (!instance) {
+        logError(`[checkAndRerender] No instance found for ID: ${instanceId}`);
+        return;
+    }
+
+    const currentSkinRootDirectory = State.getCurrentSkinRoot();
+    const editedFilePath = instance.filePath;
+
+    // ADDED: Debug logging
+    console.log(`[checkAndRerender DEBUG] Instance File Path: "${editedFilePath}", Current Skin Root Dir: "${currentSkinRootDirectory}"`);
+
+    let expectedMainSkinFile = "";
+    if (currentSkinRootDirectory && typeof currentSkinRootDirectory === 'string' && currentSkinRootDirectory.length > 0) {
+        const separator = currentSkinRootDirectory.endsWith('/') ? '' : '/';
+        expectedMainSkinFile = State.normalizePath(currentSkinRootDirectory + separator + 'gui.xml');
+    } else {
+        // This case means currentSkinRootDirectory is not set or invalid.
+        // The comparison will likely fail, which is correct if we don't know the main skin.
+        console.warn(`[checkAndRerender DEBUG] Current Skin Root Directory is empty or invalid. Cannot reliably determine main skin XML.`);
+        expectedMainSkinFile = editedFilePath; // Default to self, will likely not trigger general skin reload unless it's specifically set as root
+    }
+
+    console.log(`[checkAndRerender DEBUG] Comparing "${editedFilePath}" with expected main skin file "${expectedMainSkinFile}"`);
+
+    if (editedFilePath === expectedMainSkinFile) {
+        if (DEBUG_OPEN_EDITOR) console.log(`[checkAndRerender] Edited file ${editedFilePath} is the current main skin XML. Triggering reload.`);
+        const elements = instanceDomElements.get(instanceId);
+        if (elements && elements.textarea) {
+            const updatedXmlContent = elements.textarea.value;
+            loadSkin(editedFilePath, updatedXmlContent) // Use editedFilePath, which is the full path
+                .then(() => {
+                    showToast(`Skin ${editedFilePath} reloaded with changes.`, 'info');
+                })
+                .catch(err => {
+                    logError(`[checkAndRerender] Error reloading skin ${editedFilePath}:`, err);
+                    showToast(`Error reloading skin ${editedFilePath}. See console.`, 'error');
+                });
+        } else {
+            logError(`[checkAndRerender] Could not get updated content from textarea for instance ${instanceId} to reload skin.`);
+            showToast('Internal error: Could not get text to reload skin.', 'error');
+        }
+    } else {
+        console.log(`[checkAndRerender DEBUG] Paths do NOT match the expected main skin file. No reload triggered for instance ${instanceId}.`);
+        if (DEBUG_OPEN_EDITOR) console.log(`[checkAndRerender] Edited file ${editedFilePath} is NOT the current main skin XML (${expectedMainSkinFile}). No immediate reload.`);
+    }
+}
+
+function closeEditor(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    const instance = State.getEditorInstance(instanceId);
+
+    if (elements && elements.modal) {
+        elements.modal.remove();
+        if (DEBUG_OPEN_EDITOR) console.log(`[closeEditor] Modal for instance ${instanceId} removed from DOM.`);
+    }
+
+    const handlers = instanceEventHandlers.get(instanceId);
+    if (elements && handlers) {
+        elements.okButton?.removeEventListener('click', handlers.ok);
+        elements.cancelButton?.removeEventListener('click', handlers.cancel);
+        elements.applyButton?.removeEventListener('click', handlers.apply);
+        elements.closeButton?.removeEventListener('click', handlers.close);
+        elements.textarea?.removeEventListener('input', handlers.input);
+        elements.textarea?.removeEventListener('scroll', handlers.scroll);
+        elements.textarea?.removeEventListener('keyup', handlers.caretActivity);
+        elements.textarea?.removeEventListener('mouseup', handlers.caretActivity);
+        elements.textarea?.removeEventListener('focus', handlers.textareaFocus);
+        elements.textarea?.removeEventListener('blur', handlers.textareaBlur);
+        elements.saveAsFileButton?.removeEventListener('click', handlers.saveAsFile);
+        elements.copyContentButton?.removeEventListener('click', handlers.copyContent);
+        elements.contentContainer?.removeEventListener('mousedown', handlers.focusModal, true);
+        // elements.lineNumbers?.removeEventListener('click', handlers.lineNumberClick); // Add this when lineNumberClick is implemented
+
+        if (DEBUG_OPEN_EDITOR) console.log(`[closeEditor] Event listeners removed for instance ${instanceId}.`);
+    }
+
+    State.removeEditorInstance(instanceId);
+    instanceDomElements.delete(instanceId);
+    instanceEventHandlers.delete(instanceId);
+
+    if (State.getActiveEditorInstanceId() === instanceId) {
+        State.setActiveEditorInstance(null);
+    }
+
+    const mainContentArea = document.getElementById('main-content-area');
+    if (mainContentArea) {
+        mainContentArea.focus();
+    } else {
+        document.body.focus();
+    }
+
+    if (DEBUG_OPEN_EDITOR) console.log(`[closeEditor] Editor for instance ${instanceId} (Path: ${instance?.filePath || 'N/A'}) fully closed and cleaned up.`);
+}
+
+
+// --- Main Exported Functions ---
+export function initializeXmlEditor() {
+    setupSharedXmlEditorInteractionListeners();
+    populateCaches();
+    document.addEventListener('referenceDataUpdated', () => {
+        initialCachesPopulated = false; populateCaches();
+        State.getAllEditorInstances()?.forEach((instance, instanceId) => {
+            if (instance.modalElement?.classList.contains('visible')) {
+                updateUIDisplay(instanceId);
+            }
+        });
+    });
+    document.addEventListener('paramReferenceDataUpdated', () => {
+        initialCachesPopulated = false; populateCaches();
+        State.getAllEditorInstances()?.forEach((instance, instanceId) => {
+            if (instance.modalElement?.classList.contains('visible')) {
+                 updateStatusBarDescription(instanceId);
+            }
+        });
+    });
+}
+
+export function openXmlEditor(filePath) {
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor - ENTRY] Called with filePath: ${filePath}`);
+
+    const normalizedFilePath = domNormalizePath(filePath);
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Normalized filePath: ${normalizedFilePath}`);
+
+    let editorInstanceFromState = State.getEditorInstanceByPath(normalizedFilePath);
+    let instanceId;
+
+    if (editorInstanceFromState && editorInstanceFromState.uniqueId) {
+        instanceId = editorInstanceFromState.uniqueId;
+        if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Found existing instance in State: ${instanceId}`);
+        State.setActiveEditorInstance(instanceId);
+        const existingInstanceElements = instanceDomElements.get(instanceId);
+
+        const modalStillInDom = existingInstanceElements && existingInstanceElements.modal && document.body.contains(existingInstanceElements.modal);
+
+        if (modalStillInDom) {
+            if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Existing DOM elements (and modal) found for instance ${instanceId}.`);
+            if (!existingInstanceElements.modal.classList.contains('visible')) {
+                existingInstanceElements.modal.classList.add('visible');
+                if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Made existing instance ${instanceId} visible.`);
+            }
+            existingInstanceElements.textarea?.focus();
+            updateUIDisplay(instanceId);
+            if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Focused and refreshed existing instance ${instanceId}. Returning.`);
+            return;
+        } else {
+            if (DEBUG_OPEN_EDITOR) {
+                console.warn(`[openXmlEditor] Instance ${instanceId} found in State, but its modal is not in DOM or elements are missing. Cleaning up stale instance.`);
+            }
+            State.removeEditorInstance(instanceId);
+            instanceDomElements.delete(instanceId);
+            instanceEventHandlers.delete(instanceId);
+            editorInstanceFromState = null;
+        }
+    }
+
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Proceeding to create NEW editor instance for: ${normalizedFilePath}`);
+
+    const fileContent = State.getFileContent(normalizedFilePath);
+    if (fileContent === undefined) {
+        logError(`[xmlEditor openXmlEditor] Could not load content for editing: ${normalizedFilePath}`);
+        showToast(`Error loading ${normalizedFilePath} for editing.`, 'error');
+        if (DEBUG_OPEN_EDITOR) console.error(`[openXmlEditor] EXIT: File content is undefined.`);
+        return;
+    }
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] File content loaded. Length: ${fileContent.length}`);
+
+    instanceId = State.createEditorInstance(normalizedFilePath, fileContent);
+    editorInstanceFromState = State.getEditorInstance(instanceId);
+    if (!editorInstanceFromState) {
+        logError(`[xmlEditor openXmlEditor] Failed to create editor instance state for ${normalizedFilePath}. Instance ID: ${instanceId}`);
+        if (DEBUG_OPEN_EDITOR) console.error(`[openXmlEditor] EXIT: Failed to create editor instance in State.`);
+        return;
+    }
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Editor instance created in State. Instance ID: ${instanceId}`);
+
+    const modalTemplate = getXmlEditorModalTemplate();
+    if (!modalTemplate) {
+        logError("[xmlEditor openXmlEditor] XML editor modal template could not be found in the DOM!");
+        State.removeEditorInstance(instanceId);
+        if (DEBUG_OPEN_EDITOR) console.error(`[openXmlEditor] EXIT: Modal template not found.`);
+        return;
+    }
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Modal template found.`);
+
+    const newModal = modalTemplate.cloneNode(true);
+    newModal.id = `xml-editor-modal-${instanceId}`;
+    newModal.dataset.instanceId = instanceId;
+    document.body.appendChild(newModal);
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] New modal cloned and appended. ID: ${newModal.id}. In DOM: ${document.body.contains(newModal)}`);
+
+    const elements = {
+        modal: newModal,
+        contentContainer: newModal.querySelector('.modal-content-container'),
+        header: newModal.querySelector('.modal-content-container > div:first-child'),
+        resizeHandle: newModal.querySelector('#xml-editor-resize-handle'),
+        textarea: newModal.querySelector('#xml-editor-textarea'),
+        lineNumbers: newModal.querySelector('#xml-editor-line-numbers'),
+        highlightOverlay: newModal.querySelector('#xml-editor-highlight-overlay'),
+        statusBar: newModal.querySelector('#xml-editor-status-bar'),
+        editingFilenameSpan: newModal.querySelector('#editing-filename'),
+        okButton: newModal.querySelector('#ok-xml-button'),
+        cancelButton: newModal.querySelector('#cancel-xml-button'),
+        applyButton: newModal.querySelector('#apply-xml-button'),
+        closeButton: newModal.querySelector('#close-xml-editor-btn'),
+        saveAsFileButton: newModal.querySelector('#save-xml-as-file-btn'),
+        copyContentButton: newModal.querySelector('#copy-xml-content-btn'),
+        insertElementButton: newModal.querySelector('#insert-element-xml-btn')
+    };
+
+    if (DEBUG_OPEN_EDITOR) {
+        console.log(`[openXmlEditor] Queried elements within new modal (instance ${instanceId}):`);
+        console.log(`  Textarea:`, elements.textarea);
+        console.log(`  Highlight Overlay:`, elements.highlightOverlay);
+        console.log(`  Line Numbers:`, elements.lineNumbers);
+    }
+
+    if(elements.textarea) {
+        elements.textarea.id = `xml-editor-textarea-${instanceId}`;
+    } else { logError(`[openXmlEditor] Textarea #xml-editor-textarea not found in template for instance ${instanceId}.`); }
+
+    if(elements.highlightOverlay) {
+        elements.highlightOverlay.id = `xml-editor-highlight-overlay-${instanceId}`;
+        elements.highlightOverlay.classList.remove('pointer-events-none');
+        elements.highlightOverlay.classList.add('xml-highlight-overlay-instance');
+    } else { logError(`[openXmlEditor] Overlay #xml-editor-highlight-overlay not found in template for instance ${instanceId}.`); }
+
+    if(elements.lineNumbers) {
+        elements.lineNumbers.id = `xml-editor-line-numbers-${instanceId}`;
+    } else { logError(`[openXmlEditor] Line numbers #xml-editor-line-numbers not found in template for instance ${instanceId}.`); }
+
+    instanceDomElements.set(instanceId, elements);
+    State.updateEditorInstance(instanceId, { modalElement: newModal });
+    if(elements.editingFilenameSpan) elements.editingFilenameSpan.textContent = normalizedFilePath;
+    if(elements.textarea) elements.textarea.value = editorInstanceFromState.currentContent;
+
+    updateUIDisplay(instanceId);
+
+    if (elements.contentContainer && elements.header) makeModalDraggable(elements.contentContainer, elements.header);
+    if (elements.contentContainer && elements.resizeHandle) makeModalResizable(elements.contentContainer, elements.resizeHandle);
+
+    if (elements.textarea && elements.highlightOverlay && document.body.contains(elements.highlightOverlay)) {
+        if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Both Textarea and HighlightOverlay valid for instance ${instanceId}. ABOUT TO CALL setupInstanceHoverListeners. Overlay ID: ${elements.highlightOverlay.id}`);
+        setupInstanceHoverListeners(elements.textarea, elements.highlightOverlay, instanceId);
+    } else {
+        logError(`[openXmlEditor] Textarea or HighlightOverlay missing, or overlay not in DOM for instanceId: ${instanceId}. Cannot setup hover listeners.`);
+        if (DEBUG_OPEN_EDITOR) console.error(`[openXmlEditor] SKIPPING setupInstanceHoverListeners. Textarea found: ${!!elements.textarea}, Overlay found: ${!!elements.highlightOverlay}, Overlay in DOM: ${elements.highlightOverlay && document.body.contains(elements.highlightOverlay)}`);
+    }
+
+    attachInstanceListeners(instanceId);
+    State.setActiveEditorInstance(instanceId);
+    newModal.classList.add('visible');
+    if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] New modal ${newModal.id} is now visible. Setup complete.`);
+    setTimeout(() => {
+        elements.textarea?.focus();
+    }, 50);
+}
+
+
+export function highlightXmlSyntax(rawXmlText, instanceId) {
+    if (typeof rawXmlText !== 'string') {
+        return '';
+    }
+    const currentEditorInstance = State.getEditorInstance(instanceId);
+    const currentXmlFilePath = currentEditorInstance?.filePath;
+    const knownElementNames = getKnownElementNames();
+    const knownAttrNames = getKnownAttributeNames();
+    const colorRegionsForEscapedText = [];
+    const rawTextRanges = [];
+    const attributeQuoteInfoMap = new Map();
+    const iconPlaceholderHtml = `<span class="icon-action-trigger"></span>`;
+
+    try {
+        const tagRegex = /<(\/)?([\w.:-]+)([^>]*)?>/g;
+        let tagMatch;
+        while ((tagMatch = tagRegex.exec(rawXmlText)) !== null) {
+            const tagName = tagMatch[2];
+            const tagNameStart = tagMatch.index + (tagMatch[1] ? 2 : 1);
+            const tagNameEnd = tagNameStart + tagName.length;
+            rawTextRanges.push({ type: 'element', name: tagName, start: tagNameStart, end: tagNameEnd });
+
+            if (!tagMatch[1] && tagMatch[3]) {
+                const attributesString = tagMatch[3];
+                const attributesStringStartInRaw = tagMatch.index + tagMatch[0].indexOf(attributesString);
+
+                const attrRegexInRaw = /([\w.:-]+)\s*=\s*(")(.*?)(")/g;
+                let attrMatchInRaw;
+                while ((attrMatchInRaw = attrRegexInRaw.exec(attributesString)) !== null) {
+                    const attrName = attrMatchInRaw[1];
+                    const attrNameStartInRaw = attributesStringStartInRaw + attrMatchInRaw.index;
+                    const attrNameEndInRaw = attrNameStartInRaw + attrName.length;
+                    rawTextRanges.push({ type: 'attribute', name: attrName, start: attrNameStartInRaw, end: attrNameEndInRaw });
+
+                    if (attrName.toLowerCase() === 'param') {
+                        const valueRaw = attrMatchInRaw[3];
+                        const valueStartInRaw = attributesStringStartInRaw + attrMatchInRaw.index + attrName.length + 2;
+                        const valueEndInRaw = valueStartInRaw + valueRaw.length;
+                        rawTextRanges.push({type: 'param', name: valueRaw, start: valueStartInRaw, end: valueEndInRaw });
+                    }
+                }
+            }
+        }
+        const attrFullRegexRaw = /([\w.:-]+)\s*=\s*(")(.*?)(")/g;
+        let rawAttrMatch;
+        while((rawAttrMatch = attrFullRegexRaw.exec(rawXmlText)) !== null) {
+            const attrNameRaw = rawAttrMatch[1];
+            const attrDefPrefixLength = attrNameRaw.length + rawAttrMatch[0].substring(attrNameRaw.length).indexOf('"');
+            const quoteStartIndexInRaw = rawAttrMatch.index + attrDefPrefixLength;
+            const valueRawContent = rawAttrMatch[3];
+            const quoteEndIndexInRaw = quoteStartIndexInRaw + 1 + valueRawContent.length + 1;
+            attributeQuoteInfoMap.set(rawAttrMatch.index, { name: attrNameRaw, startQuoteIndex: quoteStartIndexInRaw, endQuoteIndex: quoteEndIndexInRaw });
+        }
+
+    } catch(e) {
+        logError("[xmlEditor highlightXmlSyntax PreScan]", e);
+        return escapeHtml(rawXmlText) + '\n\n';
+    }
+
+
+    let textForHighlighting = escapeHtml(rawXmlText);
+    let tempHighlighted = textForHighlighting;
+
+    try {
+        const attributeValueRegex = /([\w.:-]+)(\s*=\s*)(&quot;)((?:[^&]|&(?!quot;))*?)(&quot;)/g;
+        tempHighlighted = tempHighlighted.replace(attributeValueRegex,
+            (match, attrNameEscaped, separatorEscaped, openingQuoteEscaped, valueInsideDoubleQuotesEscaped, closingQuoteEscaped, attributeMatchOffsetInEscapedText) => {
+                const attrNameClasses = ['hl-attr-name'];
+                if (knownAttrNames.has(attrNameEscaped)) attrNameClasses.push('hl-known-attr-name');
+
+                let bestGuessRawAttrStartIndex = -1;
+                let minDiff = Infinity;
+                attributeQuoteInfoMap.forEach((rawAttrInfo, rawAttrActualStartIndex) => {
+                    if (rawAttrInfo.name === attrNameEscaped) {
+                        const estimatedOriginalStartForEscapedAttr = attributeMatchOffsetInEscapedText - (textForHighlighting.length - rawXmlText.length);
+                        const currentDifference = Math.abs(rawAttrActualStartIndex - estimatedOriginalStartForEscapedAttr);
+                        if (currentDifference < minDiff) { minDiff = currentDifference; bestGuessRawAttrStartIndex = rawAttrActualStartIndex;}
+                    }
+                });
+
+                const rawAttrRange = rawTextRanges.find(r => r.type === 'attribute' && r.name === attrNameEscaped && r.start === bestGuessRawAttrStartIndex);
+                const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}" data-name="${escapeHtml(attrNameEscaped)}"` : '';
+                const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" ${attrDataAttrs}>${attrNameEscaped}</span>`;
+
+                let finalAttributeValueHtml = "";
+                const originalEscapedValue = valueInsideDoubleQuotesEscaped;
+
+                const segments = [];
+
+                const colorRegex = /#(([0-9a-fA-F]{8})|([0-9a-fA-F]{6}(?!([0-9a-fA-F]{2}))))\b/g;
+                let tokenMatch;
+                while ((tokenMatch = colorRegex.exec(originalEscapedValue)) !== null) {
+                    segments.push({
+                        type: 'color_placeholder',
+                        start: tokenMatch.index,
+                        end: tokenMatch.index + tokenMatch[0].length,
+                        hex: tokenMatch[0],
+                        colorType: tokenMatch[0].length === 9 ? 'rgba' : 'rgb'
+                    });
+                }
+
+                const filepathRegex = /([\w\.-]+\.(xml|svg|png|jpg|jpeg|gif))\b/gi;
+                while ((tokenMatch = filepathRegex.exec(originalEscapedValue)) !== null) {
+                    const isOverlapping = segments.some(s => s.type === 'color_placeholder' && tokenMatch.index < s.end && (tokenMatch.index + tokenMatch[0].length) > s.start);
+                    if (!isOverlapping) {
+                        segments.push({
+                            type: 'filepath_span',
+                            start: tokenMatch.index,
+                            end: tokenMatch.index + tokenMatch[0].length,
+                            filename: tokenMatch[0]
+                        });
+                    }
+                }
+                segments.sort((a, b) => a.start - b.start);
+
+                let currentIndex = 0;
+                let builtHtmlValue = "";
+                segments.forEach(seg => {
+                    if (seg.start > currentIndex) {
+                        builtHtmlValue += originalEscapedValue.substring(currentIndex, seg.start);
+                    }
+                    if (seg.type === 'color_placeholder') {
+                        const placeholderIndex = colorRegionsForEscapedText.length;
+                        const rawQuoteInfo = attributeQuoteInfoMap.get(bestGuessRawAttrStartIndex);
+                        colorRegionsForEscapedText.push({
+                            attrValueGlobalOffset: attributeMatchOffsetInEscapedText + openingQuoteEscaped.length,
+                            startInEscapedValue: seg.start,
+                            endInEscapedValue: seg.end,
+                            hex: seg.hex,
+                            type: seg.colorType,
+                            attrQuoteRawStart: rawQuoteInfo?.startQuoteIndex,
+                            attrQuoteRawEnd: rawQuoteInfo?.endQuoteIndex
+                        });
+                        builtHtmlValue += `__COLOR_PLACEHOLDER_${placeholderIndex}__`;
+                    } else if (seg.type === 'filepath_span') {
+                        const resolvedPath = resolveXmlFilePath(currentXmlFilePath, seg.filename);
+                        builtHtmlValue += `<span class="hl-filepath" data-filepath="${escapeHtml(resolvedPath)}">${escapeHtml(seg.filename)}${iconPlaceholderHtml}</span>`;
+                    }
+                    currentIndex = seg.end;
+                });
+                if (currentIndex < originalEscapedValue.length) {
+                    builtHtmlValue += originalEscapedValue.substring(currentIndex);
+                }
+                finalAttributeValueHtml = builtHtmlValue;
+
+                if (attrNameEscaped.toLowerCase() === 'param') {
+                    const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
+                    const rawParamRange = rawTextRanges.find(r => r.type === 'param' && r.name === unescapedOriginalValue && rawAttrRange && r.start > rawAttrRange.start);
+                    const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}" data-name="${escapeHtml(rawParamRange.name)}"` : '';
+                    finalAttributeValueHtml = `<span class="hl-param-value" ${paramDataAttrs}>${finalAttributeValueHtml}</span>`;
+                }
+
+                return `${attrNameHtml}${separatorEscaped}${openingQuoteEscaped}${finalAttributeValueHtml}${closingQuoteEscaped}`;
+            }
+        );
+    } catch (e) { logError("[xmlEditor highlightXmlSyntax AttributeProcessing]", e); }
+
+
+    try {
+        tempHighlighted = tempHighlighted.replace(/(&lt;\/?)([\w.:-]+)/g, (match, prefixAndSlash, tagNameEscaped, offsetInEscaped) => {
+            const isKnown = knownElementNames.has(tagNameEscaped);
+            const tagClasses = isKnown ? 'hl-tag hl-known-tag' : 'hl-tag';
+
+            const rawElemRange = rawTextRanges.find(r =>
+                r.type === 'element' &&
+                r.name === tagNameEscaped &&
+                Math.abs(offsetInEscaped - (r.start - (rawXmlText.length - textForHighlighting.length))) < 20
+            );
+            const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}" data-name="${escapeHtml(tagNameEscaped)}"` : '';
+
+            return `${prefixAndSlash}<span class="${tagClasses}" ${elemDataAttrs}>${tagNameEscaped}</span>`;
+        });
+
+        tempHighlighted = tempHighlighted.replace(/(\/?&gt;)/g, '<span class="hl-tag">$1</span>');
+
+        tempHighlighted = tempHighlighted.replace(/(&lt;!--[\s\S]*?--&gt;)/gs, (match) => {
+            if (match.includes('<span class="hl-comment">') || match.includes('hl-filepath')) {
+                return match;
+            }
+            return `<span class="hl-comment">${match}</span>`;
+        });
+    } catch (e) { logError("[xmlEditor highlightXmlSyntax TagCommentProcessing]", e); }
+
+
+    try {
+        colorRegionsForEscapedText.forEach((region, i) => {
+            const placeholder = `__COLOR_PLACEHOLDER_${i}__`;
+            const originalHex = region.hex;
+            const hexDigits = originalHex.substring(1);
+            const hashSign = originalHex.substring(0,1);
+
+            const quoteDataAttrs = (region.attrQuoteRawStart !== null && region.attrQuoteRawEnd !== null) ? `data-attr-quote-raw-start="${region.attrQuoteRawStart}" data-attr-quote-raw-end="${region.attrQuoteRawEnd}"` : '';
+            const dataIndicesForPicker = `data-start-index-in-escaped-attr-val="${region.startInEscapedValue}" data-end-index-in-escaped-attr-val="${region.endInEscapedValue}"`;
+
+            const textBrightness = getBrightness(originalHex);
+            const contrastColor = textBrightness > 128 ? '#000000' : '#FFFFFF';
+            const textShadow = textBrightness > 128 ?
+                '-1px -1px 0 #ddd, 1px -1px 0 #ddd, -1px 1px 0 #ddd, 1px 1px 0 #ddd' :
+                '-1px -1px 0 #333, 1px -1px 0 #333, -1px 1px 0 #333, 1px 1px 0 #333';
+
+            let innerContent = '';
+            let wrapperClass = '';
+            let wrapperStyleVariables = '';
+
+            if (region.type === 'rgba') {
+                wrapperClass = 'hl-color-box-wrapper';
+                wrapperStyleVariables = `style="--box-bg-color: ${originalHex}; --box-border-color: ${originalHex.substring(0, 7)};"`;
+                innerContent = `<span style="color: ${contrastColor}; text-shadow: ${textShadow};">${hashSign}</span><span class="hl-color-rgba-text" style="color: ${contrastColor}; text-shadow: ${textShadow};">${hexDigits}</span>`;
+            } else {
+                wrapperClass = 'hl-color-rgb-warning-box';
+                wrapperStyleVariables = `style="--box-border-color-warning: red;"`;
+                innerContent = `${hashSign}<span class="hl-color-rgb-warning-text">${hexDigits}</span>`;
+            }
+
+            const colorHtml = `<span class="${wrapperClass}" ${wrapperStyleVariables} data-color="${originalHex}" ${dataIndicesForPicker} ${quoteDataAttrs}>${innerContent}${iconPlaceholderHtml}</span>`;
+
+            if (typeof tempHighlighted === 'string') {
+                tempHighlighted = tempHighlighted.replace(placeholder, colorHtml);
+            } else {
+                logError(`[xmlEditor highlightXmlSyntax ColorPlaceholder] tempHighlighted became non-string before placeholder ${i}.`);
+                throw new Error("tempHighlighted corrupted during color placeholder replacement.");
+            }
+        });
+    } catch (e) {
+        logError("[xmlEditor highlightXmlSyntax ColorPlaceholderReplacement]", e);
+        return escapeHtml(rawXmlText) + '\n\n';
+    }
+
+
+    if (typeof tempHighlighted !== 'string') {
+        logError("[xmlEditor highlightXmlSyntax] tempHighlighted is not a string at the end of processing.");
+        return escapeHtml(rawXmlText) + '\n\n';
+    }
+    return tempHighlighted + '\n\n';
+}
+
+// --- Event Handlers for Editor Instances ---
+function handleEditorInput(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements?.textarea) return;
+    State.updateEditorInstance(instanceId, { currentContent: elements.textarea.value });
+    updateUIDisplay(instanceId);
+}
+
+function handleEditorScroll(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements?.textarea || !elements.lineNumbers || !elements.highlightOverlay) return;
+    const { scrollTop, scrollLeft } = elements.textarea;
+    elements.lineNumbers.scrollTop = scrollTop;
+    elements.highlightOverlay.scrollTop = scrollTop;
+    elements.highlightOverlay.scrollLeft = scrollLeft;
+}
+
+function attachInstanceListeners(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements) return;
+
+    const handlers = {
+        ok: () => handleOkClick(instanceId),
+        cancel: () => handleCancelClick(instanceId),
+        apply: () => handleApplyClick(instanceId),
+        close: () => handleCancelClick(instanceId),
+        input: () => handleEditorInput(instanceId),
+        scroll: () => handleEditorScroll(instanceId),
+        caretActivity: () => {
+            updateStatusBarForInstance(instanceId);
+            checkAndUpdateHexWarnings(instanceId);
+            updateColorBoxFocusEffect(instanceId);
+            updateStatusBarDescription(instanceId);
+        },
+        textareaFocus: () => {
+            updateColorBoxFocusEffect(instanceId);
+            updateStatusBarDescription(instanceId);
+            State.setActiveEditorInstance(instanceId);
+        },
+        textareaBlur: () => {
+            elements.highlightOverlay?.querySelectorAll('.hl-color-box-wrapper, .hl-color-rgb-warning-box').forEach(el => el.classList.remove('color-text-focused'));
+        },
+        saveAsFile: () => handleSaveXmlAsFileClick(instanceId),
+        copyContent: () => handleCopyXmlContentClick(instanceId),
+        focusModal: (event) => {
+            if (event.target.closest('button')) return;
+            State.setActiveEditorInstance(instanceId);
+        }
+        // Add lineNumberClick handler here when implemented
+    };
+    instanceEventHandlers.set(instanceId, handlers);
+
+    elements.okButton?.addEventListener('click', handlers.ok);
+    elements.cancelButton?.addEventListener('click', handlers.cancel);
+    elements.applyButton?.addEventListener('click', handlers.apply);
+    elements.closeButton?.addEventListener('click', handlers.close);
+    elements.textarea?.addEventListener('input', handlers.input);
+    elements.textarea?.addEventListener('scroll', handlers.scroll);
+    elements.textarea?.addEventListener('keyup', handlers.caretActivity);
+    elements.textarea?.addEventListener('mouseup', handlers.caretActivity);
+    elements.textarea?.addEventListener('focus', handlers.textareaFocus);
+    elements.textarea?.addEventListener('blur', handlers.textareaBlur);
+    elements.saveAsFileButton?.addEventListener('click', handlers.saveAsFile);
+    elements.copyContentButton?.addEventListener('click', handlers.copyContent);
+    elements.contentContainer?.addEventListener('mousedown', handlers.focusModal, true);
+    // elements.lineNumbers?.addEventListener('click', handlers.lineNumberClick); // Add this when implemented
+}
+
+
+function handleSaveXmlAsFileClick(instanceId) {
+    const instance = State.getEditorInstance(instanceId);
+    const elements = instanceDomElements.get(instanceId);
+    if (!instance || !elements?.textarea) return;
+
+    const filename = instance.filePath.substring(instance.filePath.lastIndexOf('/') + 1) || `editor-content-${instanceId}.xml`;
+    const blob = new Blob([elements.textarea.value], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`'${filename}' prepared for download.`, 'info');
+}
+
+function handleCopyXmlContentClick(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    if (!elements?.textarea || elements.textarea.value.length === 0) {
+        showToast('Nothing to copy.', 'warn');
+        return;
+    }
+    navigator.clipboard.writeText(elements.textarea.value)
+        .then(() => {
+            const instance = State.getEditorInstance(instanceId);
+            showToast(`XML content from ${instance?.filePath || 'editor'} copied!`, 'info');
+        })
+        .catch(err => {
+            logError(`[xmlEditor] Failed to copy XML (Instance ${instanceId}): `, err);
+            showToast('Failed to copy XML content. See console.', 'error');
+        });
+}
+
+export function insertXmlText(textToInsert) {
+    const activeInstanceId = State.getActiveEditorInstanceId();
+    if (!activeInstanceId) {
+        showToast("No active XML editor to insert text into.", "warn");
+        return;
+    }
+    const elements = instanceDomElements.get(activeInstanceId);
+    if (!elements?.textarea) {
+        showToast("Active editor's textarea not found.", "error");
+        logError(`[insertXmlText] Textarea not found for active instance ${activeInstanceId}`);
+        return;
+    }
+
+    const { textarea } = elements;
+    const { selectionStart: start, selectionEnd: end, value: currentText } = textarea;
+    textarea.value = currentText.substring(0, start) + textToInsert + currentText.substring(end);
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = start + textToInsert.length;
+    handleEditorInput(activeInstanceId);
+}
+
+
+// --- Button Click Handlers for OK, Apply, Cancel ---
+function handleOkClick(instanceId) {
+    if (saveChanges(instanceId)) {
+        checkAndRerender(instanceId);
+        closeEditor(instanceId);
+    }
+}
+
+function handleApplyClick(instanceId) {
+    const elements = instanceDomElements.get(instanceId);
+    let warningsPresent = false;
+    if (elements?.textarea && containsRgbWithoutAlpha(elements.textarea.value)) {
+        warningsPresent = true;
+    }
+
+    if (saveChanges(instanceId)) {
+        checkAndRerender(instanceId); // This now contains debug logs
+        if (warningsPresent) {
+            showToast("Warning: 6-digit Hex RGB values found. Alpha channel is missing for full compatibility.", 'warn', 4000);
+        }
+        updateColorBoxFocusEffect(instanceId);
+        updateStatusBarDescription(instanceId);
+        elements?.textarea?.focus();
+    }
+}
+
+function handleCancelClick(instanceId) {
+    const instance = State.getEditorInstance(instanceId);
+    if (instance && instance.currentContent !== instance.originalContent) {
+        if (!confirm(`You have unsaved changes in '${instance.filePath}'. Are you sure you want to close and discard changes?`)) {
+            return;
+        }
+    }
+    if (instance && instance.currentContent !== instance.originalContent) {
+         State.updateEditorInstance(instanceId, { currentContent: instance.originalContent });
+    }
+    closeEditor(instanceId);
+}

@@ -1,7 +1,7 @@
 // File: cs/renderers/dropDownRenderer.js
-import * as DomUtils from '/cs/domUtils.js';
-import * as State from '/cs/state.js';
-import { loadSkin } from '/cs/skinManager.js'; 
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
+import { loadSkin } from '../core/skinManager.js'; 
 
 function renderPresetMenu(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('div');

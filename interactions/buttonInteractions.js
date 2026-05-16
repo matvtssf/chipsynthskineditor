@@ -1,0 +1,246 @@
+// File: cs/buttonInteractions.js
+/**
+ * buttonInteractions.js
+ * (Assuming this is the version from P11 that the user preferred for modal interactions,
+ * which uses data-modal-container-id)
+ */
+import * as State from '../core/state.js';
+import * as DomUtils from '../core/domUtils.js';
+import { renderElement } from '../core/uiRenderer.js';
+
+let activeClickOutsideListener = null;
+let activeClickOutsideTag = null;
+let activeModalContainer = null; 
+
+function removeActiveClickOutsideListener() {
+    if (activeClickOutsideListener) {
+        document.removeEventListener('mousedown', activeClickOutsideListener, { capture: true });
+        console.log(`[BI] Removed click-outside listener for tag: ${activeClickOutsideTag}`);
+        activeClickOutsideListener = null;
+        activeClickOutsideTag = null;
+        activeModalContainer = null;
+    }
+}
+
+function handleOnOffButtonClick(event) {
+    const button = event.currentTarget;
+    const command = button.dataset.command;
+    if (!command) {
+        console.warn("[BI] OnOffButton clicked, but missing 'data-command' attribute.", button);
+        DomUtils.logError("[BI] OnOffButton missing 'data-command'", { element: button });
+        return;
+    }
+    const parts = command.split('|');
+    if (parts.length !== 2 || parts[0].trim() !== 'visibilityChangingView' || !parts[1] || parts[1].trim() === '') {
+        console.warn(`[BI] OnOffButton command format not recognized: "${command}"`, button);
+        DomUtils.logError(`[BI] Invalid command format for OnOffButton: "${command}"`, { element: button });
+        return;
+    }
+    const changeName = parts[1].trim();
+    const currentState = State.getVisibilityState(changeName);
+    const newState = !currentState;
+    State.setVisibilityState(changeName, newState);
+    button.classList.toggle('active', newState);
+    button.setAttribute('aria-checked', newState.toString());
+}
+
+function closeExpandableView(tag) {
+    console.log(`[BI closeExpandableView] Attempting to close view for tag: "${tag}"`);
+    const viewInfo = State.getExpandableViewInfo(tag); 
+    
+    const modalId = `modal-for-${tag}`; // Find by ID
+    const containerElement = document.getElementById(modalId);
+
+    if (containerElement) {
+        State.hideExpandableView(tag); // state.js uses its stored element reference
+    } else {
+        console.warn(`[BI closeExpandableView] Modal container with ID ${modalId} not found for tag ${tag}. This might happen if state was cleared or modal not correctly registered.`);
+    }
+
+    let expandButtonElement = null;
+    if (viewInfo && viewInfo.expandButtonElement) {
+        expandButtonElement = viewInfo.expandButtonElement;
+    } else {
+        // Fallback if not in viewInfo (e.g., if state was cleared somehow)
+        const buttons = document.querySelectorAll(`.gui-expand-view-button[data-close-button-tag="${tag}"]`);
+        if (buttons.length > 0) expandButtonElement = buttons[0];
+    }
+
+    if (expandButtonElement) {
+        expandButtonElement.classList.remove('active');
+        console.log(`[BI closeExpandableView] Removed 'active' class from expand button for tag: "${tag}"`);
+    }
+    
+    if (activeClickOutsideTag === tag) {
+        removeActiveClickOutsideListener();
+    }
+    console.log(`[BI] Closed (or ensured closed) expandable view for tag: "${tag}"`);
+}
+
+async function handleExpandViewButtonClick(event) {
+    const button = event.currentTarget;
+    const tag = button.dataset.closeButtonTag;
+    const modalContainerId = button.dataset.modalContainerId; // Get ID from button
+    const expandedViewCloser = button.dataset.expandedViewCloser === '1';
+
+    console.log(`[BI handleExpandViewButtonClick] Clicked. Tag: "${tag}", ModalID: "${modalContainerId}", ExpandedViewCloser: ${expandedViewCloser}`);
+
+    if (!tag) {
+        DomUtils.logError("[BI] ExpandViewButton missing 'data-close-button-tag'", { element: button });
+        return;
+    }
+    // This check is crucial:
+    if (!modalContainerId) {
+        DomUtils.logError(`[BI CRITICAL] ExpandViewButton (tag: "${tag}") is missing 'data-modal-container-id'. Modal cannot be found because uiRenderer didn't set it on the button.`, { button });
+        return;
+    }
+
+    const containerElement = document.getElementById(modalContainerId);
+
+    if (!containerElement) {
+        DomUtils.logError(`[BI CRITICAL] Modal container with ID: "${modalContainerId}" NOT FOUND in document for ExpandViewButton tag: "${tag}".`, { button });
+        return;
+    }
+
+    console.log(`[BI] Found modal container by ID "${modalContainerId}" for tag "${tag}":`, containerElement);
+
+    let viewInfo = State.getExpandableViewInfo(tag);
+    // Ensure state is registered with the correct element if it wasn't or if element changed (e.g. full re-render)
+    if (!viewInfo || viewInfo.containerElement !== containerElement) {
+        const originalDisplay = containerElement.dataset.originalDisplay || 'block';
+        State.registerExpandableView(tag, containerElement, button, originalDisplay);
+        viewInfo = State.getExpandableViewInfo(tag); 
+        console.log(`[BI] Registered/Updated expandable view for tag "${tag}" with specific container. Initial display: ${originalDisplay}`);
+    } else {
+        console.log(`[BI] Existing view info for tag "${tag}":`, { isVisible: viewInfo.isVisible, isContentLoaded: viewInfo.isContentLoaded });
+    }
+    
+
+    if (viewInfo && viewInfo.isVisible) {
+        console.log(`[BI] View for tag "${tag}" is already visible. Closing it.`);
+        closeExpandableView(tag);
+        return;
+    }
+
+    if (activeClickOutsideTag && activeClickOutsideTag !== tag) {
+        console.log(`[BI] Another modal (tag: "${activeClickOutsideTag}") has an active click-outside listener. Closing it first.`);
+        closeExpandableView(activeClickOutsideTag);
+    }
+
+    console.log(`[BI] Proceeding to show/load content for tag "${tag}".`);
+
+    if (viewInfo && !viewInfo.isContentLoaded) {
+        const path = containerElement.dataset.loadPath;
+        console.log(`[BI] Content not loaded for tag "${tag}". Path: "${path}"`);
+        if (path) {
+            DomUtils.updateStatus(`Loading view: ${path}...`);
+            try {
+                const xmlContent = State.getFileContent(path);
+                if (xmlContent) {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlContent, "application/xml");
+                    const parseError = xmlDoc.querySelector("parsererror");
+                    if (parseError) { throw new Error(`XML parse error in "${path}": ${parseError.textContent}`); }
+                    const rootElement = xmlDoc.documentElement;
+                    if (rootElement) {
+                        containerElement.innerHTML = '';
+                        let childRenderCount = 0;
+                        for (const childNode of rootElement.children) {
+                            if (childNode.nodeType === Node.ELEMENT_NODE) {
+                                renderElement(childNode, containerElement, {}, path);
+                                childRenderCount++;
+                            }
+                        }
+                        console.log(`   - Rendered ${childRenderCount} child elements into container for tag "${tag}".`);
+                        State.setExpandViewContentLoaded(tag, true); 
+                        setupButtonListeners(containerElement); 
+                    } else { throw new Error(`No root element found in XML from "${path}".`); }
+                } else { throw new Error(`File content not found for path: "${path}".`); }
+                DomUtils.updateStatus(`View loaded: ${path}`, 3000);
+            } catch (error) {
+                DomUtils.logError(`[BI] Error loading/rendering content for tag "${tag}", path "${path}"`, { error, path });
+                containerElement.innerHTML = `<p style="color:red;padding:10px;">Error loading view content. Check console.</p>`;
+                State.setExpandViewContentLoaded(tag, false); 
+                DomUtils.updateStatus(`Error loading view: ${path}`, 5000);
+                return;
+            }
+        } else {
+            DomUtils.logError(`No load path for expandable container tag "${tag}"`, { containerElement });
+        }
+    } else if (viewInfo) {
+        console.log(`[BI] Content for tag "${tag}" already loaded.`);
+    }
+
+    State.showExpandableView(tag); // State uses its internally stored containerElement
+    button.classList.add('active');
+    // Ensure containerElement is valid before accessing style/offset properties
+    if (containerElement) {
+        console.log(`[BI] Called State.showExpandableView for tag "${tag}". Container display: ${containerElement.style.display}, offsetWidth: ${containerElement.offsetWidth}, offsetHeight: ${containerElement.offsetHeight}`);
+    }
+
+
+    if (expandedViewCloser) {
+        removeActiveClickOutsideListener(); 
+        
+        activeClickOutsideTag = tag;
+        activeModalContainer = containerElement; 
+        
+        activeClickOutsideListener = (e) => {
+            const currentButtonInfo = State.getExpandableViewInfo(activeClickOutsideTag);
+            const currentButtonElement = currentButtonInfo ? currentButtonInfo.expandButtonElement : null;
+
+            if (!activeModalContainer || !document.body.contains(activeModalContainer) || activeModalContainer.style.display === 'none') {
+                removeActiveClickOutsideListener(); 
+                return;
+            }
+
+            if (!activeModalContainer.contains(e.target) && (!currentButtonElement || !currentButtonElement.contains(e.target)) ) {
+                console.log(`[BI] Click outside detected for active tag: ${activeClickOutsideTag}. Target:`, e.target);
+                closeExpandableView(activeClickOutsideTag); 
+            }
+        };
+        document.addEventListener('mousedown', activeClickOutsideListener, { capture: true });
+        console.log(`[BI] Added click-outside listener for tag: "${tag}"`);
+    } else {
+         console.log(`[BI] Click-outside-to-close not enabled for tag: "${tag}" (expandedViewCloser=${expandedViewCloser})`);
+    }
+}
+
+function handleControlTextButtonClick(event) {
+    const button = event.currentTarget;
+    const tag = button.dataset.controlTag;
+    if (!tag) {
+        DomUtils.logError("[BI] ControlTextButton missing 'data-control-tag'", { element: button });
+        return;
+    }
+    console.log(`[BI] ControlTextButton (presumed close) clicked. Tag: "${tag}"`);
+    closeExpandableView(tag);
+}
+
+export function setupButtonListeners(scopeElement) {
+    const searchScope = scopeElement || document.getElementById('skin-container-actual');
+    if (!searchScope) {
+        console.warn("[BI] Cannot find search scope for button listeners.");
+        return;
+    }
+
+    const onOffButtons = searchScope.querySelectorAll('.gui-onoff-button, .gui-image-button');
+    onOffButtons.forEach(button => {
+        button.removeEventListener('click', handleOnOffButtonClick); 
+        button.addEventListener('click', handleOnOffButtonClick);
+    });
+
+    const expandViewButtons = searchScope.querySelectorAll('.gui-expand-view-button');
+    expandViewButtons.forEach(button => {
+        button.removeEventListener('click', handleExpandViewButtonClick); 
+        button.addEventListener('click', handleExpandViewButtonClick);
+    });
+
+    const controlTextButtons = searchScope.querySelectorAll('.gui-control-text-button');
+    controlTextButtons.forEach(button => {
+        if (button.dataset.controlTag) { 
+            button.removeEventListener('click', handleControlTextButtonClick); 
+            button.addEventListener('click', handleControlTextButtonClick);
+        }
+    });
+}

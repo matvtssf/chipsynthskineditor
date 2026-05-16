@@ -1,6 +1,6 @@
 // File: cs/renderers/buttonRenderer.js
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 export function renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('button');

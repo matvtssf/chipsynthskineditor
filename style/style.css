@@ -1,0 +1,16 @@
+/* File: style/style.css */
+
+/* 1. Base & Reset */
+@import url('./base.css');
+
+/* 2. Main Layout Structure */
+@import url('./layout.css');
+
+/* 3. Components */
+@import url('./sidebar.css');
+@import url('./modals.css');
+@import url('./xml-editor.css');
+@import url('./gui-elements.css');
+
+/* 4. Animations & Effects */
+@import url('./animations.css');

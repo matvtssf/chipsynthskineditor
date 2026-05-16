@@ -1,6 +1,6 @@
 // File: cs/renderers/keyboardRenderer.js
-import * as DomUtils from '/cs/domUtils.js';
-import * as State from '/cs/state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 function renderCS01Keyboard(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('div');

@@ -1,0 +1,601 @@
+/**
+ * elementRefModalInteractions.js
+ * Handles all interactions specific to the XML Element Reference modal.
+ * FIXED: Added imports for modal toggles and getAttributeCategory. Fixed button listeners.
+ * FIXED: Added call to makeModalDraggable.
+ * ADDED: Handling for "Supported" checkbox.
+ * ADDED: Styling list items based on supported status.
+ * FIXED: Removed duplicate declaration of setElementUnsavedChanges.
+ */
+import * as State from '../core/state.js'; // Assuming state is accessible globally or passed
+import * as Refs from '../core/references.js'; // Import reference data functions
+import { handleAttributeEditorToggle } from './attributeEditorInteractions.js';
+import { handleParamReferenceToggle } from './paramRefModalInteractions.js';
+import { makeModalDraggable } from '../managers/modalManager.js';
+import {
+    // Getters for Element Reference Modal elements
+    getReferenceModal, getCloseReferenceBtn, getReferenceContent,
+    getImportReferenceBtn, getExportReferenceBtn, getReferenceFileInput,
+    getReferenceElementList, getReferenceAttributeList, getReferencePlaceholderText,
+    getReferenceDescriptionTextarea, getAddElementRefBtn,
+    getAddAttributeRefBtn,
+    getManageAttributeDefinitionsBtn, getEditElementCategoriesBtnRef,
+    getParamReferenceButton, getElementRefNameInput,
+    getAttributeDescriptionTextarea, getOverrideAttributeDescriptionBtn,
+    getReferenceModalContent, getReferenceModalHeader,
+    // Utility functions
+    logError, showToast, getAttributeCategory
+} from '../core/domUtils.js';
+// Import the setter and updater for unsaved changes flag & supported status
+import { setElementUnsavedChanges, updateElementSupportedStatus } from '../core/references.js'; // <<< CORRECT: Use imported version
+
+// --- Module State ---
+let selectedElementListItem = null;
+let selectedAttributeListItem = null;
+let currentSelectedElementName = null;
+let currentSelectedAttributeName = null;
+let currentSelectedAttributeType = null; // 'element', 'common-attribute', 'specific-attribute'
+// let elementReferenceDataChanged = false; // Use Refs.hasUnsavedElementChanges() instead
+let currentAttributeIsOverridden = false; // Track if current attr desc is override
+let isRefModalDraggable = false; // Flag to prevent duplicate listener attachment
+
+// --- Constants ---
+const ELEMENT_CATEGORIES = ['Containers & Layout', 'Buttons & Toggles', 'Knobs & Sliders', 'Menus & Options', 'Text & Display', 'Graphics & Shapes', 'Complex Editors & Views', 'Overlays', 'Definitions & Structure', 'Other'];
+const ATTRIBUTE_CATEGORIES = ['Layout & Position', 'Value & Parameter', 'Appearance & Style', 'Text & Font', 'Interaction & Behavior', 'Timing & Mode', 'Structure & System', 'Other'];
+
+
+// --- Initialization ---
+
+/**
+ * Sets up all event listeners for the Element Reference modal.
+ * Needs to be called after the main DOM is ready and reference data loaded.
+ */
+export function setupReferenceModalListeners() {
+    console.log("[elementRefModal] Setting up Reference Modal listeners...");
+    // Assume getReferenceButton() is handled elsewhere (e.g., sidebar module) to call handleReferenceToggle
+    safelyAttachListener(getCloseReferenceBtn, 'click', handleReferenceToggle);
+    safelyAttachListener(getImportReferenceBtn, 'click', handleImportElementReference);
+    safelyAttachListener(getReferenceFileInput, 'change', handleElementReferenceFileSelected);
+    safelyAttachListener(getExportReferenceBtn, 'click', handleExportElementReference);
+    safelyAttachListener(getAddElementRefBtn, 'click', handleAddElementRef);
+    safelyAttachListener(getAddAttributeRefBtn, 'click', handleAddAttributeRef);
+
+    // Call imported toggle functions directly
+    safelyAttachListener(getManageAttributeDefinitionsBtn, 'click', () => {
+        handleAttributeEditorToggle(true);
+    });
+    safelyAttachListener(getParamReferenceButton, 'click', () => {
+        handleParamReferenceToggle();
+    });
+
+    safelyAttachListener(getEditElementCategoriesBtnRef, 'click', handleEditElementCategories);
+
+
+    // Listeners for dynamic content
+    safelyAttachListener(getElementRefNameInput, 'input', handleElementNameChange);
+    safelyAttachListener(getAttributeDescriptionTextarea, 'input', handleAttributeDescriptionChange);
+    safelyAttachListener(getOverrideAttributeDescriptionBtn, 'click', handleOverrideDescriptionClick);
+
+    const elementList = getReferenceElementList();
+    if (elementList) {
+        elementList.addEventListener('click', handleElementListItemClick);
+        elementList.addEventListener('mouseover', handleListItemHover);
+        elementList.addEventListener('mouseout', handleListItemHoverOut);
+    }
+    const attributeList = getReferenceAttributeList();
+    if (attributeList) {
+        attributeList.addEventListener('click', handleAttributeListItemClick);
+        attributeList.addEventListener('mouseover', handleListItemHover);
+        attributeList.addEventListener('mouseout', handleListItemHoverOut);
+    }
+    const descriptionArea = getReferenceDescriptionTextarea();
+    if (descriptionArea) {
+        descriptionArea.addEventListener('input', handleElementDescriptionChange);
+    }
+
+    // Listener for Supported Checkbox
+    const supportedCheckbox = document.getElementById('element-ref-supported-checkbox');
+    if (supportedCheckbox) {
+        supportedCheckbox.addEventListener('change', handleSupportedCheckboxChange);
+    } else {
+        console.warn("[elementRefModal] Supported checkbox not found during listener setup!");
+    }
+
+    // --- Make Modal Draggable ---
+    if (!isRefModalDraggable) {
+        const modalContent = getReferenceModalContent();
+        const modalHeader = getReferenceModalHeader();
+        if (modalContent && modalHeader) {
+            makeModalDraggable(modalContent, modalHeader);
+            isRefModalDraggable = true; // Set flag
+        } else {
+            console.error("[elementRefModal] Could not find content or header to make modal draggable.");
+        }
+    }
+    // --- End Make Modal Draggable ---
+}
+
+// --- Core UI Logic ---
+
+/** Toggles the visibility of the Element Reference modal */
+export function handleReferenceToggle() {
+    console.log("[elementRefModal] handleReferenceToggle called.");
+    const referenceModal = getReferenceModal();
+    if (!referenceModal) { console.error("[elementRefModal] Reference modal element NOT found!"); return; }
+
+    const isCurrentlyVisible = referenceModal.classList.contains('visible');
+    const show = !isCurrentlyVisible;
+
+    if (!show && Refs.hasUnsavedElementChanges()) {
+        if (!confirm("You have unsaved changes in the element reference data. Are you sure you want to close without exporting?")) {
+            console.log("[elementRefModal] Close cancelled due to unsaved changes.");
+            return;
+        }
+        setElementUnsavedChanges(false); // Reset flag if closing confirmed
+    }
+
+    try {
+        referenceModal.classList.toggle('visible', show);
+        console.log(`[elementRefModal] Toggled 'visible' class. Modal should be ${show ? 'visible' : 'hidden'}.`);
+        if (show) {
+            loadElementReferenceUI();
+        } else {
+            cleanupModalState(); // Clear selections on close
+        }
+    } catch (e) {
+        logError("[elementRefModal] Error toggling 'visible' class", e);
+    }
+}
+
+/** Clears selections and resets fields when modal is closed */
+function cleanupModalState() {
+    if (selectedElementListItem) selectedElementListItem.classList.remove('selected');
+    if (selectedAttributeListItem) selectedAttributeListItem.classList.remove('selected');
+    selectedElementListItem = null; selectedAttributeListItem = null;
+    currentSelectedElementName = null; currentSelectedAttributeName = null; currentSelectedAttributeType = null;
+    const attributeList = getReferenceAttributeList(); if (attributeList) attributeList.innerHTML = '';
+    const descriptionText = getReferenceDescriptionTextarea(); if(descriptionText) descriptionText.value = '';
+    const nameInput = getElementRefNameInput(); if (nameInput) { nameInput.value = ''; nameInput.disabled = true; }
+    const attrDescArea = getAttributeDescriptionTextarea(); if(attrDescArea) { attrDescArea.value = ''; attrDescArea.readOnly = true; attrDescArea.disabled = true; attrDescArea.classList.add('bg-gray-100'); }
+    const overrideBtn = getOverrideAttributeDescriptionBtn(); if (overrideBtn) overrideBtn.style.display = 'none';
+    const placeholder = getReferencePlaceholderText(); if(placeholder) placeholder.style.display = 'none';
+    const supportedCheckbox = document.getElementById('element-ref-supported-checkbox'); if (supportedCheckbox) { supportedCheckbox.checked = false; supportedCheckbox.disabled = true; }
+    console.log("[elementRefModal] Modal closed and selections cleared.");
+}
+
+
+/** Loads data and populates the Element Reference UI */
+function loadElementReferenceUI() {
+    console.log("[elementRefModal] loadElementReferenceUI called.");
+    const elementList = getReferenceElementList(); const attributeList = getReferenceAttributeList(); const placeholder = getReferencePlaceholderText(); const detailsArea = getReferenceDescriptionTextarea();
+    const nameInput = getElementRefNameInput(); const attrDescArea = getAttributeDescriptionTextarea(); const overrideBtn = getOverrideAttributeDescriptionBtn();
+    const supportedCheckbox = document.getElementById('element-ref-supported-checkbox');
+    if (!elementList || !attributeList || !placeholder || !detailsArea || !nameInput || !attrDescArea || !overrideBtn || !supportedCheckbox) {
+        console.error("[elementRefModal] Missing required UI elements.");
+        return;
+    }
+
+    // Reset UI state
+    elementList.innerHTML = ''; attributeList.innerHTML = ''; detailsArea.value = ''; placeholder.style.display = 'none';
+    nameInput.value = ''; nameInput.disabled = true; attrDescArea.value = ''; attrDescArea.readOnly = true; attrDescArea.disabled = true; attrDescArea.classList.add('bg-gray-100'); overrideBtn.style.display = 'none';
+    supportedCheckbox.checked = false; supportedCheckbox.disabled = true;
+
+    if (!Refs.hasLoadedElementReferenceData()) { placeholder.textContent = Refs.ELEMENT_PLACEHOLDER_TEXT; placeholder.style.display = 'block'; return; }
+
+    const elementsArray = Refs.getElementReferenceData();
+    const commonAttributes = Refs.getCommonAttributes();
+
+    if (!Array.isArray(elementsArray)) { logError("Data consistency error: getElementReferenceData() did not return an array.", elementsArray); placeholder.textContent = "Error: Invalid element reference data format."; placeholder.style.display = 'block'; return; }
+    if (elementsArray.length === 0 && Object.keys(commonAttributes).length === 0) { placeholder.textContent = "Element reference data loaded, but is empty."; placeholder.style.display = 'block'; return; }
+
+    const categorizedElements = {};
+    elementsArray.forEach(elementObj => { if (!elementObj || typeof elementObj !== 'object' || !elementObj.element) { console.warn("Skipping invalid element object in reference data array:", elementObj); return; } const category = elementObj.category || 'Other'; if (!categorizedElements[category]) categorizedElements[category] = []; categorizedElements[category].push(elementObj); });
+
+    // Function to create and add list item
+    const addElementListItem = (elementObj) => {
+        const li = document.createElement('li');
+        li.dataset.elementName = elementObj.element;
+        li.innerHTML = `<span class="font-mono text-blue-700">&lt;${elementObj.element}&gt;</span>`;
+        // Toggle class based on supported status
+        li.classList.toggle('element-supported', !!elementObj.supported);
+        elementList.appendChild(li);
+    };
+
+    // Populate list by category
+    ELEMENT_CATEGORIES.forEach(category => {
+         if (categorizedElements[category]) {
+             const headerLi = document.createElement('li'); headerLi.className = 'element-category-header'; headerLi.textContent = category; elementList.appendChild(headerLi);
+             categorizedElements[category].sort((a, b) => (a.element || '').localeCompare(b.element || ''));
+             categorizedElements[category].forEach(addElementListItem); // Use helper function
+         }
+    });
+
+    const otherElements = categorizedElements['Other'] || [];
+    Object.keys(categorizedElements).forEach(cat => { if (!ELEMENT_CATEGORIES.includes(cat) && cat !== 'Other') { otherElements.push(...categorizedElements[cat]); } });
+    if (otherElements.length > 0) {
+        const headerLi = document.createElement('li'); headerLi.className = 'element-category-header'; headerLi.textContent = 'Other'; elementList.appendChild(headerLi);
+        otherElements.sort((a, b) => (a.element || '').localeCompare(b.element || ''));
+        otherElements.forEach(addElementListItem); // Use helper function
+    }
+    console.log("[elementRefModal] loadElementReferenceUI finished.");
+}
+
+
+/** Handles clicks within the element list */
+function handleElementListItemClick(event) {
+    if (event.target.closest('.delete-item-btn')) { return; }
+
+    let targetLi = event.target.closest('li');
+    if (!targetLi || !targetLi.dataset.elementName || targetLi.classList.contains('element-category-header')) {
+        if (selectedElementListItem) selectedElementListItem.classList.remove('selected');
+        if (selectedAttributeListItem) selectedAttributeListItem.classList.remove('selected');
+        selectedElementListItem = null; selectedAttributeListItem = null;
+        currentSelectedElementName = null; currentSelectedAttributeName = null; currentSelectedAttributeType = null;
+        const attributeList = getReferenceAttributeList(); if (attributeList) attributeList.innerHTML = '';
+        populateReferenceDetails(); // Clear details pane
+        return;
+    }
+    const elementName = targetLi.dataset.elementName;
+    if (selectedElementListItem && selectedElementListItem !== targetLi) selectedElementListItem.classList.remove('selected');
+    if (selectedAttributeListItem) selectedAttributeListItem.classList.remove('selected'); selectedAttributeListItem = null;
+    targetLi.classList.add('selected'); selectedElementListItem = targetLi; currentSelectedElementName = elementName; currentSelectedAttributeName = null; currentSelectedAttributeType = 'element';
+    populateAttributeList(elementName); populateReferenceDetails();
+}
+
+/** Populates the attribute list based on the selected element */
+function populateAttributeList(elementName) {
+    const attributeList = getReferenceAttributeList(); if (!attributeList) return;
+    attributeList.innerHTML = '';
+
+    const elementsArray = Refs.getElementReferenceData();
+    const elementData = elementsArray.find(el => el.element === elementName);
+    const commonAttributes = Refs.getCommonAttributes();
+    const allAttributes = {};
+
+    if (!elementData) { console.warn(`Element data not found for "${elementName}"`); attributeList.innerHTML = '<li>Error: Element not found</li>'; return; }
+
+    if (elementData.usesCommonAttributes && commonAttributes) {
+        Object.entries(commonAttributes).forEach(([attrName, attrData]) => {
+            if (typeof attrName === 'string' && (!elementData.attributes || !elementData.attributes[attrName])) {
+                allAttributes[attrName] = { ...attrData, isCommon: true };
+            }
+        });
+    }
+    if (elementData.attributes && typeof elementData.attributes === 'object') {
+         Object.entries(elementData.attributes).forEach(([attrName, attrData]) => {
+            if (typeof attrName === 'string') {
+                const validAttrData = (typeof attrData === 'object' && attrData !== null) ? attrData : {};
+                 const baseData = commonAttributes[attrName] || {};
+                 allAttributes[attrName] = { ...baseData, ...validAttrData, description: typeof attrData.description === 'string' ? attrData.description : baseData.description, isCommon: false, hasOverrideDescription: typeof attrData.description === 'string' };
+            }
+        });
+    }
+
+    if (Object.keys(allAttributes).length === 0) { attributeList.innerHTML = '<li class="text-gray-500 italic">No attributes defined or used.</li>'; return; }
+
+    const categorizedAttributes = {};
+    Object.entries(allAttributes).forEach(([attrName, attrFullData]) => {
+        const category = attrFullData.category || getAttributeCategory(attrName) || 'Other';
+        if (!categorizedAttributes[category]) categorizedAttributes[category] = [];
+        categorizedAttributes[category].push({ name: String(attrName), data: attrFullData });
+    });
+
+    ATTRIBUTE_CATEGORIES.forEach(category => {
+        if (categorizedAttributes[category]) {
+            const headerLi = document.createElement('li'); headerLi.className = 'attribute-category-header'; headerLi.textContent = category; attributeList.appendChild(headerLi);
+            categorizedAttributes[category].sort((a, b) => a.name.localeCompare(b.name));
+            categorizedAttributes[category].forEach(attr => {
+                const li = document.createElement('li'); const attributeNameString = attr.name;
+                if (typeof attributeNameString !== 'string' || !attributeNameString) { console.error("Invalid attribute name.", attr); return; }
+                li.dataset.attributeName = attributeNameString; li.dataset.attributeType = attr.data.isCommon ? 'common-attribute' : 'specific-attribute'; li.dataset.hasOverride = attr.data.hasOverrideDescription ? 'true' : 'false';
+                li.innerHTML = `<span>${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
+                attributeList.appendChild(li);
+            });
+        }
+    });
+     const otherAttributes = categorizedAttributes['Other'] || [];
+     Object.keys(categorizedAttributes).forEach(cat => { if (!ATTRIBUTE_CATEGORIES.includes(cat) && cat !== 'Other') { otherAttributes.push(...categorizedAttributes[cat]); } });
+     if (otherAttributes.length > 0) {
+         const headerLi = document.createElement('li'); headerLi.className = 'attribute-category-header'; headerLi.textContent = 'Other'; attributeList.appendChild(headerLi);
+         otherAttributes.sort((a, b) => a.name.localeCompare(b.name));
+         otherAttributes.forEach(attr => {
+             const li = document.createElement('li'); const attributeNameString = attr.name;
+             if (typeof attributeNameString !== 'string' || !attributeNameString) { console.error("Invalid attribute name (Other).", attr); return; }
+             li.dataset.attributeName = attributeNameString; li.dataset.attributeType = attr.data.isCommon ? 'common-attribute' : 'specific-attribute'; li.dataset.hasOverride = attr.data.hasOverrideDescription ? 'true' : 'false';
+             li.innerHTML = `<span>${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
+             attributeList.appendChild(li);
+         });
+     }
+}
+
+/** Handles clicks within the attribute list */
+function handleAttributeListItemClick(event) {
+     if (event.target.closest('.delete-item-btn')) { return; }
+
+    let targetLi = event.target.closest('li');
+    if (!targetLi || !targetLi.dataset.attributeName || targetLi.classList.contains('attribute-category-header')) return;
+    const attributeName = targetLi.dataset.attributeName; const attributeType = targetLi.dataset.attributeType;
+    const hasOverride = targetLi.dataset.hasOverride === 'true';
+
+    if (selectedAttributeListItem && selectedAttributeListItem !== targetLi) selectedAttributeListItem.classList.remove('selected');
+    if (selectedElementListItem) selectedElementListItem.classList.remove('selected'); // Deselect element
+    targetLi.classList.add('selected'); selectedAttributeListItem = targetLi;
+    currentSelectedAttributeName = attributeName; currentSelectedAttributeType = attributeType;
+    currentAttributeIsOverridden = hasOverride;
+
+    populateReferenceDetails(); // Update details pane
+}
+
+/** Populates the details pane based on current selection */
+function populateReferenceDetails() {
+    const descriptionArea = getReferenceDescriptionTextarea();
+    const nameInput = getElementRefNameInput();
+    const attrDescArea = getAttributeDescriptionTextarea();
+    const overrideBtn = getOverrideAttributeDescriptionBtn();
+    const supportedCheckbox = document.getElementById('element-ref-supported-checkbox');
+
+    // Clear/disable all details first
+    if (descriptionArea) { descriptionArea.value = ''; descriptionArea.disabled = true; }
+    if (nameInput) { nameInput.value = ''; nameInput.disabled = true; }
+    if (attrDescArea) { attrDescArea.value = ''; attrDescArea.readOnly = true; attrDescArea.disabled = true; attrDescArea.classList.add('bg-gray-100'); }
+    if (overrideBtn) overrideBtn.style.display = 'none';
+    if (supportedCheckbox) { supportedCheckbox.checked = false; supportedCheckbox.disabled = true; }
+
+    try {
+        if (currentSelectedAttributeType === 'element') {
+            const elementData = Refs.getElementReferenceData().find(el => el.element === currentSelectedElementName);
+            if (elementData) {
+                if (descriptionArea) { descriptionArea.value = elementData.description || ''; descriptionArea.disabled = false; }
+                if (nameInput) { nameInput.value = currentSelectedElementName; nameInput.disabled = false; }
+                if (attrDescArea) { attrDescArea.placeholder = 'Select an attribute...'; attrDescArea.disabled = true;}
+                if (overrideBtn) overrideBtn.style.display = 'none';
+                if (supportedCheckbox) { // Set checkbox state
+                    supportedCheckbox.checked = !!elementData.supported; // Default to false if undefined
+                    supportedCheckbox.disabled = false; // Enable checkbox
+                }
+            } else {
+                 if(descriptionArea) descriptionArea.value = `Details for element "${currentSelectedElementName}" not found.`;
+                 if(nameInput) nameInput.value = currentSelectedElementName;
+            }
+        } else if (currentSelectedAttributeType === 'common-attribute' || currentSelectedAttributeType === 'specific-attribute') {
+            const elementData = Refs.getElementReferenceData().find(el => el.element === currentSelectedElementName);
+            if (elementData) {
+                if (descriptionArea) { descriptionArea.value = elementData.description || ''; descriptionArea.disabled = false; } // Keep element description editable
+                if (nameInput) { nameInput.value = currentSelectedElementName; nameInput.disabled = false; } // Keep element name editable
+                if (supportedCheckbox) { // Set checkbox state based on element
+                    supportedCheckbox.checked = !!elementData.supported;
+                    supportedCheckbox.disabled = false; // Enable checkbox
+                }
+                if (attrDescArea) { attrDescArea.disabled = false; }
+                 populateAttributeDescription(); // Populate the lower description area
+            } else {
+                 if(descriptionArea) descriptionArea.value = `Error: Element data not found for ${currentSelectedElementName}.`;
+                 if(attrDescArea) { attrDescArea.value = ''; attrDescArea.disabled = true; attrDescArea.placeholder = ''; }
+                 if(overrideBtn) overrideBtn.style.display = 'none';
+            }
+        } else { // Nothing selected
+            if(descriptionArea) descriptionArea.value = 'Select an element or attribute to see details.';
+            if(nameInput) nameInput.placeholder = 'Select an element';
+            if(attrDescArea) { attrDescArea.placeholder = 'Select an attribute...'; attrDescArea.disabled = true; }
+             if(overrideBtn) overrideBtn.style.display = 'none';
+        }
+    } catch (error) { logError("Error populating reference details", error); if(descriptionArea) descriptionArea.value = 'Error loading details.'; }
+}
+
+/** Populates the lower attribute description area */
+function populateAttributeDescription() {
+    const attrDescArea = getAttributeDescriptionTextarea();
+    const overrideBtn = getOverrideAttributeDescriptionBtn();
+    if (!attrDescArea || !overrideBtn || !currentSelectedElementName || !currentSelectedAttributeName) return;
+
+    attrDescArea.value = ''; attrDescArea.readOnly = true; attrDescArea.classList.add('bg-gray-100');
+    overrideBtn.style.display = 'none'; currentAttributeIsOverridden = false;
+
+    const elementData = Refs.getElementReferenceData().find(el => el.element === currentSelectedElementName);
+    const specificAttrData = elementData?.attributes?.[currentSelectedAttributeName];
+    let baseDescription = Refs.getCommonAttributes()[currentSelectedAttributeName]?.description || '(No base description defined)';
+
+    if (specificAttrData && typeof specificAttrData.description === 'string') {
+        attrDescArea.value = specificAttrData.description; overrideBtn.style.display = 'inline-flex';
+        overrideBtn.disabled = false; currentAttributeIsOverridden = true;
+        attrDescArea.readOnly = false; attrDescArea.classList.remove('bg-gray-100');
+        overrideBtn.title = "Element-Specific Description (Editable)";
+    } else {
+        attrDescArea.value = baseDescription; overrideBtn.style.display = 'inline-flex';
+        overrideBtn.disabled = false; currentAttributeIsOverridden = false;
+        overrideBtn.title = "Override Description for this Element";
+    }
+}
+
+/** Handles changes to the element name input */
+function handleElementNameChange() {
+     if (currentSelectedAttributeType !== 'element' || !currentSelectedElementName) return;
+     const nameInput = getElementRefNameInput();
+     const newName = nameInput.value.trim();
+     if (!newName || newName === currentSelectedElementName) return;
+
+     const elements = Refs.getElementReferenceData();
+     if (elements.some(el => el.element === newName && el.element !== currentSelectedElementName)) {
+         showToast(`Error: Element name "${newName}" already exists.`, 'error'); return;
+     }
+     const elementData = elements.find(el => el.element === currentSelectedElementName);
+     if (!elementData) { logError("Error renaming element: Cannot find original data for", currentSelectedElementName); showToast("Error: Could not find original element data.", "error"); return; }
+
+     elementData.element = newName; const oldName = currentSelectedElementName;
+     currentSelectedElementName = newName;
+     if (selectedElementListItem) { selectedElementListItem.dataset.elementName = newName; const span = selectedElementListItem.querySelector('span'); if (span) span.textContent = `<${newName}>`; }
+     setElementUnsavedChanges(true); console.log(`Element "${oldName}" renamed to "${newName}" (unsaved).`);
+}
+
+/** Handles changes to the main description textarea */
+function handleElementDescriptionChange() {
+    if (currentSelectedAttributeType !== 'element' || !currentSelectedElementName) return; // Only applies when element is selected
+    const descriptionArea = getReferenceDescriptionTextarea(); if (!descriptionArea) return;
+    const success = Refs.updateElementReferenceDescription('element', currentSelectedElementName, descriptionArea.value, null);
+    if (success) { setElementUnsavedChanges(true); }
+    else { showToast("Failed to save element description update.", "error"); }
+}
+
+/** Handles changes to the attribute description textarea */
+function handleAttributeDescriptionChange() {
+    if (currentSelectedAttributeType === 'element' || !currentSelectedElementName || !currentSelectedAttributeName) return;
+    const attrDescArea = getAttributeDescriptionTextarea();
+    if (!attrDescArea || attrDescArea.readOnly) return; // Only save if editable
+
+    const newDescription = attrDescArea.value.trim();
+    const success = Refs.updateElementReferenceDescription('specific-attribute', currentSelectedAttributeName, newDescription, currentSelectedElementName);
+    if (success) {
+        setElementUnsavedChanges(true);
+        // Update override state based on whether description matches base
+        let baseDescription = Refs.getCommonAttributes()[currentSelectedAttributeName]?.description || '';
+        currentAttributeIsOverridden = (newDescription !== baseDescription.trim());
+         if (selectedAttributeListItem) selectedAttributeListItem.dataset.hasOverride = currentAttributeIsOverridden ? 'true' : 'false';
+         const overrideBtn = getOverrideAttributeDescriptionBtn();
+         if (overrideBtn) overrideBtn.title = currentAttributeIsOverridden ? "Element-Specific Description (Editable)" : "Override Description for this Element";
+
+    } else { showToast("Failed to save attribute description update.", "error"); }
+}
+
+/** Handles click on the attribute description override button */
+function handleOverrideDescriptionClick() {
+     if (currentSelectedAttributeType === 'element' || !currentSelectedElementName || !currentSelectedAttributeName) return;
+     const attrDescArea = getAttributeDescriptionTextarea();
+     const overrideBtn = getOverrideAttributeDescriptionBtn();
+     if (!attrDescArea || !overrideBtn) return;
+
+     if (attrDescArea.readOnly) { // Start overriding
+         attrDescArea.readOnly = false; attrDescArea.classList.remove('bg-gray-100');
+         attrDescArea.focus();
+         handleAttributeDescriptionChange(); // Trigger save/state update
+     } else { // Revert override
+        if(confirm("Revert to base description? Any specific override text will be lost.")) {
+             let baseDescription = Refs.getCommonAttributes()[currentSelectedAttributeName]?.description || '';
+             attrDescArea.value = baseDescription;
+             handleAttributeDescriptionChange(); // Trigger save logic (should remove override)
+             attrDescArea.readOnly = true; // Make read-only again after revert
+             attrDescArea.classList.add('bg-gray-100');
+        }
+     }
+}
+
+/** Handler for Supported Checkbox Change */
+function handleSupportedCheckboxChange(event) {
+    if (!currentSelectedElementName || !event.target) return;
+    const isSupported = event.target.checked;
+    const success = Refs.updateElementSupportedStatus(currentSelectedElementName, isSupported);
+    if (success) {
+        // Update the style of the list item in the UI
+        const elementList = getReferenceElementList();
+        if (elementList) {
+            const listItem = elementList.querySelector(`li[data-element-name="${currentSelectedElementName}"]`);
+            if (listItem) {
+                listItem.classList.toggle('element-supported', isSupported);
+            }
+        }
+        // Set unsaved changes flag (already done within updateElementSupportedStatus)
+    } else {
+        showToast(`Failed to update supported status for <${currentSelectedElementName}>`, 'error');
+        // Revert checkbox state visually on failure
+        event.target.checked = !isSupported;
+    }
+}
+
+
+/** Placeholder for Add Element button click */
+function handleAddElementRef() {
+     showToast("Use the Element Editor modal (TODO) to add new elements.", "info");
+}
+
+/** Placeholder for Add Attribute to Element button click */
+function handleAddAttributeRef() {
+    if (!currentSelectedElementName) { showToast("Select an element first to add attributes to.", "info"); return; }
+    // Open Attribute Editor in a mode to select an attribute to add
+    handleAttributeEditorToggle(true, true); // Use imported function
+    showToast("Attribute Editor 'Assign Mode' not fully implemented.", "info");
+}
+
+/** Handles removing an element definition (called by hover delete) */
+function handleRemoveElementRef(elementNameToRemove) {
+    if (!elementNameToRemove) return;
+    if (!confirm(`Are you sure you want to delete the reference definition for <${elementNameToRemove}>?`)) { return; }
+    if (Refs.deleteReferenceElement(elementNameToRemove)) {
+        showToast(`Element <${elementNameToRemove}> definition removed.`, 'info');
+        setElementUnsavedChanges(true); // Now uses the function
+        if (elementNameToRemove === currentSelectedElementName) { cleanupModalState(); }
+        loadElementReferenceUI(); // Reload list
+    } else { showToast(`Failed to remove element <${elementNameToRemove}>.`, 'error'); }
+}
+
+/** Handles removing a specific attribute from the current element (called by hover delete) */
+function handleRemoveAttributeRef(attributeNameToRemove) {
+    if (!currentSelectedElementName || !attributeNameToRemove) return;
+
+    // Cannot remove common attributes this way
+    const listItem = document.querySelector(`#reference-attribute-list li[data-attribute-name="${attributeNameToRemove}"]`);
+    const effectiveType = listItem?.dataset.attributeType;
+    if (effectiveType === 'common-attribute') { showToast("Cannot remove common attributes directly. Edit the element to toggle 'Uses Common Attributes'.", "info"); return; }
+    if (effectiveType !== 'specific-attribute') { showToast("Can only remove specifically added/overridden attributes here.", "info"); return; }
+
+    const elementData = Refs.getElementReferenceData().find(el => el.element === currentSelectedElementName);
+    if (!elementData?.attributes?.[attributeNameToRemove]) { showToast(`Attribute "${attributeNameToRemove}" not found specifically on <${currentSelectedElementName}>.`, "error"); return; }
+
+    if (!confirm(`Remove attribute "${attributeNameToRemove}" from element <${currentSelectedElementName}>?`)) { return; }
+    try {
+        delete elementData.attributes[attributeNameToRemove];
+        if (Object.keys(elementData.attributes).length === 0) { delete elementData.attributes; } // Clean up empty object
+        showToast(`Attribute "${attributeNameToRemove}" removed from <${currentSelectedElementName}>.`, 'info');
+        setElementUnsavedChanges(true);
+        populateAttributeList(currentSelectedElementName); // Refresh list
+        if (attributeNameToRemove === currentSelectedAttributeName) {
+            selectedAttributeListItem = null; currentSelectedAttributeName = null; currentSelectedAttributeType = 'element';
+            populateReferenceDetails(); // Reset details pane
+        }
+    } catch (error) { logError(`Error removing attribute ${attributeNameToRemove}`, error); showToast("Failed to remove attribute.", "error"); }
+}
+
+function handleEditElementCategories() { showToast("TODO: Implement Element Category Editor UI.", "info"); }
+
+// --- Import/Export/Unsaved Changes ---
+function handleImportElementReference() { if (Refs.hasUnsavedElementChanges() && !confirm("Discard unsaved element reference changes and import new data?")) return; const refInput = getReferenceFileInput(); if(refInput) refInput.click(); else logError("Element reference file input not found.", null); }
+function handleElementReferenceFileSelected(event) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (!data || typeof data !== 'object' || !data.globalAttributes || !data.elements || !Array.isArray(data.elements)) throw new Error("Invalid element JSON format. Expected 'globalAttributes' (object) and 'elements' (array) keys."); if (Refs.setElementReferenceData(data.elements, data.globalAttributes)) { showToast(`Element reference data imported from ${file.name}.`, 'info'); /* setElementUnsavedChanges(false); Handled by setElementReferenceData */ loadElementReferenceUI(); } else throw new Error("Failed to update internal element reference state."); } catch (error) { logError(`Element Ref Import error: ${file.name}`, error); showToast(`Element Ref Import failed: ${error.message}`, 'error'); } finally { if (event.target) event.target.value = null; } }; reader.onerror = (e) => { logError(`File read error: ${file.name}`, reader.error); showToast(`Error reading file.`, 'error'); if (event.target) event.target.value = null; }; reader.readAsText(file); }
+function handleExportElementReference() { const dataToExport = { globalAttributes: Refs.getCommonAttributes(), elements: Refs.getElementReferenceData() }; try { const jsonString = JSON.stringify(dataToExport, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; const dateStr = new Date().toISOString().slice(0, 10); a.download = `chipsynth-element-reference-${dateStr}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); showToast("Element reference data exported.", 'info'); setElementUnsavedChanges(false); } catch (error) { logError("Element Ref Export error", error); showToast(`Element Ref Export failed: ${error.message}`, 'error'); } }
+
+// <<< REMOVED duplicate window.setElementUnsavedChanges assignment >>>
+
+
+// --- Hover handlers for delete icons (Generic for Element/Attribute Lists) ---
+function handleListItemHover(event) {
+    const li = event.target.closest('li');
+    if (li && (li.dataset.elementName || li.dataset.attributeName) && !li.classList.contains('element-category-header') && !li.classList.contains('attribute-category-header')) {
+        let deleteBtn = li.querySelector('.delete-item-btn');
+        if (!deleteBtn) {
+            deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-item-btn'; deleteBtn.innerHTML = '<i class="iconoir-bin-minus-in"></i>';
+            if (li.closest('#reference-element-list')) { deleteBtn.title = 'Delete Element Definition'; deleteBtn.dataset.targetType = 'element'; deleteBtn.dataset.targetName = li.dataset.elementName; }
+            else if (li.closest('#reference-attribute-list')) { deleteBtn.title = 'Remove Attribute from Element'; deleteBtn.dataset.targetType = 'attribute'; deleteBtn.dataset.targetName = li.dataset.attributeName; }
+            deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); handleItemDeleteClick(e.currentTarget.dataset.targetType, e.currentTarget.dataset.targetName); });
+            li.appendChild(deleteBtn);
+        }
+        deleteBtn.style.display = 'inline-flex';
+    }
+}
+function handleListItemHoverOut(event) {
+    const li = event.target.closest('li');
+    if (li) { const deleteBtn = li.querySelector('.delete-item-btn'); if (deleteBtn && !li.contains(event.relatedTarget)) { deleteBtn.style.display = 'none'; } }
+    const listContainer = event.target.closest('ul'); if (listContainer && !listContainer.contains(event.relatedTarget)) { listContainer.querySelectorAll('.delete-item-btn').forEach(btn => btn.style.display = 'none'); }
+}
+function handleItemDeleteClick(itemType, itemName) { // Unified delete handler
+    if (itemType === 'element') { handleRemoveElementRef(itemName); }
+    else if (itemType === 'attribute') { handleRemoveAttributeRef(itemName); }
+}
+
+
+// --- Utility (keep internal for now) ---
+function safelyAttachListener(elementGetter, eventName, handler, options = {}) {
+    const element = typeof elementGetter === 'function' ? elementGetter() : document.getElementById(elementGetter);
+    let elementName = "Unknown";
+    if (typeof elementGetter === 'function') { elementName = elementGetter.name; }
+    else if (typeof elementGetter === 'string') { elementName = `#${elementGetter}`; }
+    if (!element) { console.warn(`[elementRefModal safelyAttachListener] Element not found for listener: ${elementName}`); return false; }
+    try { if (!options.once) { element.removeEventListener(eventName, handler, options); } element.addEventListener(eventName, handler, options); return true; }
+    catch (e) { console.error(`[elementRefModal safelyAttachListener] Error attaching listener ${eventName} to ${element.id || element.tagName}`, e); return false; }
+}

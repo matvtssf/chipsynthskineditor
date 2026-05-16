@@ -1,0 +1,235 @@
+// File: cs/modalManager.js
+/**
+ * modalManager.js
+ * Handles generic modal functionalities like visibility toggling, dragging, and resizing.
+ * FIXED: Set position:absolute on drag start and initialize top/left correctly to prevent jump in dragging.
+ * ADDED: makeModalResizable function to allow modal resizing.
+ */
+import { logError, showToast } from '../domUtils.js'; // Import necessary utils
+
+/**
+ * Makes a modal draggable by its header element.
+ * @param {HTMLElement} modalContentElement - The main content container of the modal (the element to be moved).
+ * @param {HTMLElement} headerElement - The element within the modal content that acts as the drag handle.
+ */
+export function makeModalDraggable(modalContentElement, headerElement) {
+    if (!modalContentElement || !headerElement) {
+        console.warn("makeModalDraggable: Missing modal content or header element.");
+        return;
+    }
+
+    let isDragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    const handleMouseDown = (e) => {
+        // Prevent dragging if clicking on interactive elements inside the header
+        if (e.target.closest('button, input, select, textarea, a')) { return; }
+        // Ensure the drag starts on the header itself or its non-interactive children
+        // MODIFIED: Allow drag if target is header or a child that isn't interactive.
+        if (!headerElement.contains(e.target) || e.target.closest('button, input, select, textarea, a')) {
+             if (e.target !== headerElement) return;
+        }
+
+
+        isDragging = true;
+        const rect = modalContentElement.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+
+        const initialTop = rect.top;
+        const initialLeft = rect.left;
+
+        modalContentElement.style.position = 'absolute';
+        modalContentElement.style.top = `${initialTop}px`;
+        modalContentElement.style.left = `${initialLeft}px`;
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp, { once: true });
+        e.preventDefault();
+        document.body.style.userSelect = 'none';
+        modalContentElement.style.willChange = 'top, left';
+        headerElement.style.cursor = 'grabbing';
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+        const newLeft = e.clientX - dragOffsetX;
+        const newTop = e.clientY - dragOffsetY;
+        modalContentElement.style.left = `${newLeft}px`;
+        modalContentElement.style.top = `${newTop}px`;
+    };
+
+    const handleMouseUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.body.style.userSelect = '';
+        modalContentElement.style.willChange = 'auto';
+        headerElement.style.cursor = 'move';
+    };
+
+    headerElement.removeEventListener('mousedown', handleMouseDown);
+    headerElement.addEventListener('mousedown', handleMouseDown);
+    headerElement.style.cursor = 'move';
+    console.log(`[ModalManager] Draggable listener attached to header of:`, modalContentElement.id || modalContentElement.classList[0] || modalContentElement);
+}
+
+/**
+ * Makes a modal resizable using a handle element.
+ * @param {HTMLElement} modalContentElement - The main content container of the modal (the element to be resized).
+ * @param {HTMLElement} resizeHandleElement - The element that acts as the resize handle.
+ */
+export function makeModalResizable(modalContentElement, resizeHandleElement) {
+    if (!modalContentElement || !resizeHandleElement) {
+        console.warn("makeModalResizable: Missing modal content or resize handle element.");
+        return;
+    }
+
+    let isResizing = false;
+    let originalMouseX = 0;
+    let originalMouseY = 0;
+    let originalWidth = 0;
+    let originalHeight = 0;
+    let minWidth = 300; // Minimum width for the modal
+    let minHeight = 200; // Minimum height for the modal
+
+    // Try to get minWidth and minHeight from CSS if they are set
+    const style = window.getComputedStyle(modalContentElement);
+    const cssMinWidth = parseInt(style.minWidth, 10);
+    const cssMinHeight = parseInt(style.minHeight, 10);
+
+    if (!isNaN(cssMinWidth) && cssMinWidth > 0) {
+        minWidth = cssMinWidth;
+    }
+    if (!isNaN(cssMinHeight) && cssMinHeight > 0) {
+        minHeight = cssMinHeight;
+    }
+
+    const handleMouseDownResize = (e) => {
+        isResizing = true;
+        originalMouseX = e.clientX;
+        originalMouseY = e.clientY;
+        originalWidth = modalContentElement.offsetWidth;
+        originalHeight = modalContentElement.offsetHeight;
+
+        document.addEventListener('mousemove', handleMouseMoveResize);
+        document.addEventListener('mouseup', handleMouseUpResize, { once: true });
+        e.preventDefault();
+        document.body.style.userSelect = 'none'; // Prevent text selection during resize
+        modalContentElement.style.willChange = 'width, height';
+        resizeHandleElement.style.cursor = 'se-resize'; // Should already be set by CSS, but good to ensure
+    };
+
+    const handleMouseMoveResize = (e) => {
+        if (!isResizing) return;
+
+        const widthChange = e.clientX - originalMouseX;
+        const heightChange = e.clientY - originalMouseY;
+
+        let newWidth = originalWidth + widthChange;
+        let newHeight = originalHeight + heightChange;
+
+        // Enforce minimum dimensions
+        newWidth = Math.max(newWidth, minWidth);
+        newHeight = Math.max(newHeight, minHeight);
+
+        // Enforce maximum dimensions (e.g., not larger than viewport with some margin)
+        const viewportWidth = window.innerWidth - 20; // 20px margin
+        const viewportHeight = window.innerHeight - 20; // 20px margin
+        newWidth = Math.min(newWidth, viewportWidth);
+        newHeight = Math.min(newHeight, viewportHeight);
+
+        modalContentElement.style.width = `${newWidth}px`;
+        modalContentElement.style.height = `${newHeight}px`;
+    };
+
+    const handleMouseUpResize = () => {
+        if (!isResizing) return;
+        isResizing = false;
+        document.removeEventListener('mousemove', handleMouseMoveResize);
+        document.body.style.userSelect = '';
+        modalContentElement.style.willChange = 'auto';
+        // Cursor style for handle is set by CSS, no need to reset generally unless it was changed dynamically
+    };
+
+    resizeHandleElement.removeEventListener('mousedown', handleMouseDownResize);
+    resizeHandleElement.addEventListener('mousedown', handleMouseDownResize);
+    console.log(`[ModalManager] Resizable listener attached to handle of:`, modalContentElement.id || modalContentElement.classList[0] || modalContentElement);
+}
+
+
+/**
+ * Applies a flashing border effect to a modal overlay.
+ * @param {HTMLElement} modalOverlay - The modal overlay element (e.g., #reference-modal).
+ */
+export function flashModalBorder(modalOverlay) {
+    if (!modalOverlay || !modalOverlay.classList.contains('modal-overlay')) return;
+    if (modalOverlay.classList.contains('modal-flash')) return; // Prevent rapid re-flash
+
+    modalOverlay.classList.add('modal-flash');
+    setTimeout(() => {
+        modalOverlay.classList.remove('modal-flash');
+    }, 500); // Match animation duration from style.css
+}
+
+/**
+ * Global click listener to detect clicks outside the topmost visible modal and trigger flash.
+ * @param {MouseEvent} event - The click event.
+ */
+export function handleGlobalClickForModalFlash(event) {
+    const visibleModals = document.querySelectorAll('.modal-overlay.visible');
+    if (visibleModals.length === 0) return;
+
+    const topModalOverlay = visibleModals[visibleModals.length - 1];
+
+    if (event.target === topModalOverlay) {
+        flashModalBorder(topModalOverlay);
+    }
+}
+
+/**
+ * Generic function to toggle modal visibility with optional unsaved changes check.
+ * @param {HTMLElement} modalOverlay - The modal overlay element.
+ * @param {boolean} show - Explicitly show (true) or hide (false) the modal. If undefined, toggles current state.
+ * @param {Function | null} [unsavedCheckCallback=null] - A function that returns true if there are unsaved changes, false otherwise.
+ * @param {Function | null} [onOpenCallback=null] - Function to call after the modal becomes visible.
+ * @param {Function | null} [onCloseCallback=null] - Function to call after the modal becomes hidden.
+ * @returns {boolean} - True if the visibility state was changed, false otherwise (e.g., cancelled by user).
+ */
+export function toggleModalVisibility(modalOverlay, show, unsavedCheckCallback = null, onOpenCallback = null, onCloseCallback = null) {
+    if (!modalOverlay) {
+        logError("toggleModalVisibility: Provided modalOverlay element is invalid.", null);
+        return false;
+    }
+
+    const isCurrentlyVisible = modalOverlay.classList.contains('visible');
+    const shouldShow = (show === undefined) ? !isCurrentlyVisible : !!show;
+
+    if (shouldShow === isCurrentlyVisible) {
+        return false;
+    }
+
+    if (!shouldShow && typeof unsavedCheckCallback === 'function' && unsavedCheckCallback()) {
+        if (!confirm("You have unsaved changes. Are you sure you want to close?")) {
+            console.log("toggleModalVisibility: Close cancelled due to unsaved changes confirmation.");
+            return false;
+        }
+    }
+
+    try {
+        modalOverlay.classList.toggle('visible', shouldShow);
+        console.log(`toggleModalVisibility: Toggled visibility for ${modalOverlay.id || 'modal'} to ${shouldShow}`);
+
+        if (shouldShow && typeof onOpenCallback === 'function') {
+            onOpenCallback();
+        } else if (!shouldShow && typeof onCloseCallback === 'function') {
+            onCloseCallback();
+        }
+        return true;
+
+    } catch (e) {
+        logError(`Error toggling modal visibility for ${modalOverlay.id || 'modal'}`, e);
+        return false;
+    }
+}

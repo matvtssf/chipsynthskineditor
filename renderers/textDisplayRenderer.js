@@ -1,6 +1,6 @@
 // File: cs/renderers/textDisplayRenderer.js
-import * as DomUtils from '/cs/domUtils.js';
-import * as State from '/cs/state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 function renderStaticText(xmlNode, mergedAttributes) {
     const htmlElement = document.createElement('div'); // Use a div for StaticText

@@ -1,6 +1,6 @@
 // File: cs/renderers/drawRenderer.js
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
+import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 

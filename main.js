@@ -8,20 +8,20 @@
 
 // debugger; 
 
-import * as State from './state.js';
-import { loadInitialElementReferenceData, loadInitialParamReferenceData } from './references.js';
-import { initializeXmlEditor } from './xmlEditor.js'; 
-import { updateStatus, getStatusDiv, logError, showToast, getAcknowledgeDisclaimerButton, getDisclaimerModal, getLoadFolderButton } from './domUtils.js';
+import * as State from './core/state.js';
+import { loadInitialElementReferenceData, loadInitialParamReferenceData } from './core/references.js';
+import { initializeXmlEditor } from './core/xmlEditor.js'; 
+import { updateStatus, getStatusDiv, logError, showToast, getAcknowledgeDisclaimerButton, getDisclaimerModal, getLoadFolderButton } from './core/domUtils.js';
 // Corrected import from sidebarControlsInteractions.js
-import { initializeSidebarControls } from './sidebarControlsInteractions.js'; 
-import { setupReferenceModalListeners } from './elementRefModalInteractions.js';
-import { setupParamReferenceModalListeners } from './paramRefModalInteractions.js';
-import { setupAttributeEditorModalListeners } from './attributeEditorInteractions.js';
-import { setupXmlEditorListeners } from './xmlEditorInteractions.js';
-import { setupMainContentInteractions } from './mainContentInteractions.js';
-import { setupGlobalListeners } from './globalListeners.js';
-import { setupButtonListeners } from './buttonInteractions.js'; 
-import { setupSliderListeners } from './sliderInteractions.js'; 
+import { initializeSidebarControls } from './interactions/sidebarControlsInteractions.js'; 
+import { setupReferenceModalListeners } from './interactions/elementRefModalInteractions.js';
+import { setupParamReferenceModalListeners } from './interactions/paramRefModalInteractions.js';
+import { setupAttributeEditorModalListeners } from './interactions/attributeEditorInteractions.js';
+import { setupXmlEditorListeners } from './interactions/xmlEditorInteractions.js';
+import { setupMainContentInteractions } from './interactions/mainContentInteractions.js';
+import { setupGlobalListeners } from './interactions/globalListeners.js';
+import { setupButtonListeners } from './interactions/buttonInteractions.js'; 
+import { setupSliderListeners } from './interactions/sliderInteractions.js'; 
 
 /** Capture browser console logs and route them to our UI console */
 function setupConsoleInterception() {
@@ -78,47 +78,18 @@ async function initializeApp() {
         setupSliderListeners(); 
         console.log("Interaction modules setup complete.");
 
-        // Disclaimer Logic
-        const ackButton = getAcknowledgeDisclaimerButton();
+        // Disclaimer Visibility State Control
         const discModal = getDisclaimerModal();
         const loadBtn = getLoadFolderButton();
 
-        if (ackButton && discModal && loadBtn) {
+        if (discModal && loadBtn) {
             if (discModal.classList.contains('visible')) {
                 loadBtn.disabled = true;
                 console.log("Disclaimer visible, load button disabled until acknowledged.");
-                ackButton.addEventListener('click', () => {
-                    console.log("Disclaimer acknowledged: Initiating blur dissolution and logo glitch.");
-                    
-                    // Trigger the text logo digital glitch block
-                    const textLogo = document.getElementById('text-logo');
-                    if (textLogo) {
-                        textLogo.classList.add('logo-glitch-active');
-                        textLogo.addEventListener('animationend', () => {
-                            textLogo.classList.remove('logo-glitch-active');
-                        }, { once: true });
-                    }
-
-                    if (discModal) {
-                        discModal.classList.add('dissolve-blur-active');
-                        discModal.addEventListener('animationend', () => {
-                            discModal.classList.remove('visible');
-                            discModal.classList.remove('dissolve-blur-active');
-                            discModal.style.display = 'none';
-                        }, { once: true });
-                    }
-                    if (loadBtn) {
-                        loadBtn.disabled = false; // Enable the load button
-                        console.log("Load button enabled after disclaimer.");
-                    }
-                }, { once: true });
             } else {
-                loadBtn.disabled = false; // Ensure load button is enabled if disclaimer isn't visible
-                console.log("Disclaimer not visible or not found, load button enabled.");
+                loadBtn.disabled = false;
+                console.log("Disclaimer not visible, load button ready.");
             }
-        } else {
-            if (!loadBtn) logError("Load folder button not found for disclaimer logic.");
-            if (!discModal) logError("Disclaimer modal not found for disclaimer logic.");
         }
 
         updateStatus('Ready. Please load a product folder.', 0);

@@ -1,0 +1,344 @@
+/**
+ * paramRefModalInteractions.js
+ * Handles all interactions specific to the Parameter Reference modal.
+ * FIXED: Added call to makeModalDraggable.
+ */
+import * as State from '../core/state.js';
+import * as Refs from '../core/references.js';
+import { makeModalDraggable } from '../managers/modalManager.js'; // <<< ADDED IMPORT
+import {
+    // Getters for Parameter Reference Modal elements
+    getParamReferenceModal, getCloseParamRefBtn, getImportParamRefBtn, getExportParamRefBtn,
+    getParamReferenceFileInput, getParamReferenceContent, getParamListContainer, getParamList,
+    getAddParamRefBtn, getParamDetailsContainer, getParamCategorySelect,
+    getAddParamCategoryBtn, getRenameParamCategoryBtn, getRemoveParamCategoryBtn,
+    getParamIdInput, getParamLabelInput, getParamDescriptionTextarea,
+    getParamPlaceholderText,
+    getParamReferenceModalContent, getParamReferenceModalHeader, // <<< ADDED IMPORTS
+    // Utility functions
+    logError, showToast
+} from '../core/domUtils.js';
+// TODO: Replace direct toggle logic with import from modalManager.js later
+// import { toggleModalVisibility } from './modalManager.js';
+
+// --- Module State ---
+let selectedParamListItem = null;
+let currentSelectedParamCategory = null;
+let currentSelectedParamId = null;
+let currentParamEditMode = 'view'; // 'view', 'edit', 'add'
+let isParamRefModalDraggable = false; // Flag for dragging setup
+
+// --- Initialization ---
+
+/**
+ * Sets up all event listeners for the Parameter Reference modal.
+ */
+export function setupParamReferenceModalListeners() {
+    console.log("[paramRefModal] Setting up Parameter Reference Modal listeners...");
+    // Assumes the button to open this modal is handled elsewhere (e.g., elementRefModalInteractions.js)
+    safelyAttachListener(getCloseParamRefBtn, 'click', handleParamReferenceToggle);
+    safelyAttachListener(getImportParamRefBtn, 'click', handleImportParamReference);
+    safelyAttachListener(getExportParamRefBtn, 'click', handleExportParamReference);
+    safelyAttachListener(getParamReferenceFileInput, 'change', handleParamReferenceFileSelected);
+    safelyAttachListener(getParamCategorySelect, 'change', handleParamCategoryChange);
+    safelyAttachListener(getAddParamCategoryBtn, 'click', handleAddParamCategory);
+    safelyAttachListener(getRenameParamCategoryBtn, 'click', handleRenameParamCategory);
+    safelyAttachListener(getRemoveParamCategoryBtn, 'click', handleRemoveParamCategory);
+    safelyAttachListener(getAddParamRefBtn, 'click', handleAddParam);
+
+    // Input listeners for implicit save
+    safelyAttachListener(getParamLabelInput, 'input', handleParamDetailInputChange);
+    safelyAttachListener(getParamDescriptionTextarea, 'input', handleParamDetailInputChange);
+    safelyAttachListener(getParamIdInput, 'input', handleParamDetailInputChange); // Trigger on ID change only when adding
+
+    // Hover listeners for delete icon
+    const paramList = getParamList();
+    if (paramList) {
+        paramList.addEventListener('click', handleParamListItemClick); // Combined click handler
+        paramList.addEventListener('mouseover', handleParamListItemHover);
+        paramList.addEventListener('mouseout', handleParamListItemHoverOut);
+    }
+
+    // --- Make Modal Draggable ---
+    if (!isParamRefModalDraggable) {
+        const modalContent = getParamReferenceModalContent(); // Use new getter
+        const modalHeader = getParamReferenceModalHeader(); // Use new getter
+        if (modalContent && modalHeader) {
+            makeModalDraggable(modalContent, modalHeader);
+            isParamRefModalDraggable = true; // Set flag
+        } else {
+            console.error("[paramRefModal] Could not find content or header to make Param Ref modal draggable.");
+        }
+    }
+    // --- End Make Modal Draggable ---
+}
+
+// --- Core UI Logic ---
+
+/** Toggles the visibility of the Parameter Reference modal */
+export function handleParamReferenceToggle() {
+    console.log("[paramRefModal] handleParamReferenceToggle called.");
+    const modal = getParamReferenceModal(); if (!modal) { console.error("Param reference modal not found!"); return; }
+
+    const isCurrentlyVisible = modal.classList.contains('visible');
+    const show = !isCurrentlyVisible;
+
+    // Check unsaved changes using callback from references.js
+    if (!show && Refs.hasUnsavedParamChanges()) {
+        if (!confirm("You have unsaved changes in the parameter reference data. Close anyway? (Changes are saved internally, use Export to save to file)")) {
+            console.log("[paramRefModal] Close cancelled due to unsaved changes.");
+            return; // Keep modal open
+        }
+    }
+
+    try {
+        modal.classList.toggle('visible', show);
+        console.log(`[paramRefModal] Toggled 'visible' class. Modal should be ${show ? 'visible' : 'hidden'}.`);
+        if (show) {
+            loadParamReferenceUI();
+        } else {
+            cleanupModalState();
+        }
+    } catch(e) {
+        logError("Error toggling parameter reference modal visibility", e);
+    }
+
+}
+
+/** Clears selections and resets fields when modal is closed */
+function cleanupModalState() {
+    selectedParamListItem = null;
+    const paramList = getParamList(); if (paramList) paramList.innerHTML = ''; // Clear list
+    clearParamDetailsForm();
+    currentParamEditMode = 'view';
+}
+
+/** Loads data and populates the Parameter Reference UI */
+function loadParamReferenceUI() {
+    const categorySelect = getParamCategorySelect(); const paramList = getParamList(); const placeholder = getParamPlaceholderText();
+    const exportBtn = getExportParamRefBtn();
+    if (!categorySelect || !paramList || !placeholder || !exportBtn) { logError("Missing UI elements for Parameter Reference Modal.", null); return; }
+
+    paramList.innerHTML = ''; categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
+    clearParamDetailsForm(); placeholder.style.display = 'none';
+
+    if (!Refs.hasLoadedParamReferenceData()) { placeholder.textContent = Refs.PARAM_PLACEHOLDER_TEXT; placeholder.style.display = 'block'; return; }
+
+    const categories = Refs.getParamCategories();
+    if (categories.length === 0) { placeholder.textContent = "Parameter data loaded, but is empty."; placeholder.style.display = 'block'; return; }
+
+    categories.forEach(cat => { const option = document.createElement('option'); option.value = cat; option.textContent = cat; categorySelect.appendChild(option); });
+
+    const categoryToLoad = currentSelectedParamCategory && categories.includes(currentSelectedParamCategory) ? currentSelectedParamCategory : categories[0];
+    if (categoryToLoad) { categorySelect.value = categoryToLoad; populateParamList(categoryToLoad); }
+    else { placeholder.textContent = "No categories found."; placeholder.style.display = 'block'; }
+
+    const unsaved = Refs.hasUnsavedParamChanges();
+    exportBtn.classList.toggle('unsaved-changes', unsaved);
+    exportBtn.title = unsaved ? "Export Param JSON (Unsaved Changes)" : "Export current parameter reference data to JSON file";
+}
+
+/** Populates the parameter list for a given category */
+function populateParamList(categoryName) {
+    const paramList = getParamList(); const placeholder = getParamPlaceholderText();
+    if (!paramList || !placeholder) return;
+    paramList.innerHTML = ''; placeholder.style.display = 'none';
+    currentSelectedParamCategory = categoryName; // Update current category state
+
+    if (!categoryName) { placeholder.textContent = "Select a category to view parameters."; placeholder.style.display = 'block'; clearParamDetailsForm(); return; }
+
+    const params = Refs.getParamsByCategory(categoryName);
+    if (params.length === 0) { paramList.innerHTML = '<li class="text-gray-500 italic">No parameters in this category.</li>'; clearParamDetailsForm(); return; }
+
+    params.forEach(param => {
+        const li = document.createElement('li');
+        li.dataset.paramId = param.paramID;
+        li.innerHTML = `<span>${param.paramID}: ${param.name || '(No Name)'}</span>`; // Span for content
+        paramList.appendChild(li);
+    });
+     clearParamDetailsForm(); // Clear details form when list repopulates
+}
+
+/** Handles change in the category dropdown */
+function handleParamCategoryChange(event) {
+    const selectedCategory = event.target.value;
+    populateParamList(selectedCategory);
+    selectedParamListItem = null; currentSelectedParamId = null; currentParamEditMode = 'view';
+}
+
+/** Handles clicks within the parameter list (selection or delete button) */
+function handleParamListItemClick(event) {
+    const deleteButton = event.target.closest('.delete-param-item-btn');
+    if (deleteButton) {
+        const li = deleteButton.closest('li');
+        const paramId = li?.dataset.paramId;
+        if(paramId) {
+            handleRemoveParam(paramId);
+        }
+        return;
+    }
+
+    let targetLi = event.target.closest('li');
+    if (!targetLi || !targetLi.dataset.paramId || targetLi.classList.contains('text-gray-500')) return;
+    const paramId = targetLi.dataset.paramId; const category = currentSelectedParamCategory;
+    if (selectedParamListItem && selectedParamListItem !== targetLi) { selectedParamListItem.classList.remove('selected', 'bg-indigo-100'); }
+    targetLi.classList.add('selected', 'bg-indigo-100'); selectedParamListItem = targetLi;
+    currentSelectedParamId = paramId; currentParamEditMode = 'view';
+    populateParamDetails(category, paramId);
+}
+
+/** Populates the details form based on selected parameter */
+function populateParamDetails(categoryName, paramId) {
+    const idInput = getParamIdInput(); const labelInput = getParamLabelInput(); const descriptionTextarea = getParamDescriptionTextarea();
+    if (!idInput || !labelInput || !descriptionTextarea ) return;
+
+    const params = Refs.getParamsByCategory(categoryName);
+    const paramData = params.find(p => String(p.paramID) === String(paramId));
+
+    if (paramData) {
+        idInput.value = paramData.paramID || ''; labelInput.value = paramData.name || ''; descriptionTextarea.value = paramData.description || '';
+        idInput.readOnly = true; idInput.classList.add('bg-gray-100'); idInput.classList.remove('border-red-500');
+        labelInput.disabled = false; descriptionTextarea.disabled = false;
+        currentParamEditMode = 'edit';
+    } else { clearParamDetailsForm(); }
+}
+
+/** Clears and disables the details form */
+function clearParamDetailsForm() {
+    const idInput = getParamIdInput(); const labelInput = getParamLabelInput(); const descriptionTextarea = getParamDescriptionTextarea();
+    if (idInput) { idInput.value = ''; idInput.readOnly = true; idInput.classList.add('bg-gray-100'); idInput.placeholder = "Select or Add Parameter"; idInput.classList.remove('border-red-500');}
+    if (labelInput) { labelInput.value = ''; labelInput.disabled = true; }
+    if (descriptionTextarea) { descriptionTextarea.value = ''; descriptionTextarea.disabled = true; }
+    if (selectedParamListItem) { selectedParamListItem.classList.remove('selected', 'bg-indigo-100'); selectedParamListItem = null; }
+    currentSelectedParamId = null; currentParamEditMode = 'view';
+}
+
+/** Handles adding a new parameter category */
+function handleAddParamCategory() {
+    const newCategory = prompt("Enter new category name:");
+    if (newCategory && newCategory.trim()) {
+        if (Refs.addParamCategory(newCategory.trim())) {
+            loadParamReferenceUI(); // Reload the UI entirely
+            const categorySelect = getParamCategorySelect();
+            if(categorySelect) { setTimeout(() => { categorySelect.value = newCategory.trim(); populateParamList(newCategory.trim()); }, 0); } // Select new category
+        } else { showToast(`Category "${newCategory.trim()}" already exists or is invalid.`, 'error'); }
+    }
+}
+
+/** Handles renaming the selected parameter category */
+function handleRenameParamCategory() {
+    const categorySelect = getParamCategorySelect(); const oldName = categorySelect ? categorySelect.value : null;
+    if (!oldName) { showToast("Select a category to rename.", "info"); return; }
+    const newName = prompt(`Enter new name for category "${oldName}":`, oldName);
+    if (newName && newName.trim() && oldName !== newName.trim()) {
+        if (Refs.renameParamCategory(oldName, newName.trim())) {
+            currentSelectedParamCategory = newName.trim(); // Update state
+            loadParamReferenceUI(); // Reload UI
+            setTimeout(() => { const updatedSelect = getParamCategorySelect(); if (updatedSelect) updatedSelect.value = newName.trim(); }, 0); // Reselect
+        } else { showToast(`Failed to rename category "${oldName}". New name might exist or be invalid.`, 'error'); }
+    }
+}
+
+/** Handles removing the selected parameter category */
+function handleRemoveParamCategory() {
+    const categorySelect = getParamCategorySelect(); const categoryName = categorySelect ? categorySelect.value : null;
+    if (!categoryName) { showToast("Select a category to remove.", "info"); return; }
+    if (confirm(`Are you sure you want to remove the category "${categoryName}" and all its parameters?`)) {
+        if (Refs.removeParamCategory(categoryName)) {
+            currentSelectedParamCategory = null; // Reset selected category
+            loadParamReferenceUI(); // Reload UI
+        } else { showToast(`Failed to remove category "${categoryName}".`, 'error'); }
+    }
+}
+
+/** Prepares the form to add a new parameter */
+function handleAddParam() {
+    if (!currentSelectedParamCategory) { showToast("Select a category first before adding a parameter.", "info"); return; }
+    clearParamDetailsForm(); currentParamEditMode = 'add';
+    const idInput = getParamIdInput(); const labelInput = getParamLabelInput(); const descriptionTextarea = getParamDescriptionTextarea();
+    if (idInput) { idInput.readOnly = false; idInput.classList.remove('bg-gray-100'); idInput.placeholder = "Enter Param ID"; idInput.value = ''; idInput.classList.remove('border-red-500'); }
+    if (labelInput) { labelInput.disabled = false; labelInput.value = ''; }
+    if (descriptionTextarea) { descriptionTextarea.disabled = false; descriptionTextarea.value = ''; }
+    idInput?.focus();
+}
+
+/** Handles removing the selected or specified parameter */
+function handleRemoveParam(paramIdToRemove = null) {
+    const idToRemove = paramIdToRemove || currentSelectedParamId;
+    if (!currentSelectedParamCategory || !idToRemove) { showToast("Select a parameter from the list to remove.", "info"); return; }
+    if (confirm(`Are you sure you want to remove parameter "${idToRemove}" from category "${currentSelectedParamCategory}"?`)) {
+        if (Refs.removeParam(currentSelectedParamCategory, idToRemove)) {
+            populateParamList(currentSelectedParamCategory); // Refresh list
+            if (idToRemove === currentSelectedParamId) { clearParamDetailsForm(); } // Clear details if selected was deleted
+        } else { showToast(`Failed to remove parameter "${idToRemove}".`, "error"); }
+    }
+}
+
+/** Handles input changes in the details form for auto-save */
+function handleParamDetailInputChange() {
+    if ((currentParamEditMode === 'edit' || currentParamEditMode === 'add') && currentSelectedParamCategory) {
+        const idInput = getParamIdInput(); const labelInput = getParamLabelInput(); const descriptionTextarea = getParamDescriptionTextarea();
+        if (!idInput || !labelInput || !descriptionTextarea) return;
+        const paramID = idInput.value.trim(); const paramName = labelInput.value.trim(); const paramDesc = descriptionTextarea.value.trim();
+        if (!paramID) { if (currentParamEditMode === 'edit') { console.warn("Attempting to save edits with empty ID for param:", currentSelectedParamId); return; } else { return; } }
+        if (currentParamEditMode === 'add') {
+             const categoryParams = Refs.getParamsByCategory(currentSelectedParamCategory);
+             if (categoryParams.some(p => String(p.paramID) === paramID)) { idInput.classList.add('border-red-500'); return; }
+             else { idInput.classList.remove('border-red-500'); }
+        }
+        const paramData = { paramID: paramID, name: paramName, description: paramDesc };
+        if (Refs.addOrUpdateParam(currentSelectedParamCategory, paramData)) {
+            if (currentParamEditMode === 'edit' && selectedParamListItem) { const span = selectedParamListItem.querySelector('span'); if (span) { span.textContent = `${paramID}: ${paramName || '(No Name)'}`; } }
+            if (currentParamEditMode === 'add') {
+                currentSelectedParamId = paramID; currentParamEditMode = 'edit'; idInput.readOnly = true; idInput.classList.add('bg-gray-100'); idInput.classList.remove('border-red-500');
+                 populateParamList(currentSelectedParamCategory);
+                 setTimeout(() => { const listItems = getParamList()?.querySelectorAll('li'); listItems?.forEach(li => { if (li.dataset.paramId === paramID) { li.classList.add('selected', 'bg-indigo-100'); selectedParamListItem = li; } }); }, 0);
+            }
+        } else { showToast(`Failed to update parameter "${paramID}".`, 'error'); }
+    }
+}
+
+// --- Import/Export ---
+function handleImportParamReference() {
+    if (Refs.hasUnsavedParamChanges() && !confirm("Discard unsaved parameter changes and import new data?")) { return; }
+    const fileInput = getParamReferenceFileInput(); if (fileInput) fileInput.click(); else logError("Parameter reference file input not found.", null);
+}
+function handleParamReferenceFileSelected(event) {
+    const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader();
+    reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (Refs.setParamReferenceData(data)) { showToast(`Parameter reference data imported from ${file.name}.`, 'info'); loadParamReferenceUI(); } } catch (error) { logError(`Param Ref Import error: ${file.name}`, error); showToast(`Param Ref Import failed: ${error.message}`, 'error'); } finally { if (event.target) event.target.value = null; } };
+    reader.onerror = (e) => { logError(`File read error: ${file.name}`, reader.error); showToast(`Error reading file.`, 'error'); if (event.target) event.target.value = null; };
+    reader.readAsText(file);
+}
+function handleExportParamReference() {
+    const dataToExport = Refs.getParamReferenceData(); try { const jsonString = JSON.stringify(dataToExport, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; const dateStr = new Date().toISOString().slice(0, 10); a.download = `chipsynth-param-reference-${dateStr}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); showToast("Parameter reference data exported.", 'info'); Refs.setParamDataChanged(false); } catch (error) { logError("Param Ref Export error", error); showToast(`Param Ref Export failed: ${error.message}`, 'error'); }
+}
+
+// --- Hover handlers for Parameter delete icons ---
+function handleParamListItemHover(event) {
+    const li = event.target.closest('li');
+    if (li && li.dataset.paramId && !li.classList.contains('text-gray-500')) {
+        let deleteBtn = li.querySelector('.delete-param-item-btn');
+        if (!deleteBtn) {
+            deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-param-item-btn';
+            deleteBtn.innerHTML = '<i class="iconoir-bin-minus-in"></i>'; deleteBtn.title = 'Delete Parameter';
+            deleteBtn.dataset.paramId = li.dataset.paramId;
+            li.appendChild(deleteBtn);
+        }
+        deleteBtn.style.display = 'inline-flex';
+    }
+}
+function handleParamListItemHoverOut(event) {
+    const li = event.target.closest('li');
+    if (li) { const deleteBtn = li.querySelector('.delete-param-item-btn'); if (deleteBtn && !li.contains(event.relatedTarget)) { deleteBtn.style.display = 'none'; } }
+    const listContainer = event.target.closest('ul#param-list'); if (listContainer && !listContainer.contains(event.relatedTarget)) { listContainer.querySelectorAll('.delete-param-item-btn').forEach(btn => btn.style.display = 'none'); }
+}
+// --- Utility (keep internal for now) ---
+function safelyAttachListener(elementGetter, eventName, handler, options = {}) {
+    const element = typeof elementGetter === 'function' ? elementGetter() : document.getElementById(elementGetter);
+    let elementName = "Unknown";
+    if (typeof elementGetter === 'function') { elementName = elementGetter.name; }
+    else if (typeof elementGetter === 'string') { elementName = `#${elementGetter}`; }
+    if (!element) { console.warn(`[paramRefModal safelyAttachListener] Element not found for listener: ${elementName}`); return false; }
+    try { if (!options.once) { element.removeEventListener(eventName, handler, options); } element.addEventListener(eventName, handler, options); return true; }
+    catch (e) { console.error(`[paramRefModal safelyAttachListener] Error attaching listener ${eventName} to ${element.id || element.tagName}`, e); return false; }
+}
