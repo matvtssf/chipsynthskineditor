@@ -101,22 +101,28 @@ body.logo-hover #text-logo { opacity: 0.1; }
     flex-shrink: 0; 
 }
 
-/* --- Skin Container Actual & Viewport Interactivity Constraints --- */
-#canvas-viewport, #canvas-viewport * {
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    -webkit-user-drag: none;
-    cursor: default !important;
-}
-
-#canvas-viewport.panning-active, #canvas-viewport.panning-active * {
-    cursor: grabbing !important;
-}
-
+/* --- Skin Container Actual --- */
 #skin-container-actual {
     position: relative; 
     overflow: hidden;   
     box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+    
+    /* Real VST UI Simulation Layer */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    cursor: default;
+}
+
+#skin-container-actual * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+#skin-container-actual .gui-statictext,
+#skin-container-actual text {
+    cursor: default;
 }

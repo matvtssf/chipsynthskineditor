@@ -35,9 +35,13 @@ export function setupMainContentInteractions() {
     if (guiZoomCanvas) {
         if (!guiZoomCanvas.dataset.panListenerAttached) {
             guiZoomCanvas.addEventListener('mousedown', handlePanStart);
-            guiZoomCanvas.style.cursor = 'default';
             guiZoomCanvas.dataset.panListenerAttached = 'true';
             console.log("[mainContent] Panning listeners attached (mousedown on canvas elements, scrolls mainContentArea).");
+        }
+        const canvasViewport = document.getElementById('canvas-viewport');
+        if (canvasViewport && !canvasViewport.dataset.dragListenerAttached) {
+            canvasViewport.addEventListener('dragstart', (e) => e.preventDefault());
+            canvasViewport.dataset.dragListenerAttached = 'true';
         }
 
         if (!guiZoomCanvas.dataset.debugListenersAttached) {
@@ -63,12 +67,13 @@ export function setupMainContentInteractions() {
 
 // --- Panning Logic (Scrolls mainContentArea based on drag on guiZoomCanvas) ---
 function handlePanStart(e) {
-    if (e.button !== 1 || e.target !== getGuiZoomCanvas()) {
+    if (e.button !== 1) {
         return;
     }
 
     const mainContentArea = getMainContentArea();
     const guiZoomCanvas = getGuiZoomCanvas();
+    const canvasViewport = document.getElementById('canvas-viewport');
 
     if (!mainContentArea || !guiZoomCanvas) return;
 
@@ -78,7 +83,10 @@ function handlePanStart(e) {
     panStartY = e.clientY;
     panStartScrollX = mainContentArea.scrollLeft;
     panStartScrollY = mainContentArea.scrollTop;
-    guiZoomCanvas.style.cursor = 'grabbing';
+    
+    if (canvasViewport) {
+        canvasViewport.classList.add('panning-active');
+    }
     document.body.style.userSelect = 'none';
 
     document.addEventListener('mousemove', handlePanMove);
@@ -108,9 +116,9 @@ export function handlePanEnd(e) {
          return;
      }
     isPanning = false;
-    const guiZoomCanvas = getGuiZoomCanvas();
-    if (guiZoomCanvas) {
-        guiZoomCanvas.style.cursor = 'grab';
+    const canvasViewport = document.getElementById('canvas-viewport');
+    if (canvasViewport) {
+        canvasViewport.classList.remove('panning-active');
     }
     document.body.style.userSelect = '';
 

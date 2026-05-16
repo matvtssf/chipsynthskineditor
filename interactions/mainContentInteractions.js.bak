@@ -10,14 +10,14 @@
  * FIXED: Use State.getCurrentZoomLevel() and State.setCurrentZoomLevel().
  * RESTORED: Appends a list of raw XML attributes and values onto the debug tooltip.
  */
-import * as State from './core/state.js';
+import * as State from '../core/state.js';
 import {
     getGuiZoomCanvas,
     getMainContentArea,
     getDebugOverlay,
     getZoomSlider, // Used for min/max zoom values
     logError
-} from './core/domUtils.js';
+} from '../core/domUtils.js';
 import { updateZoomControlsDisplay } from './sidebarControlsInteractions.js';
 
 // --- Module State ---
@@ -35,6 +35,7 @@ export function setupMainContentInteractions() {
     if (guiZoomCanvas) {
         if (!guiZoomCanvas.dataset.panListenerAttached) {
             guiZoomCanvas.addEventListener('mousedown', handlePanStart);
+            guiZoomCanvas.addEventListener('dragstart', (e) => e.preventDefault());
             guiZoomCanvas.style.cursor = 'default';
             guiZoomCanvas.dataset.panListenerAttached = 'true';
             console.log("[mainContent] Panning listeners attached (mousedown on canvas elements, scrolls mainContentArea).");
@@ -63,12 +64,13 @@ export function setupMainContentInteractions() {
 
 // --- Panning Logic (Scrolls mainContentArea based on drag on guiZoomCanvas) ---
 function handlePanStart(e) {
-    if (e.button !== 1 || e.target !== getGuiZoomCanvas()) {
+    if (e.button !== 1) {
         return;
     }
 
     const mainContentArea = getMainContentArea();
     const guiZoomCanvas = getGuiZoomCanvas();
+    const canvasViewport = document.getElementById('canvas-viewport');
 
     if (!mainContentArea || !guiZoomCanvas) return;
 
@@ -78,7 +80,10 @@ function handlePanStart(e) {
     panStartY = e.clientY;
     panStartScrollX = mainContentArea.scrollLeft;
     panStartScrollY = mainContentArea.scrollTop;
-    guiZoomCanvas.style.cursor = 'grabbing';
+    
+    if (canvasViewport) {
+        canvasViewport.classList.add('panning-active');
+    }
     document.body.style.userSelect = 'none';
 
     document.addEventListener('mousemove', handlePanMove);
