@@ -13,7 +13,7 @@ import {
     logError, applyFont, normalizePath, createErrorPlaceholder,
     getGuiContentWrapper
 } from '../core/domUtils.js';
-import { highlightXmlSyntax, openXmlEditor } from '../xmlEditor.js';
+import { highlightXmlSyntax, openXmlEditor } from '../core/xmlEditor.js';
 
 // --- Constants for Supported File Types ---
 const SUPPORTED_EXTENSIONS = ['.xml', '.svg', '.otf', '.ttf', '.png', '.html', '.fermatax', '.fermatap', '.txt', '.scl'];

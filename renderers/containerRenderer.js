@@ -638,11 +638,196 @@ function renderSplash(xmlNode, mergedAttributes, currentParams, sourcePath, rend
     };
 }
 
+function renderCS01AssignmentMap(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-assignment-map');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.boxSizing = 'border-box';
+    htmlElement.style.background = 'transparent';
+    htmlElement.style.border = '1px solid #555';
+    htmlElement.style.overflow = 'hidden';
+
+    if (!window.chipsynthSamplePool) {
+        window.chipsynthSamplePool = [
+            "Marcato 1(Mod)", "Happy Pa_76EF", "", "",
+            "", "", "", "",
+            "", "", "", "",
+            "", "", "", ""
+        ];
+    }
+
+    const numRows = parseInt(mergedAttributes['numrows'] || '16', 10);
+    const startIndexDisplay = parseInt(mergedAttributes['startindexdisplay'] || '65', 10);
+
+    const containerH = parseFloat(mergedAttributes['h'] || '357');
+    const col0_w = parseInt(mergedAttributes['col0_w'] || '24', 10);
+    
+    // Auto-calculate exact line row height to fit perfectly down to "P" without spilling or cutting off
+    const calculatedRowH = Math.floor((containerH - 2) / (numRows + 1));
+    const col0_h = calculatedRowH > 0 ? calculatedRowH : parseInt(mergedAttributes['col0_h'] || '20', 10);
+    const col1_h = col0_h;
+
+    // Header Row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('assignment-map-header');
+    headerRow.style.position = 'absolute';
+    headerRow.style.left = '0px';
+    headerRow.style.top = '0px';
+    headerRow.style.width = '100%';
+    headerRow.style.height = `${col0_h}px`;
+    headerRow.style.boxSizing = 'border-box';
+    headerRow.style.borderBottom = '1px solid #555';
+
+    const hCell0 = document.createElement('div');
+    hCell0.style.position = 'absolute';
+    hCell0.style.left = '0px';
+    hCell0.style.top = '0px';
+    hCell0.style.width = `${col0_w}px`;
+    hCell0.style.height = '100%';
+    hCell0.style.lineHeight = `${col0_h}px`;
+    hCell0.style.textAlign = mergedAttributes['col0_alignment'] || 'left';
+    hCell0.style.paddingLeft = '4px';
+    hCell0.style.boxSizing = 'border-box';
+    hCell0.style.borderRight = '1px solid #555';
+    hCell0.textContent = mergedAttributes['col0_name'] || 'ID';
+    if (mergedAttributes['font']) DomUtils.applyFont(hCell0, mergedAttributes['font']);
+    headerRow.appendChild(hCell0);
+
+    const hCell1 = document.createElement('div');
+    hCell1.style.position = 'absolute';
+    hCell1.style.left = `${col0_w}px`;
+    hCell1.style.top = '0px';
+    hCell1.style.right = '0px';
+    hCell1.style.height = '100%';
+    hCell1.style.lineHeight = `${col1_h}px`;
+    hCell1.style.textAlign = mergedAttributes['col1_alignment'] || 'left';
+    hCell1.style.paddingLeft = '4px';
+    hCell1.style.boxSizing = 'border-box';
+    hCell1.textContent = mergedAttributes['col1_name'] || 'File';
+    if (mergedAttributes['font']) DomUtils.applyFont(hCell1, mergedAttributes['font']);
+    headerRow.appendChild(hCell1);
+
+    htmlElement.appendChild(headerRow);
+
+    // Data Rows Loop
+    for (let i = 0; i < numRows; i++) {
+        const row = document.createElement('div');
+        row.classList.add('assignment-map-row');
+        row.style.position = 'absolute';
+        row.style.left = '0px';
+        row.style.top = `${col0_h + (i * col0_h)}px`;
+        row.style.width = '100%';
+        row.style.height = `${col0_h}px`;
+        row.style.boxSizing = 'border-box';
+        if (i < numRows - 1) {
+            row.style.borderBottom = '1px solid #555';
+        }
+
+        const cell0 = document.createElement('div');
+        cell0.style.position = 'absolute';
+        cell0.style.left = '0px';
+        cell0.style.top = '0px';
+        cell0.style.width = `${col0_w}px`;
+        cell0.style.height = '100%';
+        cell0.style.lineHeight = `${col0_h}px`;
+        cell0.style.textAlign = mergedAttributes['col0_alignment'] || 'left';
+        cell0.style.paddingLeft = '4px';
+        cell0.style.boxSizing = 'border-box';
+        cell0.style.borderRight = '1px solid #555';
+        cell0.textContent = String.fromCharCode(startIndexDisplay + i);
+        if (mergedAttributes['font']) DomUtils.applyFont(cell0, mergedAttributes['font']);
+        row.appendChild(cell0);
+
+        const cell1 = document.createElement('div');
+        cell1.style.position = 'absolute';
+        cell1.style.left = `${col0_w}px`;
+        cell1.style.top = '0px';
+        cell1.style.right = '0px';
+        cell1.style.height = '100%';
+        cell1.style.boxSizing = 'border-box';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = window.chipsynthSamplePool[i] || '';
+        input.style.position = 'absolute';
+        input.style.left = '0px';
+        input.style.top = '0px';
+        input.style.width = 'calc(100% - 20px)';
+        input.style.height = '100%';
+        input.style.background = 'transparent';
+        input.style.border = 'none';
+        input.style.color = 'inherit';
+        if (mergedAttributes['font']) DomUtils.applyFont(input, mergedAttributes['font']);
+        input.style.outline = 'none';
+        input.style.padding = '0 4px';
+        input.style.boxSizing = 'border-box';
+
+        const deleteBtn = document.createElement('span');
+        deleteBtn.innerHTML = '&#x2715;';
+        deleteBtn.style.position = 'absolute';
+        deleteBtn.style.right = '6px';
+        deleteBtn.style.top = '50%';
+        deleteBtn.style.transform = 'translateY(-50%)';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.fontSize = '10px';
+        deleteBtn.style.display = 'none';
+        deleteBtn.style.color = 'inherit';
+        deleteBtn.style.opacity = '0.6';
+
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            input.value = '';
+            window.chipsynthSamplePool[i] = '';
+            document.dispatchEvent(new CustomEvent('samplePoolUpdated'));
+        });
+
+        input.addEventListener('input', (e) => {
+            window.chipsynthSamplePool[i] = e.target.value;
+            document.dispatchEvent(new CustomEvent('samplePoolUpdated'));
+        });
+
+        const updateHighlight = (isActive) => {
+            if (isActive) {
+                row.style.backgroundColor = 'rgba(212, 163, 115, 0.35)';
+                deleteBtn.style.display = 'block';
+            } else {
+                row.style.backgroundColor = 'transparent';
+                deleteBtn.style.display = 'none';
+            }
+        };
+
+        input.addEventListener('focus', () => {
+            htmlElement.querySelectorAll('.assignment-map-row').forEach(r => r.style.backgroundColor = 'transparent');
+            htmlElement.querySelectorAll('.assignment-map-row span').forEach(s => s.style.display = 'none');
+            updateHighlight(true);
+        });
+
+        row.addEventListener('click', () => {
+            input.focus();
+        });
+
+        cell1.appendChild(input);
+        cell1.appendChild(deleteBtn);
+        row.appendChild(cell1);
+        htmlElement.appendChild(row);
+    }
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
+}
+
 export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourcePath, mergedAttributes, renderElementCallback) {
     switch (tagName) {
         case 'CS01ViewContainer':
         case 'CS01ViewContainer1':
+        case 'CS01AssignmentMapContainer':
             return renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCallback, currentParams, sourcePath);
+        case 'CS01AssignmentMap':
+            return renderCS01AssignmentMap(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'VisibilityContainer':
             return renderVisibilityContainer(xmlNode, mergedAttributes, currentParams, sourcePath, renderElementCallback);
         case 'Pane': 

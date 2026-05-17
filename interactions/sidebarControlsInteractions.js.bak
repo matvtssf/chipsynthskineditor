@@ -5,7 +5,7 @@
  * MODIFIED: Added exportable updateZoomControlsDisplay function.
  * MODIFIED: handleZoomChange now uses updateZoomControlsDisplay and calls updateGuiZoom.
  */
-import * as State from './core/state.js';
+import * as State from '../core/state.js';
 import {
     getLoadFolderButton, getFileInput, getZoomSlider, getZoomValueDisplay,
     getDebugToggleButton, getDebugCheckbox, getConsoleButton, getReferenceButton,
@@ -17,15 +17,14 @@ import {
     getDebugOverlay,
     getConsoleModal, getCloseConsoleBtn, getClearConsoleBtn, getConsoleLogOutput, getCopyConsoleBtn,
     logError, showToast,
-    toggleElementErrorClass
-} from './core/domUtils.js';
+    toggleElementErrorClass,
+    getSidebar, getSidebarToggleBtn
+} from '../core/domUtils.js';
 import { handleFileSelection } from '../core/fileLoader.js';
 import { handleReferenceToggle } from './elementRefModalInteractions.js';
 import { handleConfigToggle } from './configModalInteractions.js';
 import { makeModalDraggable, toggleModalVisibility } from '../managers/modalManager.js';
 import { openXmlEditor } from '../core/xmlEditor.js';
-import {
-    getSidebar, getSidebarToggleBtn,
 import { updateGuiZoom } from './mainContentInteractions.js';
 
 let previewArea = null;
@@ -269,6 +268,11 @@ function handleDebugToggle() {
         debugCheckbox.checked = newCheckedState; // Keep hidden checkbox in sync
         debugToggleButton.setAttribute('aria-checked', String(newCheckedState));
         debugToggleButton.classList.toggle('active', newCheckedState);
+        const debugIcon = debugToggleButton.querySelector('i');
+        if (debugIcon) {
+            debugIcon.classList.toggle('iconoir-bug', !newCheckedState);
+            debugIcon.classList.toggle('iconoir-bug-solid', newCheckedState);
+        }
         State.setDebugEnabled(newCheckedState); // Update global state
 
         debugOverlayElement.style.display = newCheckedState ? 'block' : 'none';

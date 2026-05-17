@@ -481,13 +481,13 @@ export function applyStyles(element, styleName, xmlNode) {
     const roundedRectRatio = getFinalValue('roundedRectRatio', 'roundedRectRatio', null);
     const roundedRatio = getFinalValue('roundedRatio', 'roundedRatio', null);
     if (roundedRectRatio && (element.classList.contains('gui-rounded-rect') || isContainer)) {
-        const elementW = parseFloat(element.style.width || getFinalValue('w', 'w', null) || '0');
-        const elementH = parseFloat(element.style.height || getFinalValue('h', 'h', null) || '0');
+        const elementW = parseFloat(element.style.width || xmlNode.getAttribute('w') || '0');
+        const elementH = parseFloat(element.style.height || xmlNode.getAttribute('h') || '0');
         const ratio = parseFloat(roundedRectRatio || '0');
         if (elementW > 0 && elementH > 0 && ratio >= 0) { const radius = Math.min(elementW, elementH) * ratio * 0.5; element.style.borderRadius = `${radius}px`; }
     } else if (roundedRatio && isButton) {
-        const elementW = parseFloat(element.style.width || getFinalValue('w', 'w', null) || '0');
-        const elementH = parseFloat(element.style.height || getFinalValue('h', 'h', null) || '0');
+        const elementW = parseFloat(element.style.width || xmlNode.getAttribute('w') || '0');
+        const elementH = parseFloat(element.style.height || xmlNode.getAttribute('h') || '0');
         const ratio = parseFloat(roundedRatio || '0');
         if (elementW > 0 && elementH > 0 && ratio >= 0) {
             const size = Math.min(elementW, elementH);

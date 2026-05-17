@@ -268,6 +268,11 @@ function handleDebugToggle() {
         debugCheckbox.checked = newCheckedState; // Keep hidden checkbox in sync
         debugToggleButton.setAttribute('aria-checked', String(newCheckedState));
         debugToggleButton.classList.toggle('active', newCheckedState);
+        const debugIcon = debugToggleButton.querySelector('i');
+        if (debugIcon) {
+            debugIcon.classList.toggle('iconoir-bug', !newCheckedState);
+            debugIcon.classList.toggle('iconoir-bug-solid', newCheckedState);
+        }
         State.setDebugEnabled(newCheckedState); // Update global state
 
         debugOverlayElement.style.display = newCheckedState ? 'block' : 'none';
@@ -356,6 +361,10 @@ function handleSidebarPreviewAreaClick() {
 
     if (previewedFileType === 'xml' && previewedFilePath) {
         openXmlEditor(previewedFilePath);
+        return;
+    }
+
+    if (previewedFileType === 'html') {
         return;
     }
 

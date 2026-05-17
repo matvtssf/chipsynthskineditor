@@ -25,23 +25,68 @@ function removeActiveClickOutsideListener() {
 function handleOnOffButtonClick(event) {
     const button = event.currentTarget;
     const command = button.dataset.command;
-    if (!command) {
-        console.warn("[BI] OnOffButton clicked, but missing 'data-command' attribute.", button);
-        DomUtils.logError("[BI] OnOffButton missing 'data-command'", { element: button });
-        return;
-    }
-    const parts = command.split('|');
-    if (parts.length !== 2 || parts[0].trim() !== 'visibilityChangingView' || !parts[1] || parts[1].trim() === '') {
-        console.warn(`[BI] OnOffButton command format not recognized: "${command}"`, button);
-        DomUtils.logError(`[BI] Invalid command format for OnOffButton: "${command}"`, { element: button });
-        return;
-    }
-    const changeName = parts[1].trim();
-    const currentState = State.getVisibilityState(changeName);
+    const param = button.dataset.param;
+
+    const currentState = button.classList.contains('active');
     const newState = !currentState;
-    State.setVisibilityState(changeName, newState);
+
     button.classList.toggle('active', newState);
     button.setAttribute('aria-checked', newState.toString());
+
+    if (param) {
+        State.setElementState(param, newState ? 1 : 0);
+    }
+
+    if (button.dataset.role === 'onOff') {
+        const container = button.closest('.gui-cs01viewcontainer1');
+        if (container) {
+            container.classList.toggle('disabled', !newState);
+            container.dispatchEvent(new CustomEvent('stateChanged'));
+        }
+    }
+
+    if (typeof window.updateControllerVisibilities === 'function') {
+        window.updateControllerVisibilities();
+    }
+
+    const getAttrFromDataset = (name) => {
+        const lower = name.toLowerCase();
+        for (const key in button.dataset) {
+            if (key.toLowerCase() === `xmlattr_${lower}`) {
+                return button.dataset[key];
+            }
+        }
+        return null;
+    };
+
+    const onColor = getAttrFromDataset('oncolor');
+    const offColor = getAttrFromDataset('offcolor');
+    if (onColor || offColor) {
+        const targetColor = newState ? (onColor || offColor) : (offColor || onColor);
+        if (targetColor) {
+            button.style.backgroundColor = DomUtils.parseColor(targetColor);
+        }
+    }
+
+    const imgOn = getAttrFromDataset('image_on') || getAttrFromDataset('image');
+    const imgOff = getAttrFromDataset('image_off') || getAttrFromDataset('image');
+    if (imgOn || imgOff) {
+        const imgPath = newState ? imgOn : imgOff;
+        if (imgPath) {
+            const blob = State.getAssetBlobUrl(State.normalizePath(imgPath, State.getCurrentSkinRoot()));
+            if (blob) {
+                button.style.backgroundImage = `url(${blob})`;
+            }
+        }
+    }
+
+    if (command && command.includes('|')) {
+        const parts = command.split('|');
+        if (parts.length === 2 && parts[0].trim() === 'visibilityChangingView') {
+            const changeName = parts[1].trim();
+            State.setVisibilityState(changeName, newState);
+        }
+    }
 }
 
 function closeExpandableView(tag) {

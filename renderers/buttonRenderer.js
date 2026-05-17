@@ -79,6 +79,28 @@ export function renderImageButton(tagName, xmlNode, mergedAttributes, currentPar
     htmlElement.dataset.param = paramId;
     htmlElement.dataset.command = mergedAttributes['command'] || '';
 
+    const onValue = mergedAttributes['on_value'] || '1.0';
+    const offValue = mergedAttributes['off_value'] || '0.0';
+    const vDefaultOnOff = mergedAttributes['vdefault'] || offValue;
+    const defaultStateIsOn = vDefaultOnOff === onValue;
+    const initialStoredState = State.getElementState(paramId);
+
+    let isActive;
+    if (initialStoredState !== null && initialStoredState !== undefined) {
+        isActive = String(initialStoredState) === '1' || initialStoredState === 1;
+    } else {
+        isActive = defaultStateIsOn;
+    }
+
+    if (isActive) {
+        htmlElement.classList.add('active');
+    } else {
+        htmlElement.classList.remove('active');
+    }
+
+    htmlElement.setAttribute('role', 'switch');
+    htmlElement.setAttribute('aria-checked', isActive ? 'true' : 'false');
+
     const updateImage = (state) => {
         const imgKey = state ? 'image_on' : 'image_off';
         const imgPath = mergedAttributes[imgKey] || mergedAttributes['image'];
@@ -91,7 +113,7 @@ export function renderImageButton(tagName, xmlNode, mergedAttributes, currentPar
         }
     };
 
-    updateImage(false);
+    updateImage(isActive);
 
     return {
         htmlElement: htmlElement,

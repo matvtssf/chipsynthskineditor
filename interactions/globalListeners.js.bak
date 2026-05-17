@@ -6,7 +6,7 @@
  */
 
 import * as State from '../core/state.js'; // For setIsMouseButtonDown
-import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton } from '../core/domUtils.js';
+import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton, showToast } from '../core/domUtils.js';
 import { handlePanEnd } from './mainContentInteractions.js'; // Sibling interaction import
 import { flashModalBorder } from '../managers/modalManager.js'; // Moved up one level
 
@@ -22,21 +22,21 @@ export function setupGlobalListeners() {
     const ackBtn = getAcknowledgeDisclaimerButton();
     const discModal = getDisclaimerModal();
     const loadBtn = getLoadFolderButton();
-    const textLogo = getTextLogo();
+    const currentTextLogo = getTextLogo();
 
     if (ackBtn && discModal && !document.body.dataset.disclaimerListenerAttached) {
         ackBtn.addEventListener('click', () => {
             console.log("[globalListeners] Disclaimer acknowledged: Triggering dissolve animation loop.");
             
             // Trigger digital text logo glitch animation
-            if (textLogo) {
-                textLogo.classList.add('logo-glitch-active');
-                textLogo.addEventListener('animationend', () => {
-                    textLogo.classList.remove('logo-glitch-active');
+            if (currentTextLogo) {
+                currentTextLogo.classList.add('logo-glitch-active');
+                currentTextLogo.addEventListener('animationend', () => {
+                    currentTextLogo.classList.remove('logo-glitch-active');
                 }, { once: true });
             }
 
-            // Apply animation classes
+            // Apply animation classes for blur dissolution and mist fade
             discModal.classList.add('dissolve-mist', 'dissolve-blur-active');
             
             const completeDismissal = () => {
@@ -48,8 +48,8 @@ export function setupGlobalListeners() {
                 }
             };
 
-            // Failsafe timeout filter in case transition events are missing or blocked by other CSS actions
-            const animationFailsafe = setTimeout(completeDismissal, 400);
+            // Failsafe timeout backstop (450ms) in case the animation fails to trigger or fire events
+            const animationFailsafe = setTimeout(completeDismissal, 450);
 
             discModal.addEventListener('animationend', () => {
                 clearTimeout(animationFailsafe);
@@ -61,7 +61,7 @@ export function setupGlobalListeners() {
 
     // Logo Hover Effect
     const textLogo = getTextLogo();
-    // Use document.body to store listener flags
+    // Use document.body to store listener flags (textLogo is already declared at the top of the function scope)
     if (textLogo && !document.body.dataset.logoHoverListenerAttached) {
         document.body.addEventListener('mousemove', handleLogoHover);
         document.body.dataset.logoHoverListenerAttached = 'true';
@@ -81,6 +81,11 @@ export function setupGlobalListeners() {
         document.addEventListener('mouseup', handleGlobalMouseUp);
         window.addEventListener('blur', handleWindowBlur); // Stop actions if window loses focus
         document.body.dataset.globalMouseListenersAttached = 'true'; // Set flag on body
+    }
+
+    if (!document.body.dataset.contextMenuDebugListenerAttached) {
+        document.addEventListener('contextmenu', handleGlobalContextMenu);
+        document.body.dataset.contextMenuDebugListenerAttached = 'true';
     }
 }
 
@@ -151,4 +156,47 @@ function handleWindowBlur() {
     // Ensure panning stops if active
     // Call imported function directly
      handlePanEnd(); // <<< UPDATED CALL (Call without event object)
+}
+
+/** Handles right-click actions on GUI elements for debug copying */
+function handleGlobalContextMenu(event) {
+    // Check all possible debug mode toggle flags comprehensively at the absolute top
+    let isDebug = false;
+    if (typeof State.getDebugMode === 'function') isDebug = isDebug || State.getDebugMode();
+    if (typeof State.isDebugMode === 'function') isDebug = isDebug || State.isDebugMode();
+    if (typeof State.isDebug === 'function') isDebug = isDebug || State.isDebug();
+    if (State.debugMode !== undefined) isDebug = isDebug || State.debugMode;
+    if (window.debugMode !== undefined) isDebug = isDebug || window.debugMode;
+    if (document.body.classList.contains('debug-mode') || document.body.classList.contains('debug')) isDebug = true;
+    if (document.body.dataset.debug === 'true' || document.body.dataset.mode === 'debug') isDebug = true;
+
+    if (!isDebug) return;
+
+    // Suppress the default browser context menu immediately across the workspace when debug is active
+    event.preventDefault();
+
+    const guiElement = event.target.closest('.gui-element');
+    if (!guiElement) return;
+
+    const xmlString = guiElement.dataset.rawXml;
+    if (!xmlString) {
+        console.warn("[globalListeners] Missing dataset.rawXml on element:", guiElement);
+        if (typeof showToast === 'function') {
+            showToast(`Element <${guiElement.dataset.xmlTagName || 'element'}> missing serialized XML data.`, 'warn', 3000);
+        }
+        return;
+    }
+
+    navigator.clipboard.writeText(xmlString)
+        .then(() => {
+            if (typeof showToast === 'function') {
+                showToast(`Copied XML for <${guiElement.dataset.xmlTagName || 'element'}> to clipboard!`, 'info', 3000);
+            }
+        })
+        .catch(err => {
+            console.error("[globalListeners] Clipboard write failed:", err);
+            if (typeof showToast === 'function') {
+                showToast("Failed to copy XML to clipboard.", "error", 3000);
+            }
+        });
 }

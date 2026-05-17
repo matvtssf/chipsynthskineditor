@@ -6,7 +6,7 @@
  */
 
 import * as State from '../core/state.js'; // For setIsMouseButtonDown
-import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton } from '../core/domUtils.js';
+import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton, showToast } from '../core/domUtils.js';
 import { handlePanEnd } from './mainContentInteractions.js'; // Sibling interaction import
 import { flashModalBorder } from '../managers/modalManager.js'; // Moved up one level
 
@@ -82,6 +82,11 @@ export function setupGlobalListeners() {
         window.addEventListener('blur', handleWindowBlur); // Stop actions if window loses focus
         document.body.dataset.globalMouseListenersAttached = 'true'; // Set flag on body
     }
+
+    if (!document.body.dataset.contextMenuDebugListenerAttached) {
+        document.addEventListener('contextmenu', handleGlobalContextMenu);
+        document.body.dataset.contextMenuDebugListenerAttached = 'true';
+    }
 }
 
 // --- Event Handlers ---
@@ -151,4 +156,48 @@ function handleWindowBlur() {
     // Ensure panning stops if active
     // Call imported function directly
      handlePanEnd(); // <<< UPDATED CALL (Call without event object)
+}
+
+/** Handles right-click actions on GUI elements for debug copying */
+function handleGlobalContextMenu(event) {
+    // Check all possible debug mode toggle flags comprehensively at the absolute top
+    let isDebug = false;
+    if (typeof State.getDebugEnabled === 'function') isDebug = isDebug || State.getDebugEnabled();
+    if (typeof State.getDebugMode === 'function') isDebug = isDebug || State.getDebugMode();
+    if (typeof State.isDebugMode === 'function') isDebug = isDebug || State.isDebugMode();
+    if (typeof State.isDebug === 'function') isDebug = isDebug || State.isDebug();
+    if (State.debugMode !== undefined) isDebug = isDebug || State.debugMode;
+    if (window.debugMode !== undefined) isDebug = isDebug || window.debugMode;
+    if (document.body.classList.contains('debug-mode') || document.body.classList.contains('debug')) isDebug = true;
+    if (document.body.dataset.debug === 'true' || document.body.dataset.mode === 'debug') isDebug = true;
+
+    if (!isDebug) return;
+
+    // Suppress the default browser context menu immediately across the workspace when debug is active
+    event.preventDefault();
+
+    const guiElement = event.target.closest('.gui-element');
+    if (!guiElement) return;
+
+    const xmlString = guiElement.dataset.rawXml;
+    if (!xmlString) {
+        console.warn("[globalListeners] Missing dataset.rawXml on element:", guiElement);
+        if (typeof showToast === 'function') {
+            showToast(`Element <${guiElement.dataset.xmlTagName || 'element'}> missing serialized XML data.`, 'warn', 3000);
+        }
+        return;
+    }
+
+    navigator.clipboard.writeText(xmlString)
+        .then(() => {
+            if (typeof showToast === 'function') {
+                showToast(`Copied XML for <${guiElement.dataset.xmlTagName || 'element'}> to clipboard!`, 'info', 3000);
+            }
+        })
+        .catch(err => {
+            console.error("[globalListeners] Clipboard write failed:", err);
+            if (typeof showToast === 'function') {
+                showToast("Failed to copy XML to clipboard.", "error", 3000);
+            }
+        });
 }

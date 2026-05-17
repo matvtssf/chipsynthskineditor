@@ -4,7 +4,13 @@ import * as State from '../core/state.js';
 
 function renderStaticText(xmlNode, mergedAttributes) {
     const htmlElement = document.createElement('div'); // Use a div for StaticText
-    htmlElement.classList.add('gui-static-text');
+    htmlElement.classList.add('gui-statictext');
+    
+    if (mergedAttributes['h']) {
+        htmlElement.style.lineHeight = `${parseFloat(mergedAttributes['h'])}px`;
+    }
+    htmlElement.style.whiteSpace = 'nowrap';
+    htmlElement.style.overflow = 'hidden';
     
     let textContent = mergedAttributes['text'] || xmlNode.textContent.trim() || '';
     
@@ -35,6 +41,12 @@ function renderLabel(xmlNode, mergedAttributes, currentParams) {
     const htmlElement = document.createElement('div'); // Use a div for Label
     htmlElement.classList.add('gui-label');
     
+    if (mergedAttributes['h']) {
+        htmlElement.style.lineHeight = `${parseFloat(mergedAttributes['h'])}px`;
+    }
+    htmlElement.style.whiteSpace = 'nowrap';
+    htmlElement.style.overflow = 'hidden';
+    
     const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
     let textContent = mergedAttributes['text'] || ''; // Default text if param value not found or for design time
 
@@ -59,7 +71,13 @@ function renderLabel(xmlNode, mergedAttributes, currentParams) {
 
 function renderTextEditor(xmlNode, mergedAttributes, currentParams) {
     const htmlElement = document.createElement('div'); // Or input, but div allows easier styling/customization
-    htmlElement.classList.add('gui-text-editor');
+    htmlElement.classList.add('gui-texteditor');
+    
+    if (mergedAttributes['h']) {
+        htmlElement.style.lineHeight = `${parseFloat(mergedAttributes['h'])}px`;
+    }
+    htmlElement.style.whiteSpace = 'nowrap';
+    htmlElement.style.overflow = 'hidden';
     
     const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
     let initialText = mergedAttributes['tdefault'] || ''; // Default text
@@ -88,7 +106,13 @@ function renderTextEditor(xmlNode, mergedAttributes, currentParams) {
 
 function renderDisplayStringOption(xmlNode, mergedAttributes, currentParams) {
     const htmlElement = document.createElement('div');
-    htmlElement.classList.add('gui-display-string-option'); // New class
+    htmlElement.classList.add('gui-textdisplay');
+
+    if (mergedAttributes['h']) {
+        htmlElement.style.lineHeight = `${parseFloat(mergedAttributes['h'])}px`;
+    }
+    htmlElement.style.whiteSpace = 'nowrap';
+    htmlElement.style.overflow = 'hidden';
 
     const paramId = mergedAttributes['param'] || DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
     let textContent = mergedAttributes['text'] || ''; // Default text if no param or value found

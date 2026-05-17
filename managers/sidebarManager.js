@@ -413,6 +413,35 @@ export function displayPreview(selectedPath, fileType) {
                      currentZoom = Math.max(0.1, Math.min(currentZoom, 15));
                      img.style.transform = `scale(${currentZoom})`;
                  };
+
+                 const previewItemModal = document.getElementById('preview-item-modal');
+                 if (previewItemModal && previewItemModal.classList.contains('visible')) {
+                     const previewItemModalTitle = document.getElementById('preview-item-modal-title');
+                     const previewItemModalContent = document.getElementById('preview-item-modal-content');
+                     if (previewItemModalTitle && previewItemModalContent) {
+                         const fileName = selectedPath.substring(selectedPath.lastIndexOf('/') + 1);
+                         previewItemModalTitle.textContent = `Preview: ${fileName}`;
+                         previewItemModalContent.innerHTML = '';
+                         const contentToClone = img.cloneNode(true);
+                         contentToClone.style.transform = '';
+                         previewItemModalContent.appendChild(contentToClone);
+
+                         let modalZoom = 1.0;
+                         contentToClone.style.transformOrigin = 'center center';
+                         contentToClone.style.transition = 'transform 0.05s ease-out';
+                         previewItemModalContent.onwheel = (e) => {
+                             e.preventDefault();
+                             const zoomFactor = 0.15;
+                             if (e.deltaY < 0) {
+                                 modalZoom *= (1 + zoomFactor);
+                             } else {
+                                 modalZoom *= (1 - zoomFactor);
+                             }
+                             modalZoom = Math.max(0.1, Math.min(modalZoom, 15));
+                             contentToClone.style.transform = `scale(${modalZoom})`;
+                         };
+                     }
+                 }
             } else {
                  previewArea.textContent = `Could not load image preview for: ${selectedPath}`;
                  logError(`Preview Error: Blob URL not found for image/svg (direct lookup)`, new Error(selectedPath));
