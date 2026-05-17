@@ -385,6 +385,13 @@ export function loadSkin(mainXmlFilePath, directXmlContent = null) {
                  const fileBrowserContainer = getFileBrowserContainer(); if (fileBrowserContainer) fileBrowserContainer.classList.add('loaded-visible');
                  const previewAreaContainer = getPreviewAreaContainer(); if (previewAreaContainer) previewAreaContainer.classList.add('loaded-visible');
                  const sidebarEl = document.getElementById('sidebar'); if (sidebarEl) sidebarEl.classList.remove('initial-condensed');
+                 
+                 // Center the scroll position of the viewport window onto the middle of the 3000x3000px workspace
+                 const viewport = document.getElementById('canvas-viewport');
+                 if (viewport) {
+                     viewport.scrollLeft = (3000 - viewport.clientWidth) / 2;
+                     viewport.scrollTop = (3000 - viewport.clientHeight) / 2;
+                 }
             });
             ensureSkinNameMap(); // ensureSkinNameMap is called here after buildGui potentially (and after state is set)
             const skinsInfo = getDetectedSkinInfo();

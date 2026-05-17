@@ -588,9 +588,9 @@ export function formatDisplayValue(value, format, vmin = 0, vmax = 1) { if (form
 
 
 export function applyCurrentBackgroundColor() {
-    const guiZoomCanvas = getGuiZoomCanvas();
-    if (!guiZoomCanvas) {
-        console.error("[domUtils applyCurrentBackgroundColor] gui-zoom-canvas not found!");
+    const canvasViewport = getElement('canvas-viewport');
+    if (!canvasViewport) {
+        console.error("[domUtils applyCurrentBackgroundColor] canvas-viewport not found!");
         return;
     }
 
@@ -611,7 +611,7 @@ export function applyCurrentBackgroundColor() {
             finalAppliedColor = customEditorBgColor;
         }
     }
-    guiZoomCanvas.style.backgroundColor = finalAppliedColor;
+    canvasViewport.style.backgroundColor = finalAppliedColor;
 }
 
 export function getAttributeCategory(attrName) {

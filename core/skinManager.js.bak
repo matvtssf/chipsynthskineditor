@@ -8,7 +8,7 @@
  * MODIFIED: populateSkinSelector to better indicate skins with missing XMLs that will use fallback.
  * MODIFIED: ensureSkinNameMap to search for gui_settings.xml in current skin root, default skin root, and project root.
  */
-import * as State from './core/state.js';
+import * as State from './state.js';
 import {
     addConsoleLogEntry, getFileContent, getAssetBlobUrl, getDirectory, normalizePath,
     getDefaultSkinRoot, getDetectedSkinInfo, getCurrentSkinRoot, setActiveFilePath,
@@ -16,15 +16,15 @@ import {
     clearUsedFiles, setGlobalGuiDefaults, getProductName, getProductVendor, getFileMap,
     getImageBlobUrls, getGuiSettingsXmlParsedForNames, setGuiSettingsXmlParsedForNames,
     setDefaultMainGuiXmlPath, getDefaultMainGuiXmlPath // Import new state functions
-} from './core/state.js';
+} from './state.js';
 import {
     logError, getSkinSelectorContainer, getSkinSelector, getDynamicStyles,
     getGuiContentWrapper, getStatusDiv, clearErrors, getProductLogoImg,
     getFileBrowserContainer, getPreviewAreaContainer, updateStatus
-} from './core/domUtils.js';
-import { buildGui } from './core/guiBuilder.js';
+} from './domUtils.js';
+import { buildGui } from './guiBuilder.js';
 import { populateFileBrowser, highlightActiveFile } from '../managers/sidebarManager.js';
-import { initializeAllContainerStates } from './core/visibilityController.js';
+import { initializeAllContainerStates } from './visibilityController.js';
 
 let skinNameMap = null;
 let skinSelectorListenerAttached = false;

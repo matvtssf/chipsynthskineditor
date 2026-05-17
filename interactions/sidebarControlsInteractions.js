@@ -388,6 +388,19 @@ function handleSidebarPreviewAreaClick() {
     if (contentToClone) {
         previewItemModalContent.innerHTML = '';
         previewItemModalContent.appendChild(contentToClone);
+
+        const previewEditBtn = document.getElementById('preview-edit-button');
+        if (previewEditBtn) {
+            if (previewedFileType === 'svg' || previewedFileType === 'xml') {
+                previewEditBtn.style.display = 'block';
+                previewEditBtn.onclick = () => {
+                    closePreviewItemModal();
+                    openXmlEditor(previewedFilePath);
+                };
+            } else {
+                previewEditBtn.style.display = 'none';
+            }
+        }
         
         // Pure CSS scale-based zoom for images/svgs/fonts in the popup preview window modal
         previewItemModalContent.onwheel = null;
@@ -419,6 +432,8 @@ function handleSidebarPreviewAreaClick() {
 function closePreviewItemModal() {
     if (previewItemModal) {
         toggleModalVisibility(previewItemModal, false); // Hide the modal
+        const previewEditBtn = document.getElementById('preview-edit-button');
+        if (previewEditBtn) previewEditBtn.style.display = 'none';
         if (previewItemModalContent) {
             previewItemModalContent.innerHTML = '';
             previewItemModalContent.onwheel = null; // Clean up wheel event on close

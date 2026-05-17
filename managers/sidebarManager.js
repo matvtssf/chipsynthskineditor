@@ -243,7 +243,7 @@ function createTreeElement(node) {
             li.appendChild(span);
             li.dataset.filePath = fullPath;
             li.dataset.fileType = fileType;
-            li.dataset.isEditable = (fileType === 'xml') ? 'true' : 'false'; 
+            li.dataset.isEditable = (fileType === 'xml' || fileType === 'svg') ? 'true' : 'false'; 
         } else {
             return; 
         }
@@ -303,6 +303,22 @@ function createTreeElement(node) {
         }
 
         if (folderLi && !fileLi) { folderLi.classList.toggle('open'); }
+    });
+
+    treeElement.addEventListener('dblclick', (event) => {
+        let current = event.target;
+        let fileLi = null;
+        while (current && current !== treeElement) {
+            if (current.tagName === 'LI' && current.classList.contains('file')) {
+                fileLi = current;
+                break;
+            }
+            current = current.parentElement;
+        }
+        if (fileLi && fileLi.dataset.filePath) {
+            const previewArea = getPreviewArea();
+            if (previewArea) previewArea.click();
+        }
     });
 
     const editButton = getEditButton();

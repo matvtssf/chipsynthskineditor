@@ -165,22 +165,8 @@ export function readFileAndStore(file, path) {
              if (/\.(svg|png|jpg|jpeg|gif)$/i.test(lowerFileName)) {
                  const blobUrl = URL.createObjectURL(file);
                  State.addImageBlobUrl(storeKey, blobUrl);
-                 
-                 // If it's an SVG file, also read it as text so it can be edited inside the XML Editor
-                 if (lowerFileName.endsWith('.svg')) {
-                     const svgReader = new FileReader();
-                     svgReader.onload = (event) => {
-                         State.addFile(storeKey, event.target.result);
-                         resolve();
-                     };
-                     svgReader.onerror = (error) => {
-                         logError(`FileReader error for SVG text: ${NORM_PATH}`, error);
-                         reject(error);
-                     };
-                     svgReader.readAsText(file);
-                 } else {
-                     resolve();
-                 }
+                 // console.log(`[FL] Stored Image: ${storeKey} -> ${blobUrl.substring(0, 20)}...`);
+                 resolve();
              } else if (/\.(ttf|otf)$/i.test(lowerFileName)) {
                  const blobUrl = URL.createObjectURL(file);
                  State.addFontBlobUrl(storeKey, blobUrl);

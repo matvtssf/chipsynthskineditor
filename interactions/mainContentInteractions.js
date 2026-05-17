@@ -65,28 +65,25 @@ export function setupMainContentInteractions() {
     }
 }
 
-// --- Panning Logic (Scrolls mainContentArea based on drag on guiZoomCanvas) ---
+// --- Panning Logic (Scrolls canvasViewport based on drag on guiZoomCanvas) ---
 function handlePanStart(e) {
     if (e.button !== 1) {
         return;
     }
 
-    const mainContentArea = getMainContentArea();
     const guiZoomCanvas = getGuiZoomCanvas();
     const canvasViewport = document.getElementById('canvas-viewport');
 
-    if (!mainContentArea || !guiZoomCanvas) return;
+    if (!canvasViewport || !guiZoomCanvas) return;
 
     e.preventDefault();
     isPanning = true;
     panStartX = e.clientX;
     panStartY = e.clientY;
-    panStartScrollX = mainContentArea.scrollLeft;
-    panStartScrollY = mainContentArea.scrollTop;
+    panStartScrollX = canvasViewport.scrollLeft;
+    panStartScrollY = canvasViewport.scrollTop;
     
-    if (canvasViewport) {
-        canvasViewport.classList.add('panning-active');
-    }
+    canvasViewport.classList.add('panning-active');
     document.body.style.userSelect = 'none';
 
     document.addEventListener('mousemove', handlePanMove);
@@ -98,16 +95,16 @@ function handlePanMove(e) {
     if (!isPanning) return;
     e.preventDefault();
 
-    const mainContentArea = getMainContentArea();
-    if (!mainContentArea) {
+    const canvasViewport = document.getElementById('canvas-viewport');
+    if (!canvasViewport) {
         handlePanEnd(e);
         return;
     }
 
     const dx = e.clientX - panStartX;
     const dy = e.clientY - panStartY;
-    mainContentArea.scrollLeft = panStartScrollX - dx;
-    mainContentArea.scrollTop = panStartScrollY - dy;
+    canvasViewport.scrollLeft = panStartScrollX - dx;
+    canvasViewport.scrollTop = panStartScrollY - dy;
 }
 
 export function handlePanEnd(e) {

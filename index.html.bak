@@ -485,10 +485,7 @@
         <div class="modal-content-container w-3/4 max-w-3xl h-3/4">
             <div class="flex justify-between items-center p-2 border-b border-gray-300 flex-shrink-0 bg-white/30">
                 <h2 id="preview-item-modal-title" class="text-lg font-semibold text-gray-700">Preview</h2>
-                <div class="flex items-center gap-2">
-                    <button id="preview-edit-button" class="text-xs px-2 py-1 border rounded hover:bg-gray-100 bg-white" style="display: none;">Edit XML</button>
-                    <button id="close-preview-item-modal-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
-                </div>
+                <button id="close-preview-item-modal-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
             </div>
             <div id="preview-item-modal-content" class="p-4 flex-grow overflow-auto flex items-center justify-center">
                 <span class="text-gray-400">Loading preview...</span>
