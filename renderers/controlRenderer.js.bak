@@ -1,868 +1,11 @@
 // File: cs/renderers/controlRenderer.js
-import * as DomUtils from '../domUtils.js';
-import * as State from '../state.js';
-
-const DRAG_SENSITIVITY = 0.5;
-const SLIDER_SENSITIVITY = 1.0;
-const SCROLL_SENSITIVITY = 0.05;
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-function generateSimpleId(length = 5) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const htmlElement = document.createElement('div');
-    htmlElement.classList.add('gui-slider-container');
-
-    const parsedBoxColor = DomUtils.parseColor(mergedAttributes['boxColor'] || '#23232300');
-    htmlElement.style.backgroundColor = parsedBoxColor;
-
-    const paramId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
-    const vmin = parseFloat(mergedAttributes['vmin'] || 0);
-    const vmax = parseFloat(mergedAttributes['vmax'] || 1);
-    let vdefault_from_xml = parseFloat(mergedAttributes['vdefault'] || vmin);
-
-    const springMode = mergedAttributes['spring_mode'] === '1';
-    const spring_default_to_center = mergedAttributes['spring_default_to_center'] === '1';
-
-    let vdefault_for_display_and_ctrl_click = DomUtils.clamp(vdefault_from_xml, vmin, vmax);
-    if (springMode && spring_default_to_center && vmin < 0 && vmax > 0) {
-        vdefault_for_display_and_ctrl_click = 0;
-    }
-    vdefault_for_display_and_ctrl_click = DomUtils.clamp(vdefault_for_display_and_ctrl_click, vmin, vmax);
-
-    const showText = mergedAttributes['show_text'] === '1';
-    const textEditEnabled = mergedAttributes['textEdit_enabled'] === '1';
-    const clickOnTrack = mergedAttributes['clickOnTrack'] === '1';
-
-    const containerW = parseFloat(mergedAttributes['w'] || 0);
-    const containerH = parseFloat(mergedAttributes['h'] || 0);
-
-    const knobWValueFromAttrs = mergedAttributes['knob_w'];
-    const knobW = parseFloat(knobWValueFromAttrs || containerW);
-
-    let knobX;
-    const knobXValueFromAttrs = mergedAttributes['knob_x'];
-    if (knobXValueFromAttrs && String(knobXValueFromAttrs).toLowerCase() === 'center') {
-        knobX = (containerW - knobW) / 2;
-    } else {
-        knobX = parseFloat(knobXValueFromAttrs || 0);
-    }
-
-    const knobY = parseFloat(mergedAttributes['knob_y'] || 0);
-    const knobH = parseFloat(mergedAttributes['knob_h'] || 4);
-    const knobColor = DomUtils.parseColor(mergedAttributes['knobColor'] || '#696969FF');
-
-    htmlElement.dataset.param = paramId || '';
-    htmlElement.dataset.vmin = vmin;
-    htmlElement.dataset.vmax = vmax;
-    htmlElement.dataset.vdefault = vdefault_for_display_and_ctrl_click;
-    htmlElement.dataset.trueXmlVdefault = DomUtils.clamp(vdefault_from_xml, vmin, vmax);
-    htmlElement.dataset.springMode = springMode ? '1' : '0';
-    htmlElement.dataset.springDefaultToCenter = spring_default_to_center ? '1' : '0';
-    htmlElement.dataset.showText = showText ? '1' : '0';
-    htmlElement.dataset.textEditEnabled = textEditEnabled ? '1' : '0';
-    htmlElement.dataset.clickOnTrack = clickOnTrack ? '1' : '0';
-    htmlElement.dataset.currentValue = vdefault_for_display_and_ctrl_click;
-    htmlElement.dataset.xmlAttr_stepped = mergedAttributes['stepped'] || '0';
-    htmlElement.dataset.xmlAttr_valueText_format = mergedAttributes['valueText_format'] || '';
-    htmlElement.dataset.containerH = containerH;
-    htmlElement.dataset.knobH = knobH;
-    htmlElement.dataset.knobY = knobY;
-
-    const knob = document.createElement('div');
-    knob.classList.add('gui-slider-knob');
-    knob.style.position = 'absolute';
-    knob.style.left = `${knobX}px`;
-    knob.style.width = `${knobW}px`;
-    knob.style.height = `${knobH}px`;
-    knob.style.backgroundColor = knobColor;
-    knob.style.cursor = 'grab';
-
-    const trackHeight = containerH - knobH;
-    const valueRange = vmax - vmin;
-    let normalizedValue = 0;
-    if (valueRange !== 0) {
-        normalizedValue = (vdefault_for_display_and_ctrl_click - vmin) / valueRange;
-    }
-
-    const safeTrackHeight = Math.max(0, trackHeight);
-    const calculatedKnobTop = DomUtils.clamp((1 - normalizedValue) * safeTrackHeight, 0, safeTrackHeight);
-    let finalKnobPosition = calculatedKnobTop + knobY;
-
-    const minKnobTopAllowed = 0;
-    const maxKnobTopAllowed = Math.max(0, containerH - knobH);
-    finalKnobPosition = DomUtils.clamp(finalKnobPosition, minKnobTopAllowed, maxKnobTopAllowed);
-    knob.style.top = `${finalKnobPosition}px`;
-
-    if (showText) {
-        const valueText = document.createElement('span');
-        valueText.classList.add('slider-value-text', 'slider-value-hidden');
-        valueText.textContent = DomUtils.formatDisplayValue(vdefault_for_display_and_ctrl_click, mergedAttributes['valueText_format'], vmin, vmax);
-        knob.appendChild(valueText);
-        knob.style.display = 'flex';
-        knob.style.alignItems = 'center';
-        knob.style.justifyContent = 'center';
-        knob.style.overflow = 'visible';
-    }
-    htmlElement.appendChild(knob);
-
-    const postProcessFunction = (element, attrs, params, sourceXmlNode, styleNameString) => {
-        const knobElement = element.querySelector('.gui-slider-knob');
-        const valueTextElement = knobElement?.querySelector('.slider-value-text');
-        if (valueTextElement) {
-            const fontAlias = attrs['font'];
-            if (fontAlias) DomUtils.applyFont(valueTextElement, fontAlias);
-
-            const textColor = attrs['color_text'] || attrs['fontColor'];
-            if (textColor) valueTextElement.style.color = DomUtils.parseColor(textColor);
-        }
-    };
-
-    return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
-        requiresRecursiveRender: false,
-        postProcessFunction: postProcessFunction
-    };
-}
-
-function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const guiAttributes = State.getGlobalGuiDefaults();
-
-    const paramId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
-    let hasNaN = false;
-
-    const springMode = mergedAttributes['spring_mode'] === '1';
-    const spring_default_to_center = mergedAttributes['spring_default_to_center'] === '1';
-
-    const w = parseFloat(mergedAttributes['w'] || 40);
-    const h = parseFloat(mergedAttributes['h'] || 50);
-    const labelText = mergedAttributes['labelText'] || '';
-    const vmin = parseFloat(mergedAttributes['vmin'] || 0);
-    const vmax = parseFloat(mergedAttributes['vmax'] || 1);
-
-    const vdefault_from_xml_attr = mergedAttributes['vdefault'];
-    let true_xml_default_value;
-    const parsed_vdefault_from_xml = parseFloat(vdefault_from_xml_attr);
-
-    if (isNaN(parsed_vdefault_from_xml)) {
-        true_xml_default_value = vmin;
-    } else {
-        true_xml_default_value = DomUtils.clamp(parsed_vdefault_from_xml, vmin, vmax);
-    }
-
-    let initial_display_value_and_ctrl_click_target = true_xml_default_value;
-    if (springMode && spring_default_to_center && vmin < 0 && vmax > 0) {
-        initial_display_value_and_ctrl_click_target = 0;
-    }
-    initial_display_value_and_ctrl_click_target = DomUtils.clamp(initial_display_value_and_ctrl_click_target, vmin, vmax);
-
-    const stepped = parseFloat(mergedAttributes['stepped'] || 0);
-    const valueTextFormat = mergedAttributes['valueText_format'] || '';
-    const knob_x = parseFloat(mergedAttributes['knob_x'] || w * 0.1);
-    const knob_y = parseFloat(mergedAttributes['knob_y'] || h * 0.1);
-    const knob_w = parseFloat(mergedAttributes['knob_w'] || w * 0.8);
-    const knob_h = parseFloat(mergedAttributes['knob_h'] || h * 0.8);
-    const parsedValueTrackWidth = parseFloat(mergedAttributes['valueTrackWidth'] || 3);
-    const actualStrokeWidth = parsedValueTrackWidth;
-    const valueIndicatorMargin = parseFloat(mergedAttributes['valueIndicatorMargin'] || 0);
-
-    const valueIndicator_w_attr = mergedAttributes['valueIndicator_w'];
-    const valueIndicator_h_attr = mergedAttributes['valueIndicator_h'];
-
-    const label_x = parseFloat(mergedAttributes['label_x'] || 0);
-    const label_y = parseFloat(mergedAttributes['label_y'] || h * 0.8);
-    const label_w = parseFloat(mergedAttributes['label_w'] || w);
-    const label_h = parseFloat(mergedAttributes['label_h'] || h * 0.2);
-    const label_alignment_attr = mergedAttributes['label_alignment'] || 'center'; // Read from XML
-
-    const valueIndicatorType = parseInt(mergedAttributes['valueIndicatorType'] || 3, 10);
-    const valueTrackOrder = parseInt(mergedAttributes['valueTrackOrder'] || 0, 10);
-
-    const knobImagePath = mergedAttributes['knob'];
-    const valueIndicatorSvgPath = mergedAttributes['valueIndicator'];
-
-    const valueIndicatorImageOriginalAngle = parseFloat(mergedAttributes['valueindicatorimageoriginalangle'] || 0);
-    const textEditBackColor = mergedAttributes['textEdit_backColor'];
-    const textEditBackColorTransparentMode = mergedAttributes['textEdit_backColorTransparentMode'] === '1';
-    
-    const isUnipolar = (mergedAttributes['unipolar'] !== '0');
-
-    const requiredNumericAttrsList = { w, h, vmin, vmax, stepped, knob_x, knob_y, knob_w, knob_h, parsedValueTrackWidth, valueIndicatorMargin, label_x, label_y, label_w, label_h, valueIndicatorImageOriginalAngle };
-    for (const key in requiredNumericAttrsList) {
-        if (isNaN(requiredNumericAttrsList[key])) {
-            DomUtils.logError(`[CS03Knob ${paramId}] Invalid NaN for core attribute '${key}' (Raw: '${mergedAttributes[key]}') value: ${requiredNumericAttrsList[key]}`, null);
-            hasNaN = true;
-        }
-    }
-    if (isNaN(valueIndicatorType)) { DomUtils.logError(`[CS03Knob ${paramId}] Invalid valueIndicatorType: ${mergedAttributes['valueIndicatorType']}`, null); hasNaN = true; }
-    if (isNaN(valueTrackOrder)) { DomUtils.logError(`[CS03Knob ${paramId}] Invalid valueTrackOrder: ${mergedAttributes['valueTrackOrder']}`, null); hasNaN = true; }
-
-    if (hasNaN) {
-        const errorPlaceholder = DomUtils.createErrorPlaceholder(`Knob Err: ${paramId || 'NaN'}`);
-        errorPlaceholder.style.width = `${w}px`; errorPlaceholder.style.height = `${h}px`;
-        return { htmlElement: errorPlaceholder, mainElementForAttributes: errorPlaceholder, requiresRecursiveRender: false, postProcessFunction: null };
-    }
-
-    const knobBodyVisualCenterX = knob_x + knob_w / 2;
-    const knobBodyVisualCenterY = knob_y + knob_h / 2;
-    const knobBodyVisualRadius = Math.min(knob_w, knob_h) / 2;
-    const trackVisualRadius = knobBodyVisualRadius + 1.5 * parsedValueTrackWidth - 0.5;
-
-    const proceduralIndicatorW = parseFloat(valueIndicator_w_attr || knob_w / 2);
-    const proceduralIndicatorH = parseFloat(valueIndicator_h_attr || knob_h / 2);
-    let proceduralIndicatorVisualRadius = (valueIndicatorType === 1) ? proceduralIndicatorH / 2 : Math.min(proceduralIndicatorW, proceduralIndicatorH) / 2;
-    if(isNaN(proceduralIndicatorVisualRadius)) proceduralIndicatorVisualRadius = 5;
-    const proceduralIndicatorOrbitRadius = knobBodyVisualRadius - proceduralIndicatorVisualRadius - valueIndicatorMargin;
-
-    // --- MODIFIED SECTION FOR SAFER COLOR PARSING ---
-    const safeParseColor = (colorAttr, defaultColor, colorNameForLog) => {
-        const rawColor = mergedAttributes[colorAttr] || defaultColor;
-        let parsedColor = DomUtils.parseColor(rawColor);
-        if (!parsedColor || typeof parsedColor !== 'string' || parsedColor.trim() === '') {
-            DomUtils.logError(`[CS03Knob ${paramId}] DomUtils.parseColor for ${colorNameForLog} ('${rawColor}') returned invalid '${parsedColor}'. Using fallback.`, null);
-            // Fallback to a generic visible color if parsing fails completely
-            if (colorNameForLog.includes("Fill")) return '#A0A0A0FF'; // Opaque gray for fills
-            return '#707070FF'; // Slightly darker opaque gray for strokes/tracks
-        }
-        return parsedColor;
-    };
-
-    const valueTrackColorData = safeParseColor('valueTrackColor', '#00000080', 'valueTrackColor');
-    const valueFillColorData = safeParseColor('valueFillColor', '#828bdeD0', 'valueFillColor');
-    const valueIndicatorFillColorData = safeParseColor('valueIndicatorFillColor', '#000000a0', 'valueIndicatorFillColor');
-    const knobFillColorData = safeParseColor('knobFillColor', '#FFFFFFa0', 'knobFillColor');
-    // --- END MODIFIED SECTION ---
-
-    const label_fontAlias = mergedAttributes['label_font'];
-    const label_fontColorHex = mergedAttributes['label_fontColor'];
-    const label_fontColor = label_fontColorHex ? DomUtils.parseColor(label_fontColorHex) : (guiAttributes.color_text || '#FFFFFFFF');
-    const showValueTextOnHL = (mergedAttributes['showValueTextOnHL'] === '1');
-    const value_fontAlias = mergedAttributes['value_font'];
-    const value_fontColorHex = mergedAttributes['value_fontColor'];
-    const value_fontColor = value_fontColorHex ? DomUtils.parseColor(value_fontColorHex) : (guiAttributes.color_text || '#FFFFFFFF');
-
-    const container = document.createElement('div');
-    container.className = 'knob-container';
-    container.setAttribute('data-param-id', paramId);
-    for (const key in mergedAttributes) { container.dataset[`xmlAttr_${key.replace(/[^a-z0-9-_]/gi, '_')}`] = mergedAttributes[key]; }
-
-    container.style.overflow = 'visible';
-    if (valueTrackOrder === 0) {
-        container.style.zIndex = '10';
-    } else if (valueTrackOrder === 2) {
-        container.style.zIndex = '0';
-    } else {
-        container.style.zIndex = '1';
-    }
-
-    const labelElement = document.createElement('div');
-    labelElement.className = 'knob-label';
-
-    let justifyContentStyle = 'center'; // Default for justify-content
-    if (label_alignment_attr === 'left') {
-        justifyContentStyle = 'flex-start';
-    } else if (label_alignment_attr === 'right') {
-        justifyContentStyle = 'flex-end';
-    }
-
-    Object.assign(labelElement.style, {
-        position: 'absolute',
-        left: `${label_x}px`,
-        top: `${label_y}px`,
-        width: `${label_w}px`,
-        height: `${label_h}px`,
-        textAlign: label_alignment_attr,     // Use value from XML for text-align
-        display: 'flex',                     // Keep display:flex for vertical alignment
-        alignItems: 'center',                // For vertical centering
-        justifyContent: justifyContentStyle, // MODIFIED: Set based on label_alignment_attr
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        color: label_fontColor,
-        zIndex: '3'
-    });
-    DomUtils.applyFont(labelElement, label_fontAlias);
-    labelElement.textContent = labelText; labelElement.dataset.originalText = labelText;
-    labelElement.title = mergedAttributes['tooltip'] || `${labelText} (${paramId})`;
-
-    const svgDrawingLayer = document.createElementNS(SVG_NS, "svg");
-    Object.assign(svgDrawingLayer.style, {
-        width: '100%', height: '100%', position: 'absolute',
-        left: '0px', top: '0px', pointerEvents: 'none', zIndex: '1',
-        overflow: 'visible !important'
-    });
-    svgDrawingLayer.setAttribute('class', 'knob-svg-drawing-layer');
-    svgDrawingLayer.setAttribute('viewBox', `0 0 ${w} ${h}`);
-
-    let htmlKnobBodyImageElement = null;
-    let svgProceduralKnobBody = null;
-
-    if (knobImagePath && typeof knobImagePath === 'string' && knobImagePath.trim() !== '') {
-        const blobUrl = State.getAssetBlobUrl(knobImagePath);
-        if (blobUrl) {
-            htmlKnobBodyImageElement = document.createElement('img');
-            htmlKnobBodyImageElement.className = 'knob-body-html-img';
-            htmlKnobBodyImageElement.src = blobUrl;
-            Object.assign(htmlKnobBodyImageElement.style, {
-                position: 'absolute', left: `${knob_x}px`, top: `${knob_y}px`,
-                width: `${knob_w}px`, height: `${knob_h}px`,
-                pointerEvents: 'none', zIndex: '0'
-            });
-            htmlKnobBodyImageElement.onerror = () => {
-                console.error(`[CS03Knob ${paramId}] Knob Body HTML <img> ONERROR: ${knobImagePath}. Will try to use procedural.`);
-                if(htmlKnobBodyImageElement.parentNode) htmlKnobBodyImageElement.parentNode.removeChild(htmlKnobBodyImageElement);
-                htmlKnobBodyImageElement = null;
-                 // Ensure procedural body is created if image fails
-                if (!svgProceduralKnobBody && svgDrawingLayer) { // Check svgDrawingLayer exists
-                    svgProceduralKnobBody = document.createElementNS(SVG_NS, "circle");
-                    svgProceduralKnobBody.setAttribute('cx', String(knobBodyVisualCenterX));
-                    svgProceduralKnobBody.setAttribute('cy', String(knobBodyVisualCenterY));
-                    svgProceduralKnobBody.setAttribute('r', String(knobBodyVisualRadius));
-                    svgProceduralKnobBody.setAttribute('fill', knobFillColorData); // Uses safe-parsed color
-                    svgProceduralKnobBody.dataset.originalFill = knobFillColorData;
-                    svgDrawingLayer.appendChild(svgProceduralKnobBody);
-                }
-            };
-        } else {
-            DomUtils.logError(`[CS03Knob ${paramId}] Knob Body HTML <img>: No blobUrl for ${knobImagePath}. Procedural fallback.`, null);
-        }
-    }
-
-    if (!htmlKnobBodyImageElement) {
-        svgProceduralKnobBody = document.createElementNS(SVG_NS, "circle");
-        svgProceduralKnobBody.setAttribute('cx', String(knobBodyVisualCenterX));
-        svgProceduralKnobBody.setAttribute('cy', String(knobBodyVisualCenterY));
-        svgProceduralKnobBody.setAttribute('r', String(knobBodyVisualRadius));
-        svgProceduralKnobBody.setAttribute('fill', knobFillColorData); // Uses safe-parsed color
-        svgProceduralKnobBody.dataset.originalFill = knobFillColorData;
-        svgDrawingLayer.appendChild(svgProceduralKnobBody);
-    }
-
-    const trackBg = document.createElementNS(SVG_NS, "path");
-    trackBg.setAttribute('fill', 'none'); trackBg.setAttribute('stroke', valueTrackColorData); // Uses safe-parsed color
-    trackBg.setAttribute('stroke-width', String(actualStrokeWidth)); trackBg.dataset.originalStroke = valueTrackColorData;
-
-    const trackFill = document.createElementNS(SVG_NS, "path");
-    trackFill.setAttribute('fill', 'none'); trackFill.setAttribute('stroke', valueFillColorData); // Uses safe-parsed color
-    trackFill.setAttribute('stroke-width', String(actualStrokeWidth)); trackFill.setAttribute('stroke-linecap', 'butt');
-    trackFill.dataset.originalStroke = valueFillColorData;
-
-    svgDrawingLayer.appendChild(trackBg);
-    svgDrawingLayer.appendChild(trackFill);
-
-    let indicatorElementTransformTarget = null;
-    let isIndicatorHTML = false;
-
-    function createProceduralIndicatorShape() {
-        let procIndicator;
-        let p_ind_w = proceduralIndicatorW; if(isNaN(p_ind_w)) p_ind_w = 10;
-        let p_ind_h = proceduralIndicatorH; if(isNaN(p_ind_h)) p_ind_h = 10;
-
-        if (valueIndicatorType === 1) {
-            procIndicator = document.createElementNS(SVG_NS, "rect");
-            procIndicator.setAttribute('width', String(p_ind_w)); procIndicator.setAttribute('height', String(p_ind_h));
-            procIndicator.setAttribute('x', String(-p_ind_w / 2)); procIndicator.setAttribute('y', String(-p_ind_h / 2));
-        } else {
-            procIndicator = document.createElementNS(SVG_NS, "circle");
-            procIndicator.setAttribute('r', String(Math.min(p_ind_w, p_ind_h) / 2));
-            procIndicator.setAttribute('cx', '0'); procIndicator.setAttribute('cy', '0');
-        }
-        procIndicator.setAttribute('fill', valueIndicatorFillColorData); // Uses safe-parsed color
-        return procIndicator;
-    }
-    
-    if (valueIndicatorSvgPath && typeof valueIndicatorSvgPath === 'string' && valueIndicatorSvgPath.trim() !== '') {
-        const indicatorBlobUrl = State.getAssetBlobUrl(valueIndicatorSvgPath);
-        if (indicatorBlobUrl) {
-            isIndicatorHTML = true;
-            indicatorElementTransformTarget = document.createElement('div');
-            indicatorElementTransformTarget.className = 'knob-indicator-wrapper-html';
-            Object.assign(indicatorElementTransformTarget.style, {
-                position: 'absolute',
-                width: `${knob_w}px`,
-                height: `${knob_h}px`,
-                pointerEvents: 'none',
-                zIndex: '2',
-                overflow: 'visible'
-            });
-
-            const htmlIndicatorImage = document.createElement('img');
-            htmlIndicatorImage.className = 'knob-indicator-html-img';
-            htmlIndicatorImage.src = indicatorBlobUrl;
-            Object.assign(htmlIndicatorImage.style, {
-                position: 'absolute', width: `100%`, height: `100%`,
-                left: `0px`, top: `0px`, pointerEvents: 'none'
-            });
-            htmlIndicatorImage.onerror = () => {
-                console.error(`[CS03Knob ${paramId}] Indicator HTML <img> ONERROR: ${valueIndicatorSvgPath}. Fallback to procedural.`);
-                if (indicatorElementTransformTarget && indicatorElementTransformTarget.parentNode) {
-                    indicatorElementTransformTarget.parentNode.removeChild(indicatorElementTransformTarget);
-                }
-                indicatorElementTransformTarget = document.createElementNS(SVG_NS, "g");
-                indicatorElementTransformTarget.setAttribute('class', 'knob-indicator-group-svg-fallback');
-                const proceduralShape = createProceduralIndicatorShape(); // Will use safe-parsed color
-                proceduralShape.dataset.originalFill = valueIndicatorFillColorData;
-                indicatorElementTransformTarget.appendChild(proceduralShape);
-                svgDrawingLayer.appendChild(indicatorElementTransformTarget);
-                isIndicatorHTML = false;
-            };
-            indicatorElementTransformTarget.appendChild(htmlIndicatorImage);
-            container.appendChild(indicatorElementTransformTarget);
-        } else {
-            DomUtils.logError(`[CS03Knob ${paramId}] Indicator HTML <img>: No blobUrl for ${valueIndicatorSvgPath}. Procedural fallback.`, null);
-        }
-    }
-
-    if (!indicatorElementTransformTarget) {
-        indicatorElementTransformTarget = document.createElementNS(SVG_NS, "g");
-        indicatorElementTransformTarget.setAttribute('class', 'knob-indicator-group-svg');
-        const proceduralShape = createProceduralIndicatorShape(); // Will use safe-parsed color
-        proceduralShape.dataset.originalFill = valueIndicatorFillColorData;
-        indicatorElementTransformTarget.appendChild(proceduralShape);
-        svgDrawingLayer.appendChild(indicatorElementTransformTarget);
-        isIndicatorHTML = false;
-    }
-
-    if (htmlKnobBodyImageElement) container.appendChild(htmlKnobBodyImageElement);
-    container.appendChild(svgDrawingLayer);
-    container.appendChild(labelElement);
-
-    let currentValue = initial_display_value_and_ctrl_click_target;
-    let isDragging = false;
-    let startY_coord = 0;
-    let startValue = 0;
-
-    const elementsToHighlight = [];
-    if (svgProceduralKnobBody) elementsToHighlight.push(svgProceduralKnobBody);
-    elementsToHighlight.push(trackBg, trackFill);
-    if (!isIndicatorHTML && indicatorElementTransformTarget && indicatorElementTransformTarget.firstChild) {
-         elementsToHighlight.push(indicatorElementTransformTarget.firstChild);
-    }
-
-    function updateVisuals(value) {
-        const angle = DomUtils.mapValueToAngle(value, vmin, vmax);
-        if (isNaN(angle)) { console.error(`[CS03Knob updateVisuals ${paramId}] Calculated angle is NaN for value ${value}`); return; }
-
-        let actualStartAngleForFill = DomUtils.KNOB_START_ANGLE;
-        let actualEndAngleForFill = angle;
-
-        if (!isUnipolar && vmin < 0.0 && vmax > 0.0) { 
-            const zeroAngle = DomUtils.mapValueToAngle(0, vmin, vmax);
-            if (isNaN(zeroAngle)) {
-                 console.warn(`[CS03Knob updateVisuals ${paramId}] Calculated zeroAngle is NaN for bipolar track. vmin=${vmin}, vmax=${vmax}. Track may not draw correctly from center.`);
-            } else {
-                if (value >= 0) { 
-                    actualStartAngleForFill = zeroAngle;
-                } else { 
-                    actualStartAngleForFill = angle; 
-                    actualEndAngleForFill = zeroAngle;
-                }
-            }
-        }
-        
-        const trackArcD = DomUtils.describeArc(knobBodyVisualCenterX, knobBodyVisualCenterY, trackVisualRadius, actualStartAngleForFill, actualEndAngleForFill);
-        trackFill.setAttribute('d', trackArcD || "");
-        trackFill.style.display = trackArcD ? '' : 'none';
-        
-        const trackBgArcD = DomUtils.describeArc(knobBodyVisualCenterX, knobBodyVisualCenterY, trackVisualRadius, DomUtils.KNOB_START_ANGLE, DomUtils.KNOB_START_ANGLE + DomUtils.KNOB_ANGLE_RANGE);
-        trackBg.setAttribute('d', trackBgArcD || "");
-
-        const orbitCenter = { x: knobBodyVisualCenterX, y: knobBodyVisualCenterY };
-        let currentOrbitRadius;
-        if (isIndicatorHTML) {
-            currentOrbitRadius = 0 - valueIndicatorMargin;
-        } else {
-            currentOrbitRadius = proceduralIndicatorOrbitRadius;
-        }
-
-        const indicatorPos = DomUtils.polarToCartesian(orbitCenter.x, orbitCenter.y, currentOrbitRadius, angle);
-
-        if (isNaN(indicatorPos.x) || isNaN(indicatorPos.y)) { console.error(`[CS03Knob ${paramId}] indicatorPos NaN`); return; }
-
-        let finalAngle = angle + valueIndicatorImageOriginalAngle + 90; 
-
-        if (indicatorElementTransformTarget) {
-            if (isIndicatorHTML) {
-                indicatorElementTransformTarget.style.left = `${(indicatorPos.x - knob_w / 2).toFixed(3)}px`;
-                indicatorElementTransformTarget.style.top = `${(indicatorPos.y - knob_h / 2).toFixed(3)}px`;
-                indicatorElementTransformTarget.style.transform = `rotate(${finalAngle.toFixed(3)}deg)`;
-            } else {
-                let svgRotation = 0;
-                if (valueIndicatorSvgPath && indicatorElementTransformTarget.firstChild && indicatorElementTransformTarget.firstChild.tagName === 'image') {
-                    svgRotation = finalAngle;
-                } else if (valueIndicatorType === 1) { // Rect indicator rotates with knob
-                    svgRotation = finalAngle;
-                }
-                // For circle indicators (default type 3), no rotation usually needed beyond translation.
-                // If specific rotation for circle indicators is needed, it would be set here.
-                indicatorElementTransformTarget.setAttribute('transform', `translate(${indicatorPos.x.toFixed(3)}, ${indicatorPos.y.toFixed(3)}) rotate(${svgRotation.toFixed(3)})`);
-            }
-        }
-
-        if (container.matches(':hover') && showValueTextOnHL && !isDragging && !container.querySelector('input.knob-value-input')) {
-            updateLabelTextWithValue(value);
-        }
-    }
-    
-    function updateLabelTextWithValue(value) {
-        if (showValueTextOnHL) {
-            labelElement.textContent = DomUtils.formatDisplayValue(value, valueTextFormat, vmin, vmax);
-            DomUtils.applyFont(labelElement, value_fontAlias || label_fontAlias);
-            labelElement.style.color = value_fontColor || label_fontColor;
-            labelElement.style.justifyContent = justifyContentStyle;
-        }
-    }
-
-    function resetLabelTextToOriginal() {
-        if (showValueTextOnHL) {
-            labelElement.textContent = labelElement.dataset.originalText;
-            DomUtils.applyFont(labelElement, label_fontAlias);
-            labelElement.style.color = label_fontColor;
-            labelElement.style.justifyContent = justifyContentStyle;
-        }
-    }
-
-    function setValue(newValue, triggerUpdate = true) {
-        let clampedInput = DomUtils.clamp(newValue, vmin, vmax);
-        if(isNaN(clampedInput)) { clampedInput = currentValue; }
-        let finalValue = DomUtils.clamp(DomUtils.quantizeValue(clampedInput, stepped, vmin), vmin, vmax);
-        if(isNaN(finalValue)) { finalValue = currentValue; }
-
-        if (finalValue !== currentValue || triggerUpdate) {
-            currentValue = finalValue;
-            container.dataset.currentValue = currentValue;
-            labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
-            if (triggerUpdate) updateVisuals(currentValue);
-            container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
-        }
-    }
-
-    function setValueFromTextInput(newValueString) {
-        const numValue = parseFloat(newValueString);
-        if (isNaN(numValue) || numValue < vmin || numValue > vmax) {
-            DomUtils.showToast(`Value for ${paramId} must be num between ${vmin}-${vmax}.`, 'warning', 2500);
-            return;
-        }
-        currentValue = DomUtils.clamp(numValue, vmin, vmax);
-        container.dataset.currentValue = currentValue;
-        labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
-        updateVisuals(currentValue);
-        container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
-        if (showValueTextOnHL) updateLabelTextWithValue(currentValue);
-    }
-
-    function applyHighlightLocal(doHighlight) { DomUtils.applyHighlight(doHighlight, elementsToHighlight, mergedAttributes); }
-
-    container.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
-        if (e.ctrlKey || e.metaKey) {
-            setValue(initial_display_value_and_ctrl_click_target);
-            if (showValueTextOnHL) { updateLabelTextWithValue(currentValue); clearTimeout(container.resetTimeout); container.resetTimeout = setTimeout(resetLabelTextToOriginal, 500); }
-            return;
-        }
-        isDragging = true; startY_coord = e.clientY; startValue = currentValue;
-        container.style.cursor = 'grabbing'; document.body.style.cursor = 'grabbing';
-        if (!container.matches(':hover')) applyHighlightLocal(true);
-        document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
-        e.preventDefault(); e.stopPropagation();
-    });
-
-    function onMouseMove(e) {
-        if (!isDragging) return;
-        const dv = (startY_coord - e.clientY) * DRAG_SENSITIVITY * (vmax - vmin || 1) / 150;
-        setValue(startValue + dv);
-        if (showValueTextOnHL) updateLabelTextWithValue(currentValue);
-    }
-
-    function onMouseUp(e) {
-        if (!isDragging) return;
-        isDragging = false; container.style.cursor = 'grab'; document.body.style.cursor = '';
-        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
-        if (springMode) setValue((spring_default_to_center && vmin < 0 && vmax > 0) ? 0 : true_xml_default_value);
-        if (!container.matches(':hover')) { applyHighlightLocal(false); if(!container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }
-        e.stopPropagation();
-    }
-
-    container.addEventListener('wheel', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const sa = stepped > 0 ? stepped * Math.sign(-e.deltaY) : Math.sign(-e.deltaY) * SCROLL_SENSITIVITY * (vmax-vmin||1);
-        setValue(currentValue + sa * (e.shiftKey ? 0.1 : 1.0));
-        if (showValueTextOnHL) {
-            updateLabelTextWithValue(currentValue); clearTimeout(container.scrollTimeout);
-            container.scrollTimeout = setTimeout(() => { if (!container.matches(':hover') && !isDragging && !container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }, 1000);
-        }
-    }, { passive: false });
-
-    container.addEventListener('mouseenter', () => { if (!isDragging) { applyHighlightLocal(true); if (showValueTextOnHL && !container.querySelector('input.knob-value-input')) updateLabelTextWithValue(currentValue); }});
-    container.addEventListener('mouseleave', () => { if (!isDragging) { applyHighlightLocal(false); if (!container.querySelector('input.knob-value-input')) resetLabelTextToOriginal(); }});
-
-    container.addEventListener('dblclick', (e) => {
-        e.preventDefault(); e.stopPropagation(); if (document.querySelector('.knob-value-input')) return;
-        const input = document.createElement('input'); input.type = 'text'; input.className = 'knob-value-input';
-        const infSym = (typeof DomUtils.INFINITY_SYMBOL === 'string' && DomUtils.INFINITY_SYMBOL) ? DomUtils.INFINITY_SYMBOL : "∞";
-        input.value = DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax).replace(' dB','').replace(infSym, String(vmin));
-        Object.assign(input.style, { position:'absolute', left:labelElement.style.left, top:labelElement.style.top, width:labelElement.style.width, height:labelElement.style.height, textAlign:'center', zIndex:'100', border:'1px solid #888', boxSizing:'border-box', color:value_fontColor||label_fontColor });
-        DomUtils.applyFont(input, value_fontAlias||label_fontAlias);
-        const tbgColor = DomUtils.parseColor(textEditBackColor);
-        input.style.backgroundColor = textEditBackColorTransparentMode && tbgColor.startsWith('rgb(') ? tbgColor.replace('rgb','rgba').replace(')','.8)') : (textEditBackColorTransparentMode ? 'rgba(51,51,51,0.8)' : tbgColor || 'rgba(51,51,51,0.9)');
-        labelElement.style.visibility = 'hidden'; container.appendChild(input); input.focus(); input.select();
-        const rmIn = () => { if(input.parentNode) input.parentNode.removeChild(input); labelElement.style.visibility='visible'; if(container.matches(':hover')&&showValueTextOnHL)updateLabelTextWithValue(currentValue); else if(showValueTextOnHL)resetLabelTextToOriginal();};
-        input.addEventListener('blur', rmIn);
-        input.addEventListener('keydown', (ev) => { if(ev.key==='Enter'){setValueFromTextInput(input.value);rmIn();} else if(ev.key==='Escape')rmIn(); ev.stopPropagation();});
-    });
-
-    updateVisuals(currentValue);
-
-    return { htmlElement: container, mainElementForAttributes: container, requiresRecursiveRender: false, postProcessFunction: null };
-}
-
-
-function renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const htmlElement = document.createElement('button');
-    htmlElement.classList.add('gui-text-button', 'gui-control-text-button');
-    htmlElement.textContent = mergedAttributes['text'] || 'Button';
-    htmlElement.dataset.controlTag = mergedAttributes['controlTag'] || '';
-
-    if (mergedAttributes['tooltip']) {
-        htmlElement.setAttribute('aria-label', mergedAttributes['tooltip']);
-        htmlElement.title = mergedAttributes['tooltip'];
-    } else {
-        htmlElement.setAttribute('aria-label', htmlElement.textContent);
-    }
-
-    return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
-        requiresRecursiveRender: false,
-        postProcessFunction: null
-    };
-}
-
-function renderCS01OnOffButton(xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const htmlElement = document.createElement('button');
-    htmlElement.classList.add('gui-onoff-button');
-
-    const commandOnOff = mergedAttributes['command'];
-    const onValue = mergedAttributes['on_value'] || '1.0';
-    const offValue = mergedAttributes['off_value'] || '0.0';
-    const vDefaultOnOff = mergedAttributes['vdefault'] || offValue;
-    const onOffParamId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
-
-    htmlElement.dataset.command = commandOnOff || '';
-    htmlElement.dataset.onValue = onValue;
-    htmlElement.dataset.offValue = offValue;
-    htmlElement.dataset.vdefault = vDefaultOnOff;
-    htmlElement.dataset.param = onOffParamId;
-
-    const defaultStateIsOn = vDefaultOnOff === onValue;
-    const initialStoredState = State.getElementState(onOffParamId);
-
-    let isActive;
-    if (initialStoredState !== null && initialStoredState !== undefined) {
-        isActive = String(initialStoredState) === '1' || initialStoredState === 1;
-    } else {
-        isActive = defaultStateIsOn;
-    }
-
-    if (isActive) {
-        htmlElement.classList.add('active');
-    } else {
-        htmlElement.classList.remove('active');
-    }
-
-    htmlElement.setAttribute('role', 'switch');
-    htmlElement.setAttribute('aria-checked', isActive ? 'true' : 'false');
-    htmlElement.setAttribute('aria-label', mergedAttributes['tooltip'] || (commandOnOff ? `Toggle ${commandOnOff.split('|')[1] || 'setting'}` : 'On/Off Button'));
-     if (mergedAttributes['text']) {
-        htmlElement.textContent = mergedAttributes['text'];
-    }
-
-    return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
-        requiresRecursiveRender: false,
-        postProcessFunction: null
-    };
-}
-
-/* STREAMING_CHUNK:Rendering the Image Button... */
-function renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const htmlElement = document.createElement('button');
-    htmlElement.classList.add('gui-image-button');
-    if (tagName === 'OnOffButton') htmlElement.classList.add('gui-onoff-button');
-    
-    const paramId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
-    htmlElement.dataset.param = paramId;
-    htmlElement.dataset.command = mergedAttributes['command'] || '';
-
-    const updateImage = (state) => {
-        const imgKey = state ? 'image_on' : 'image_off';
-        const imgPath = mergedAttributes[imgKey] || mergedAttributes['image'];
-        if (imgPath) {
-            const blob = State.getAssetBlobUrl(State.normalizePath(imgPath, State.getCurrentSkinRoot()));
-            if (blob) {
-                htmlElement.style.backgroundImage = `url(${blob})`;
-                htmlElement.style.backgroundSize = '100% 100%';
-            }
-        }
-    };
-
-    updateImage(false);
-
-    return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
-        requiresRecursiveRender: false,
-        postProcessFunction: null
-    };
-}
-
-/* STREAMING_CHUNK:Rendering the CS01 Expand View Button... */
-function renderCS01ExpandViewButton(xmlNode, mergedAttributes, currentParams, sourcePath, parentHtmlElement) {
-    const wrapper = document.createElement('div');
-    wrapper.classList.add('gui-expand-view-button-wrapper');
-
-    const button = document.createElement('button');
-    button.classList.add('gui-expand-view-button');
-    button.textContent = mergedAttributes['text'] || 'Open';
-
-
-    const closeButtonTag = mergedAttributes['close_button_tag'] || '';
-    button.dataset.closeButtonTag = closeButtonTag;
-    button.dataset.expandedViewCloser = mergedAttributes['expandedViewCloser'] || '0';
-
-    wrapper.appendChild(button);
-
-    const nestedContainerNode = xmlNode.querySelector('CS01ViewContainer');
-    if (nestedContainerNode) {
-        const containerElement = document.createElement('div');
-        containerElement.classList.add('gui-expandable-content-container');
-        containerElement.style.position = 'absolute';
-        containerElement.style.display = 'none';
-        containerElement.dataset.loadPath = nestedContainerNode.getAttribute('path') || '';
-        containerElement.dataset.originalDisplay = 'block';
-
-        const modalId = `modal-for-${closeButtonTag || generateSimpleId(5)}`;
-        containerElement.id = modalId;
-        button.dataset.modalContainerId = modalId;
-
-
-        const xoffset = parseFloat(nestedContainerNode.getAttribute('xoffset') || 0);
-        const yoffset = parseFloat(nestedContainerNode.getAttribute('yoffset') || 0);
-        containerElement.style.left = `${xoffset}px`;
-        containerElement.style.top = `${yoffset}px`;
-
-        const nestedStyleName = nestedContainerNode.getAttribute('style');
-        DomUtils.applyCommonAttributes(containerElement, nestedContainerNode, nestedStyleName);
-        DomUtils.applyStyles(containerElement, nestedStyleName, nestedContainerNode);
-
-        if (!containerElement.style.width || containerElement.style.width === '0px') { containerElement.style.width = '700px'; }
-        if (!containerElement.style.height || containerElement.style.height === '0px') { containerElement.style.height = '500px'; }
-
-        let currentZIndex = containerElement.style.zIndex ? parseInt(containerElement.style.zIndex, 10) : NaN;
-        if (isNaN(currentZIndex) || currentZIndex < 5000) {
-            containerElement.style.zIndex = '5500';
-        }
-
-        const guiContentWrapper = DomUtils.getGuiContentWrapper();
-        if (guiContentWrapper) {
-            guiContentWrapper.appendChild(containerElement);
-        } else {
-            console.warn(`[controlRenderer:CS01ExpandViewButton] guiContentWrapper not found. Modal might not behave as expected.`);
-            document.body.appendChild(containerElement); // Fallback
-        }
-
-    } else {
-        console.warn(`[controlRenderer:CS01ExpandViewButton] (tag: ${closeButtonTag}) in ${sourcePath} is missing a nested CS01ViewContainer. Pop-up content will be empty.`);
-    }
-
-    const postProcessFunction = (wrapperElement, mergedButtonAttrs, currentParams, sourceXmlNode, styleNameString) => {
-        const actualButton = wrapperElement.querySelector('.gui-expand-view-button');
-        if (actualButton && sourceXmlNode) {
-            DomUtils.applyCommonAttributes(actualButton, sourceXmlNode, styleNameString);
-            DomUtils.applyStyles(actualButton, styleNameString, sourceXmlNode);
-
-            if (mergedButtonAttrs['text'] && actualButton.textContent !== mergedButtonAttrs['text']) {
-                 actualButton.textContent = mergedButtonAttrs['text'];
-            }
-            if (!actualButton.textContent && (mergedButtonAttrs['text'] || 'Open')) {
-                 actualButton.textContent = mergedButtonAttrs['text'] || 'Open';
-            }
-        } else {
-            if (actualButton && mergedButtonAttrs) {
-                if (mergedButtonAttrs['font']) DomUtils.applyFont(actualButton, mergedButtonAttrs['font']);
-                let textColor = mergedButtonAttrs['color'] || mergedButtonAttrs['color_text'] || mergedButtonAttrs['fontColor'];
-                if (textColor) actualButton.style.color = DomUtils.parseColor(textColor);
-                if (mergedButtonAttrs['text'] && !actualButton.textContent) actualButton.textContent = mergedButtonAttrs['text'];
-
-                 let bgImageStyle = mergedButtonAttrs['background-image'] || mergedButtonAttrs['image'];
-                if (bgImageStyle) {
-                    if (typeof bgImageStyle === 'string' && bgImageStyle.toLowerCase().startsWith('url(')) {
-                        const match = bgImageStyle.match(/url\s*\(\s*['"]?([^'")]+)['"]?\s*\)/i);
-                        if (match && match[1]) {
-                            const path = match[1];
-                            const blobUrl = State.getAssetBlobUrl(path);
-                            if (blobUrl) actualButton.style.backgroundImage = `url(${blobUrl})`;
-                            else actualButton.style.backgroundImage = bgImageStyle;
-                        } else actualButton.style.backgroundImage = bgImageStyle;
-                    } else {
-                        const blobUrl = State.getAssetBlobUrl(bgImageStyle);
-                        if (blobUrl) actualButton.style.backgroundImage = `url(${blobUrl})`;
-                    }
-                }
-                let bgColor = mergedButtonAttrs['background-color'] || mergedButtonAttrs['backgroundColor'] || mergedButtonAttrs['color_back'];
-                if (bgColor) actualButton.style.backgroundColor = DomUtils.parseColor(bgColor);
-            }
-        }
-    };
-
-    return {
-        htmlElement: wrapper,
-        mainElementForAttributes: wrapper,
-        requiresRecursiveRender: false,
-        postProcessFunction: postProcessFunction
-    };
-}
-
-function renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath) {
-    const htmlElement = document.createElement('button');
-    htmlElement.classList.add('gui-image-button');
-    if (tagName === 'OnOffButton') htmlElement.classList.add('gui-onoff-button');
-         
-    const paramId = DomUtils.getParamValue(xmlNode, currentParams.paramOffset);
-    htmlElement.dataset.param = paramId;
-    htmlElement.dataset.command = mergedAttributes['command'] || '';
-
-    const updateImage = (state) => {
-        const imgKey = state ? 'image_on' : 'image_off';
-        const imgPath = mergedAttributes[imgKey] || mergedAttributes['image'];
-        if (imgPath) {
-            const blob = State.getAssetBlobUrl(State.normalizePath(imgPath, State.getCurrentSkinRoot()));
-            if (blob) {
-                htmlElement.style.backgroundImage = `url(${blob})`;
-                htmlElement.style.backgroundSize = '100% 100%';
-            }
-        }
-    };
-
-    updateImage(false);
-
-    return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
-        requiresRecursiveRender: false,
-        postProcessFunction: null
-    };
-}
+import * as State from '../core/state.js';
+import * as DomUtils from '../core/domUtils.js';
+import { renderCS01Slider, renderCS03Slider } from './sliderRenderer.js?v=2';
+import { renderCS03Knob } from './knobRenderer.js?v=2';
+import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton } from './buttonRenderer.js?v=2';
+import { renderCS01ExpandViewButton } from './expandViewButtonRenderer.js?v=2';
+import { createModulationLinksContainer } from './modulationLinksRenderer.js';
 
 export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourcePath, mergedAttributes) {
     switch (tagName) {
@@ -876,15 +19,313 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             return renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01OnOffButton':
             return renderCS01OnOffButton(xmlNode, mergedAttributes, currentParams, sourcePath);
-        case 'CS01ExpandViewButton':
-            return renderCS01ExpandViewButton(xmlNode, mergedAttributes, currentParams, sourcePath, parentHtmlElement);
+        case 'CS01CheckButtons':
+            return renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'CS01ExpandViewButton': {
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('gui-expand-view-button-wrapper');
+            wrapper.style.position = 'absolute';
+
+            const btn = document.createElement('button');
+            btn.classList.add('gui-expand-view-trigger');
+            btn.style.width = '100%';
+            btn.style.height = '100%';
+            btn.style.cursor = 'pointer';
+            btn.style.border = 'none';
+            btn.style.padding = '0';
+            btn.style.boxSizing = 'border-box';
+            btn.textContent = mergedAttributes['text'] || 'Settings';
+
+            wrapper.appendChild(btn);
+
+            // Popover viewport canvas frame positioned absolutely over the active GUI workspace
+            const popoverPanel = document.createElement('div');
+            popoverPanel.classList.add('gui-expand-view-popover-panel');
+            popoverPanel.style.position = 'absolute';
+            popoverPanel.style.display = 'none';
+            popoverPanel.style.zIndex = '5000';
+
+            // Calculate precise coordinates relative directly to the left edge of the main GUI screen
+            const childView = xmlNode.querySelector('CS01ViewContainer, CS01ViewContainer1, GUI, GUIContainer, GUIMacro');
+            let posX = '0';
+            let posY = '40';
+            if (childView) {
+                posX = childView.getAttribute('x') || childView.getAttribute('xoffset') || '0';
+                posY = childView.getAttribute('y') || childView.getAttribute('yoffset') || '40';
+            }
+            popoverPanel.style.left = posX.endsWith('px') ? posX : `${posX}px`;
+            popoverPanel.style.top = posY.endsWith('px') ? posY : `${posY}px`;
+
+            // Traverse upwards to pinpoint the absolute top-level drawn faceplate GUI workspace root node
+            let rootGuiNode = parentHtmlElement;
+            while (rootGuiNode && rootGuiNode.parentElement && rootGuiNode.dataset.xmlTagName !== 'GUI' && !rootGuiNode.classList.contains('synth-faceplate-root')) {
+                rootGuiNode = rootGuiNode.parentElement;
+            }
+            const targetAppendSurface = rootGuiNode || parentHtmlElement;
+
+            // Append popover directly to the top-level GUI surface to resolve alignment strictly from the left window edge
+            if (targetAppendSurface && typeof targetAppendSurface.appendChild === 'function') {
+                targetAppendSurface.appendChild(popoverPanel);
+            }
+
+            const closeTag = xmlNode.getAttribute('close_button_tag') || xmlNode.getAttribute('controlTag') || xmlNode.getAttribute('controltag');
+
+            return {
+                htmlElement: wrapper,
+                childAppendElement: popoverPanel,
+                mainElementForAttributes: wrapper,
+                requiresRecursiveRender: true,
+                postProcessFunction: (element, attrs) => {
+                    const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055';
+                    const colorPushed = attrs['color_pushed'] || attrs['color_pushed'] || '#ffffff';
+                    const colorText = attrs['color_text'] || attrs['color_text'] || '#cbcbd8';
+                    const fontAttr = attrs['font'];
+                    const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0.2');
+
+                    btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                    btn.style.color = DomUtils.parseColor ? DomUtils.parseColor(colorText) : colorText;
+
+                    if (fontAttr && DomUtils.applyFont) {
+                        DomUtils.applyFont(btn, fontAttr);
+                    }
+
+                    const h = parseFloat(attrs['h'] || '22');
+                    btn.style.borderRadius = `${rRatio * h}px`;
+
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isCurrentlyOpen = popoverPanel.style.display === 'block';
+                        if (isCurrentlyOpen) {
+                            popoverPanel.style.display = 'none';
+                            btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                            btn.classList.remove('expanded');
+                        } else {
+                            // Synchronize display channels by auto-hiding other loose panels
+                            document.querySelectorAll('.gui-expand-view-popover-panel').forEach(p => p.style.display = 'none');
+                            
+                            // Parse live environment specifications from the browser user agent context
+                            const ua = navigator.userAgent;
+                            let browserName = "Web Browser";
+                            let browserVersion = "Internal";
+                            let jsEngineName = "ECMAScript Engine";
+
+                            if (/Edg\/([\d.]+)/.test(ua)) {
+                                browserName = "Microsoft Edge";
+                                browserVersion = ua.match(/Edg\/([\d.]+)/)[1];
+                                jsEngineName = "V8 Engine";
+                            } else if (/Chrome\/([\d.]+)/.test(ua)) {
+                                browserName = "Google Chrome";
+                                browserVersion = ua.match(/Chrome\/([\d.]+)/)[1];
+                                jsEngineName = "V8 Engine";
+                            } else if (/Firefox\/([\d.]+)/.test(ua)) {
+                                browserName = "Mozilla Firefox";
+                                browserVersion = ua.match(/Firefox\/([\d.]+)/)[1];
+                                jsEngineName = "SpiderMonkey";
+                            } else if (/Version\/([\d.]+).*Safari/.test(ua)) {
+                                browserName = "Apple Safari";
+                                browserVersion = ua.match(/Version\/([\d.]+)/)[1];
+                                jsEngineName = "JavaScriptCore";
+                            }
+
+                            // Dynamically substitute parameters inside the popup container view branch
+                            popoverPanel.querySelectorAll('[data-xml-attr_param]').forEach(label => {
+                                const pName = label.dataset.xmlAttr_param;
+                                if (pName === 'DID_SAMPLERATE') label.textContent = '48000 Hz';
+                                if (pName === 'DID_CURBUFFERSIZE') label.textContent = '4096';
+                                if (pName === 'DID_MAXBUFFERSIZE') label.textContent = '4096';
+                                if (pName === 'DID_NOTES') label.textContent = '0';
+                                
+                                if (pName === 'DID_PRODUCTVERSION') {
+                                    let inferredProduct = 'chipsynth Plugin';
+                                    const rootPath = (typeof State.getCurrentSkinRoot === 'function' ? State.getCurrentSkinRoot() : '') || '';
+                                    if (rootPath) {
+                                        const normalized = rootPath.replace(/\\/g, '/');
+                                        const parts = normalized.split('/').filter(Boolean);
+                                        if (parts.length > 0) {
+                                            let folderToken = parts[parts.length - 1];
+                                            if ((folderToken.toLowerCase() === 'gui' || folderToken.toLowerCase() === 'skin' || folderToken.toLowerCase() === 'contents') && parts.length > 1) {
+                                                folderToken = parts[parts.length - 2];
+                                            }
+                                            inferredProduct = folderToken;
+                                        }
+                                    }
+                                    label.textContent = inferredProduct;
+                                }
+                                
+                                if (pName === 'DID_VERSION') {
+                                    label.textContent = `${browserName} v${browserVersion}`;
+                                }
+                                
+                                if (pName === 'DID_WRAPPERVERSION') {
+                                    label.textContent = `${jsEngineName} Environment`;
+                                }
+                            });
+
+                            popoverPanel.style.display = 'block';
+                            btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(colorPushed) : colorPushed;
+                            btn.classList.add('expanded');
+                        }
+                    });
+
+                    // Auto-dismiss when a child control matching close_button_tag is selected inside the layout sheets
+                    if (closeTag) {
+                        popoverPanel.addEventListener('click', (evt) => {
+                            const targetBtn = evt.target.closest('[data-xml-attr_controltag], [data-xml-attr_controlTag], [data-xml-attr_tag]');
+                            const tagVal = targetBtn?.dataset.xmlAttr_controltag || targetBtn?.dataset.xmlAttr_controlTag || targetBtn?.dataset.xmlAttr_tag;
+                            if (tagVal === String(closeTag)) {
+                                popoverPanel.style.display = 'none';
+                                btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                                btn.classList.remove('expanded');
+                            }
+                        });
+                    }
+
+                    // Intercept clicks using capturing mode (true) so parameter elements cannot swallow the event stream
+                    document.addEventListener('click', (event) => {
+                        if (popoverPanel.style.display === 'block') {
+                            const rootGui = targetAppendSurface;
+                            if (rootGui.contains(event.target) && !btn.contains(event.target) && !popoverPanel.contains(event.target)) {
+                                popoverPanel.style.display = 'none';
+                                btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                                btn.classList.remove('expanded');
+                            }
+                        }
+                    }, true);
+                }
+            };
+        }
+        case 'CS01BrowserContainer':
+            return {
+                htmlElement: document.createElement('div'),
+                mainElementForAttributes: null,
+                requiresRecursiveRender: true,
+                postProcessFunction: (element, attrs) => {
+                    if (xmlNode.getAttribute('drawFill') !== '1' && attrs['drawFill'] !== '1' && attrs['drawfill'] !== '1') {
+                        element.style.setProperty('background-color', 'transparent', 'important');
+                    }
+                }
+            };
+        case 'CS01ModulationLinksContainer':
+            const modContainer = createModulationLinksContainer(xmlNode, mergedAttributes);
+            return { 
+                htmlElement: modContainer, 
+                mainElementForAttributes: modContainer, 
+                requiresRecursiveRender: false, 
+                postProcessFunction: (element, attrs) => {
+                    if (xmlNode.getAttribute('drawFrame') === '0' || attrs['drawFrame'] === '0' || attrs['drawframe'] === '0') {
+                        element.style.setProperty('border', 'none', 'important');
+                        element.style.setProperty('box-shadow', 'none', 'important');
+                        element.style.setProperty('outline', 'none', 'important');
+                    }
+                } 
+            };
         case 'Button':
         case 'OnOffButton':
         case 'CommandButton':
-        case 'HoldButton':
-            return renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'HoldButton': {
+            const result = renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath);
+            const originalPostProcess = result.postProcessFunction;
+            
+            result.postProcessFunction = (...args) => {
+                // Run the native rule engine first so conditional stacking/visibility rules evaluate perfectly
+                if (originalPostProcess) originalPostProcess(...args);
+                
+                // Safely apply transparency overrides second without locking out engine states
+                const element = args[0];
+                if (element) {
+                    element.style.setProperty('background-color', 'transparent', 'important');
+                    element.style.setProperty('border', 'none', 'important');
+                    element.style.setProperty('outline', 'none', 'important');
+                    element.style.setProperty('box-shadow', 'none', 'important');
+                    element.style.setProperty('padding', '0', 'important');
+                    
+                    element.querySelectorAll('img, svg').forEach(child => {
+                        child.style.setProperty('background-color', 'transparent', 'important');
+                    });
+                }
+            };
+            return result;
+        }
         default:
             console.warn(`[controlRenderer] Attempted to render unhandled tag: ${tagName}`);
             return { htmlElement: null, mainElementForAttributes: null, requiresRecursiveRender: true, postProcessFunction: null };
     }
+}
+
+function renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const container = document.createElement('div');
+    container.classList.add('gui-check-buttons-container');
+    container.style.position = 'absolute';
+
+    const paramId = mergedAttributes['param'] || (currentParams ? currentParams.paramOffset : 0);
+    const vDefault = mergedAttributes['vdefault'] || '0';
+
+    for (const child of xmlNode.children) {
+        if (child.tagName === 'OptionItem') {
+            const btn = document.createElement('button');
+            btn.classList.add('gui-check-option-button');
+            btn.style.position = 'absolute';
+            
+            const cx = child.getAttribute('x');
+            const cy = child.getAttribute('y');
+            const cw = child.getAttribute('w');
+            const ch = child.getAttribute('h');
+            if (cx) btn.style.left = `${cx}px`;
+            if (cy) btn.style.top = `${cy}px`;
+            if (cw) btn.style.width = `${cw}px`;
+            if (ch) btn.style.height = `${ch}px`;
+
+            btn.style.background = 'transparent';
+            btn.style.border = 'none';
+            btn.style.padding = '0';
+            btn.style.cursor = 'pointer';
+
+            const optVal = child.getAttribute('value');
+            const imgOn = child.getAttribute('image_on');
+            const imgOff = child.getAttribute('image_off');
+
+            const updateBtnImage = () => {
+                const currentStored = typeof State?.getElementState === 'function' ? State.getElementState(paramId) : null;
+                const activeVal = currentStored !== null ? String(currentStored) : String(vDefault);
+                const isSelected = String(optVal) === activeVal;
+                const targetImg = isSelected ? (imgOn || imgOff) : imgOff;
+                if (targetImg) {
+                    const blob = typeof State?.getAssetBlobUrl === 'function' ? State.getAssetBlobUrl(State.normalizePath(targetImg, State.getCurrentSkinRoot())) : null;
+                    if (blob) {
+                        btn.style.backgroundImage = `url(${blob})`;
+                        btn.style.backgroundSize = '100% 100%';
+                    }
+                }
+                if (isSelected) btn.classList.add('active');
+                else btn.classList.remove('active');
+            };
+
+            btn.addEventListener('click', () => {
+                if (typeof State?.setElementState === 'function' && paramId) {
+                    State.setElementState(paramId, optVal);
+                }
+                container.querySelectorAll('.gui-check-option-button').forEach(b => {
+                    if (typeof b.updateVisualState === 'function') b.updateVisualState();
+                });
+                if (typeof window?.updateControllerVisibilities === 'function') {
+                    window.updateControllerVisibilities();
+                }
+            });
+
+            btn.updateVisualState = updateBtnImage;
+            updateBtnImage();
+            container.appendChild(btn);
+        }
+    }
+
+    return {
+        htmlElement: container,
+        mainElementForAttributes: container,
+        requiresRecursiveRender: false,
+        postProcessFunction: (element) => {
+            element.querySelectorAll('.gui-check-option-button').forEach(b => {
+                if (typeof b.updateVisualState === 'function') b.updateVisualState();
+            });
+        }
+    };
 }

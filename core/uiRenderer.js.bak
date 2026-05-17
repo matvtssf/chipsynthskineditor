@@ -18,6 +18,18 @@ import * as TextDisplayRenderer from '../renderers/textDisplayRenderer.js';
 import * as ContainerRenderer from '../renderers/containerRenderer.js';
 import * as DropDownRenderer from '../renderers/dropDownRenderer.js';
 
+const originalApplyStyles = DomUtils.applyStyles;
+DomUtils.applyStyles = function(htmlElement, styleName, xmlNode, mergedAttributes) {
+    if (styleName && typeof styleName === 'string' && styleName.includes(';')) {
+        const parts = styleName.split(';').map(s => s.trim()).filter(Boolean);
+        for (const part of parts) {
+            originalApplyStyles(htmlElement, part, xmlNode, mergedAttributes);
+        }
+    } else {
+        originalApplyStyles(htmlElement, styleName, xmlNode, mergedAttributes);
+    }
+};
+
 const tagToRendererMap = {
     // DrawRenderer tags
     'Rect': DrawRenderer,
@@ -34,10 +46,12 @@ const tagToRendererMap = {
     'CS01TextButton': ControlRenderer,
     'CS01OnOffButton': ControlRenderer,
     'CS01ExpandViewButton': ControlRenderer,
+    'CS01ModulationLinksContainer': ControlRenderer,
     'Button': ControlRenderer,
     'OnOffButton': ControlRenderer,
     'CommandButton': ControlRenderer,
     'HoldButton': ControlRenderer,
+    'CS01CheckButtons': ControlRenderer,
 
     // KeyboardRenderer tags
     'CS01Keyboard': KeyboardRenderer,
@@ -49,6 +63,7 @@ const tagToRendererMap = {
     'DisplayStringOption': TextDisplayRenderer, 
 
     // ContainerRenderer tags
+    'GUI': ContainerRenderer,
     'CS01ViewContainer': ContainerRenderer,
     'CS01ViewContainer1': ContainerRenderer,
     'VisibilityContainer': ContainerRenderer,
@@ -58,6 +73,10 @@ const tagToRendererMap = {
     'CS01ScrollViewPageController': ContainerRenderer,
     'PopupOverlay': ContainerRenderer,
     'Splash': ContainerRenderer,
+    'CS01BrowserContainer': ContainerRenderer,
+    'CS01Browser': ContainerRenderer,
+    'CS01WaveEditorContainer': ContainerRenderer,
+    'CS01WaveEditor': ContainerRenderer,
 
     // DropDownRenderer tags
     'PresetMenu': DropDownRenderer,
@@ -67,6 +86,116 @@ const tagToRendererMap = {
     'CS01AssignmentMap': ContainerRenderer,
 };
 
+let cachedStyleMacros = null;
+function resolveStyleMacros(attributes) {
+    if (!cachedStyleMacros) {
+        cachedStyleMacros = {};
+        try {
+            const pathsToTry = ['GUI/styles.xml', 'gui/styles.xml', 'GUI/Styles.xml', 'gui/Styles.xml'];
+            let stylesContent = null;
+            for (const p of pathsToTry) {
+                stylesContent = State.getFileContent(p);
+                if (stylesContent) break;
+            }
+            if (!stylesContent && typeof State.getCurrentSkinRoot === 'function') {
+                const root = State.getCurrentSkinRoot();
+                for (const p of pathsToTry) {
+                    stylesContent = State.getFileContent(State.normalizePath(p, root));
+                    if (stylesContent) break;
+                }
+            }
+            if (!stylesContent && typeof State.getXmlMacros === 'function') {
+                const macros = State.getXmlMacros();
+                if (macros && typeof macros.get === 'function') {
+                    stylesContent = macros.get('styles.xml') || macros.get('Styles.xml');
+                }
+            }
+
+            if (stylesContent) {
+                const macroRegex = /<StyleMacro\s+name="([^"]+)"\s+value="([^"]+)"/g;
+                let match;
+                while ((match = macroRegex.exec(stylesContent)) !== null) {
+                    cachedStyleMacros[match[1]] = match[2];
+                }
+            }
+        } catch (err) {
+            console.warn("[uiRenderer] Failed to pre-parse StyleMacros:", err);
+        }
+    }
+
+    for (const key in attributes) {
+        if (typeof attributes[key] === 'string') {
+            const trimmedVal = attributes[key].trim();
+            if (cachedStyleMacros[trimmedVal]) {
+                attributes[key] = cachedStyleMacros[trimmedVal];
+            }
+        }
+    }
+    
+    // Map custom Plogue boxColor property to standard backgroundColor so it applies to the HTML track container background
+    const bColor = attributes['boxColor'] || attributes['boxcolor'];
+    if (bColor && !attributes['backgroundColor'] && !attributes['backgroundcolor']) {
+        attributes['backgroundColor'] = bColor;
+    }
+    
+    return attributes;
+}
+
+let cachedStyleMacros = null;
+function resolveStyleMacros(attributes) {
+    if (!cachedStyleMacros) {
+        cachedStyleMacros = {};
+        try {
+            const pathsToTry = ['GUI/styles.xml', 'gui/styles.xml', 'GUI/Styles.xml', 'gui/Styles.xml'];
+            let stylesContent = null;
+            for (const p of pathsToTry) {
+                stylesContent = State.getFileContent(p);
+                if (stylesContent) break;
+            }
+            if (!stylesContent && typeof State.getCurrentSkinRoot === 'function') {
+                const root = State.getCurrentSkinRoot();
+                for (const p of pathsToTry) {
+                    stylesContent = State.getFileContent(State.normalizePath(p, root));
+                    if (stylesContent) break;
+                }
+            }
+            if (!stylesContent && typeof State.getXmlMacros === 'function') {
+                const macros = State.getXmlMacros();
+                if (macros && typeof macros.get === 'function') {
+                    stylesContent = macros.get('styles.xml') || macros.get('Styles.xml');
+                }
+            }
+
+            if (stylesContent) {
+                const macroRegex = /<StyleMacro\s+name="([^"]+)"\s+value="([^"]+)"/g;
+                let match;
+                while ((match = macroRegex.exec(stylesContent)) !== null) {
+                    cachedStyleMacros[match[1]] = match[2];
+                }
+            }
+        } catch (err) {
+            console.warn("[uiRenderer] Failed to pre-parse StyleMacros:", err);
+        }
+    }
+
+    for (const key in attributes) {
+        if (typeof attributes[key] === 'string') {
+            const trimmedVal = attributes[key].trim();
+            if (cachedStyleMacros[trimmedVal]) {
+                attributes[key] = cachedStyleMacros[trimmedVal];
+            }
+        }
+    }
+    
+    // Map custom Plogue boxColor property to standard backgroundColor so it applies to the HTML track container background
+    const bColor = attributes['boxColor'] || attributes['boxcolor'];
+    if (bColor && !attributes['backgroundColor'] && !attributes['backgroundcolor']) {
+        attributes['backgroundColor'] = bColor;
+    }
+    
+    return attributes;
+}
+
 export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, sourcePath = 'unknown.xml') {
     if (!xmlNode || xmlNode.nodeType !== Node.ELEMENT_NODE || !parentHtmlElement) {
         return;
@@ -75,7 +204,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
     const tagName = xmlNode.tagName;
     const styleName = xmlNode.getAttribute('style'); 
 
-    if (tagName === 'GUIMacro') {
+    if (tagName === 'GUIMacro' || tagName === 'GUIContainer') {
         const macroPath_relative = xmlNode.getAttribute('path');
         const xoffset = xmlNode.getAttribute('xoffset');
         const yoffset = xmlNode.getAttribute('yoffset');
@@ -100,9 +229,112 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
         }
 
         try {
+            let sanitizedMacro = macroContent;
+
+            // Extract text compilation variables from child Define elements
+            const localDefs = {};
+            xmlNode.querySelectorAll('Define').forEach(def => {
+                const name = def.getAttribute('name');
+                const value = def.getAttribute('value');
+                if (name) localDefs[name] = value || '';
+            });
+
+            // If compiler flags are acting as layout comments, strip the inactive blocks cleanly to protect the DOM structure
+            if (localDefs['$MUTEIN']?.includes('')) {
+                const regexPattern = /\$MUTEIN([\s\S]*?)\$MUTEOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+            if (localDefs['$DACIN']?.includes('')) {
+                const regexPattern = /\$DACIN([\s\S]*?)\$DACOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+            if (localDefs['$SIDIN']?.includes('')) {
+                const regexPattern = /\$SIDIN([\s\S]*?)\$MUTEOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+
+            // Clean up remaining flag anchors
+            for (const defKey in localDefs) {
+                sanitizedMacro = sanitizedMacro.replaceAll(defKey, localDefs[defKey]);
+            }
+
+            // 1. Repair missing delimiter spacing between concatenated attributes (e.g., w="10"h="20" -> w="10" h="20")
+            sanitizedMacro = sanitizedMacro.replace(/"([a-zA-Z_][a-zA-Z0-9_\-]*)=/g, '" $1=');
+            sanitizedMacro = sanitizedMacro.replace(/'([a-zA-Z_][a-zA-Z0-9_\-]*)=/g, "' $1=");
+            // 2. Repair unescaped '<' inside attribute values before parsing
+            sanitizedMacro = sanitizedMacro.replace(/=\s*"([^"]*)"/g, (m, p1) => '="' + p1.replace(/</g, '&lt;') + '"');
+            sanitizedMacro = sanitizedMacro.replace(/=\s*'([^']*)'/g, (m, p1) => "='" + p1.replace(/</g, '&lt;') + "'");
+            // 3. Automatically encode unescaped ampersands that disrupt standard document generation trees
+            sanitizedMacro = sanitizedMacro.replace(/&(?!([a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)/g, '&amp;');
+
             const parser = new DOMParser();
-            const macroDoc = parser.parseFromString(macroContent, "application/xml");
-            const parseErrorNode = macroDoc.querySelector("parsererror");
+            let macroDoc = parser.parseFromString(sanitizedMacro, "application/xml");
+            let parseErrorNode = macroDoc.querySelector("parsererror");
+
+            // Fallback Recovery: If strict parsing fails (e.g. multi-root include or leading junk lines), wrap in a virtual container
+            if (parseErrorNode) {
+                let cleanBody = sanitizedMacro.replace(/<\?xml[^>]*\?>/gi, '').trim();
+                let wrappedBody = `<virtual-macro-root>${cleanBody}</virtual-macro-root>`;
+                const recoveryDoc = parser.parseFromString(wrappedBody, "application/xml");
+                if (!recoveryDoc.querySelector("parsererror")) {
+                    macroDoc = recoveryDoc;
+                    parseErrorNode = null;
+                }
+            }
+
+            // Fallback Recovery 2: Parse via lenient HTML parser and rebuild a compliant case-sensitive XML DOM tree
+            if (parseErrorNode) {
+                try {
+                    const htmlDoc = parser.parseFromString(sanitizedMacro, "text/html");
+                    if (htmlDoc && htmlDoc.body) {
+                        const xmlDocInstance = document.implementation.createDocument(null, "virtual-macro-root", null);
+                        const xmlRoot = xmlDocInstance.documentElement;
+                        
+                        const tagMap = {};
+                        Object.keys(tagToRendererMap).forEach(k => { tagMap[k.toLowerCase()] = k; });
+                        ['font', 'styles', 'property', 'define', 'xmlmacrotext', 'style', 'stylemacro', 'optionitem', 'displaystringoptionitem', 'point', 'pagename', 'cs01assignmentmaptarget', 'guimacro', 'guicontainer'].forEach(t => {
+                            tagMap[t] = t === 'guimacro' ? 'GUIMacro' : (t === 'guicontainer' ? 'GUIContainer' : (t === 'xmlmacrotext' ? 'XMLMacroText' : (t === 'displaystringoptionitem' ? 'DisplayStringOptionItem' : t)));
+                        });
+
+                        function convertHtmlToXml(htmlNode, xmlParent) {
+                            for (const child of htmlNode.childNodes) {
+                                if (child.nodeType === Node.ELEMENT_NODE) {
+                                    const htmlTag = child.tagName.toLowerCase();
+                                    const correctTag = tagMap[htmlTag] || child.tagName;
+                                    const xmlChild = xmlDocInstance.createElement(correctTag);
+                                    
+                                    for (const attr of child.attributes) {
+                                        let attrName = attr.name;
+                                        if (attrName === 'framewidth') attrName = 'frameWidth';
+                                        if (attrName === 'drawmode') attrName = 'drawMode';
+                                        if (attrName === 'reversepoints') attrName = 'reversePoints';
+                                        if (attrName === 'closeshape') attrName = 'closeShape';
+                                        if (attrName === 'valueindicator_x') attrName = 'valueIndicator_x';
+                                        if (attrName === 'textedit_backcolor') attrName = 'textEdit_backColor';
+                                        if (attrName === 'visibilitychangename') attrName = 'visibilityChangeName';
+                                        if (attrName === 'visibilitychangedirection') attrName = 'visibilityChangeDirection';
+                                        if (attrName === 'roundedrectratio') attrName = 'roundedRectRatio';
+                                        if (attrName === 'configsetname') attrName = 'configSetName';
+                                        xmlChild.setAttribute(attrName, attr.value);
+                                    }
+                                    
+                                    xmlParent.appendChild(xmlChild);
+                                    convertHtmlToXml(child, xmlChild);
+                                } else if (child.nodeType === Node.TEXT_NODE) {
+                                    xmlParent.appendChild(xmlDocInstance.createTextNode(child.textContent));
+                                }
+                            }
+                        }
+                        
+                        convertHtmlToXml(htmlDoc.body, xmlRoot);
+                        macroDoc = xmlDocInstance;
+                        parseErrorNode = null;
+                    }
+                } catch (htmlError) {
+                    console.warn("[uiRenderer] Lenient HTML recovery parsing failed:", htmlError);
+                }
+            }
+
             if (parseErrorNode && parseErrorNode.textContent.trim() !== "") {
                 let errorDetails = parseErrorNode.textContent;
                 const srcTextNode = Array.from(parseErrorNode.childNodes).find(node => node.nodeName === 'sourcetext');
@@ -112,7 +344,13 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 throw new Error(`GUIMacro "${fullMacroPath}" parse error: ${errorDetails}`);
             }
             
-            const macroRootNode = macroDoc.documentElement;
+            let macroRootNode = macroDoc.documentElement;
+            if (macroRootNode && macroRootNode.tagName === 'virtual-macro-root') {
+                if (macroRootNode.children.length === 1) {
+                    macroRootNode = macroRootNode.firstElementChild;
+                }
+            }
+
             if (!macroRootNode || !macroRootNode.tagName) { 
                 throw new Error(`GUIMacro "${fullMacroPath}" content is empty or has invalid root XML structure.`);
             }
@@ -128,13 +366,28 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 if (yoffset) macroHostDiv.style.top = yoffset.endsWith('px') ? yoffset : yoffset + 'px';
             }
             
-            const macroRootW = macroRootNode.getAttribute('w');
-            const macroRootH = macroRootNode.getAttribute('h');
+            let macroRootW = macroRootNode.getAttribute('w');
+            let macroRootH = macroRootNode.getAttribute('h');
+            
+            // Recompute bounding box maxima if wrapped inside a multi-root recovery container
+            if (!macroRootW || !macroRootH) {
+                let maxW = 0, maxH = 0;
+                for (const child of macroRootNode.children) {
+                    const cw = parseFloat(child.getAttribute('w') || '0');
+                    const ch = parseFloat(child.getAttribute('h') || '0');
+                    if (cw > maxW) maxW = cw;
+                    if (ch > maxH) maxH = ch;
+                }
+                if (maxW > 0 && !macroRootW) macroRootW = String(maxW);
+                if (maxH > 0 && !macroRootH) macroRootH = String(maxH);
+            }
+
             if (macroRootW) macroHostDiv.style.width = macroRootW.endsWith('px') ? macroRootW : macroRootW + 'px';
             if (macroRootH) macroHostDiv.style.height = macroRootH.endsWith('px') ? macroRootH : macroRootH + 'px';
             
-            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles())); 
-            DomUtils.applyStyles(macroHostDiv, styleName, xmlNode, DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles())); 
+            const macroMergedAttrs = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
+            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, macroMergedAttrs); 
+            DomUtils.applyStyles(macroHostDiv, styleName, xmlNode, macroMergedAttrs); 
 
             parentHtmlElement.appendChild(macroHostDiv);
 
@@ -145,13 +398,6 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     newParamOffset += offset;
                 }
             }
-
-            const localDefs = {};
-            xmlNode.querySelectorAll('Define').forEach(def => {
-                const name = def.getAttribute('name');
-                const value = def.getAttribute('value');
-                if (name) localDefs[name] = value || '';
-            });
 
             const newCurrentParams = { 
                 ...currentParams, 
@@ -177,12 +423,58 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
         'Font', 'Styles', 'Property', 'Define', 'XMLMacroText', 
         'Style', 'StyleMacro', 'OptionItem', 'DisplayStringOptionItem', 
         'Point', 'PageName',
-        'CS01AssignmentMapTarget', 
-        'CS01ViewConfigurationSet', 'CSViewConfiguration', 'CS01ViewAssoc' 
+        'CS01AssignmentMapTarget'
     ];
 
     if (ignoredTags.includes(tagName)) {
         return;
+    }
+
+    if (!window.csViewConfigManagers) window.csViewConfigManagers = [];
+    if (!window.csViewConfigSets) window.csViewConfigSets = {};
+
+    if (tagName === 'CS01ViewContainerManager') {
+        const paramId = DomUtils.getParamValue(xmlNode, currentParams ? currentParams.paramOffset : 0);
+        const configSetName = xmlNode.getAttribute('configSetName');
+        if (!window.csViewConfigManagers.find(m => m.configSetName === configSetName)) {
+            window.csViewConfigManagers.push({ param: paramId, configSetName: configSetName });
+        }
+        return;
+    }
+
+    if (tagName === 'CS01ViewConfigurationSet') {
+        const setName = xmlNode.getAttribute('name');
+        const setObj = {};
+        const allContainees = new Set();
+
+        for (const configNode of xmlNode.children) {
+            if (configNode.tagName === 'CSViewConfiguration') {
+                const configName = configNode.getAttribute('name');
+                const assocs = [];
+                for (const assocNode of configNode.children) {
+                    if (assocNode.tagName === 'CS01ViewAssoc') {
+                        const containee = assocNode.getAttribute('containee');
+                        if (containee && containee !== 'none') allContainees.add(containee);
+                        assocs.push({
+                            container: assocNode.getAttribute('container'),
+                            containee: containee,
+                            defines: assocNode.getAttribute('defines')
+                        });
+                    }
+                }
+                setObj[configName] = assocs;
+            }
+        }
+        
+        window.csViewConfigSets[setName] = {
+            configs: setObj,
+            allContainees: Array.from(allContainees)
+        };
+        return;
+    }
+
+    if (tagName === 'CSViewConfiguration' || tagName === 'CS01ViewAssoc') {
+        return; 
     }
 
     let htmlElement = null;
@@ -191,7 +483,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
     let requiresRecursiveRender = true; 
     let postProcessFunction = null;     
 
-    const mergedAttributes = DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles());
+    const mergedAttributes = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
 
     if (currentParams && currentParams.macroDefs) {
         for (const key in mergedAttributes) {
@@ -215,160 +507,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
 
         let moduleRenderResult = null;
 
-        if (tagName === 'CS01ExpandViewButton') {
-            const btnElement = document.createElement('button');
-            btnElement.classList.add('gui-expand-view-button');
-            btnElement.style.position = 'absolute';
-            btnElement.style.cursor = 'pointer';
-            btnElement.style.display = 'flex';
-            btnElement.style.alignItems = 'center';
-            btnElement.style.justifyContent = 'center';
-            btnElement.style.border = 'none';
-            btnElement.style.background = 'transparent';
-            btnElement.style.boxShadow = 'none';
-            btnElement.style.textShadow = 'none';
-            btnElement.style.filter = 'none';
-            
-            const closeTag = mergedAttributes['close_button_tag'] || xmlNode.getAttribute('close_button_tag') || '';
-            btnElement.setAttribute('close_button_tag', closeTag);
-            btnElement.setAttribute('expandable_container_tag', closeTag);
-            btnElement.setAttribute('data-close-button-tag', closeTag);
-            btnElement.setAttribute('data-control-tag', closeTag);
-            btnElement.setAttribute('data-expandable-container-tag', closeTag);
-            btnElement.setAttribute('data-tag', closeTag);
-            
-            btnElement.dataset.xmlAttr_close_button_tag = closeTag;
-            btnElement.dataset.xmlAttr_expandable_container_tag = closeTag;
-            
-            const modalContainerId = `modal-container-${closeTag || Math.floor(Math.random() * 1000000)}`;
-            btnElement.setAttribute('data-modal-container-id', modalContainerId);
-            
-            const viewContainerChild = Array.from(xmlNode.children).find(child => child.tagName === 'CS01ViewContainer');
-            if (viewContainerChild) {
-                const pathAttr = viewContainerChild.getAttribute('path') || '';
-                
-                // Set all possible attribute variations on the element
-                btnElement.setAttribute('path', pathAttr);
-                btnElement.setAttribute('load_path', pathAttr);
-                btnElement.setAttribute('loadpath', pathAttr);
-                btnElement.setAttribute('container_path', pathAttr);
-                btnElement.setAttribute('container-path', pathAttr);
-                btnElement.setAttribute('view_path', pathAttr);
-                btnElement.setAttribute('view-path', pathAttr);
-                btnElement.setAttribute('gui_path', pathAttr);
-                btnElement.setAttribute('gui-path', pathAttr);
-                btnElement.setAttribute('src', pathAttr);
-                btnElement.setAttribute('file', pathAttr);
-                
-                // Set all possible dataset data-attribute variations
-                btnElement.setAttribute('data-path', pathAttr);
-                btnElement.setAttribute('data-load-path', pathAttr);
-                btnElement.setAttribute('data-loadpath', pathAttr);
-                btnElement.setAttribute('data-view-path', pathAttr);
-                btnElement.setAttribute('data-container-path', pathAttr);
-                
-                // Set XML mirror attributes for framework dataset lookups
-                btnElement.dataset.xmlAttr_path = pathAttr;
-                btnElement.dataset.xmlAttr_load_path = pathAttr;
-                btnElement.dataset.xmlAttr_loadpath = pathAttr;
-                btnElement.dataset.xmlAttr_container_path = pathAttr;
-                btnElement.dataset.xmlAttr_view_path = pathAttr;
-
-                // Seed all possible global registry maps on window to satisfy registry lookups by tag
-                if (closeTag) {
-                    window.expandablePaths = window.expandablePaths || {};
-                    window.expandablePaths[closeTag] = pathAttr;
-
-                    window.expandableContainers = window.expandableContainers || {};
-                    window.expandableContainers[closeTag] = pathAttr;
-
-                    window.loadPaths = window.loadPaths || {};
-                    window.loadPaths[closeTag] = pathAttr;
-
-                    window.containerPaths = window.containerPaths || {};
-                    window.containerPaths[closeTag] = pathAttr;
-
-                    window.viewPaths = window.viewPaths || {};
-                    window.viewPaths[closeTag] = pathAttr;
-                }
-            }
-            
-            const btnText = mergedAttributes['text'] || xmlNode.getAttribute('text') || '';
-            btnElement.textContent = btnText;
-
-            DomUtils.applyCommonAttributes(btnElement, xmlNode, mergedAttributes);
-            DomUtils.applyStyles(btnElement, styleName, xmlNode, mergedAttributes);
-
-            btnElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-
-                const workspace = parentHtmlElement.closest('.gui-view-container, .gui-view-container1') || parentHtmlElement;
-                if (workspace.querySelector('.gui-modal-backdrop')) return;
-
-                // Create full-screen modal backdrop surface layer
-                const backdrop = document.createElement('div');
-                backdrop.classList.add('gui-modal-backdrop');
-                backdrop.id = modalContainerId;
-                backdrop.setAttribute('data-modal-container-id', modalContainerId);
-                backdrop.setAttribute('data-close-button-tag', closeTag);
-                backdrop.setAttribute('data-control-tag', closeTag);
-                backdrop.setAttribute('data-expandable-container-tag', closeTag);
-                backdrop.style.position = 'absolute';
-                backdrop.style.top = '0';
-                backdrop.style.left = '0';
-                backdrop.style.width = '100%';
-                backdrop.style.height = '100%';
-                backdrop.style.zIndex = '10000';
-                backdrop.style.background = 'transparent';
-
-                // Create relative modal positioning frame content window
-                const modalContent = document.createElement('div');
-                modalContent.classList.add('gui-modal-content');
-                modalContent.style.position = 'absolute';
-                
-                if (viewContainerChild) {
-                    const xOff = viewContainerChild.getAttribute('xoffset') || '0';
-                    const yOff = viewContainerChild.getAttribute('yoffset') || '0';
-                    modalContent.style.left = xOff.endsWith('px') ? xOff : xOff + 'px';
-                    modalContent.style.top = yOff.endsWith('px') ? yOff : yOff + 'px';
-                    
-                    // Render sub-layer XML interface sheet recursively into view window panel
-                    renderElement(viewContainerChild, modalContent, currentParams, sourcePath);
-                }
-
-                backdrop.appendChild(modalContent);
-                workspace.appendChild(backdrop);
-
-                // Trigger dismissal cycle when user interaction occurs outside modal window contents
-                backdrop.addEventListener('mousedown', (clickEvent) => {
-                    if (clickEvent.target === backdrop) {
-                        backdrop.remove();
-                    }
-                });
-
-                // Intercept close events from sub-layer click bubbling paths gracefully
-                backdrop.addEventListener('click', (clickEvent) => {
-                    const targetBtn = clickEvent.target.closest('button, .gui-element');
-                    if (targetBtn) {
-                        const isCloseTrigger = 
-                            targetBtn.getAttribute('controlTag') === closeTag ||
-                            targetBtn.getAttribute('data-control-tag') === closeTag ||
-                            targetBtn.dataset.param === closeTag ||
-                            targetBtn.textContent?.trim().toLowerCase() === 'close';
-                            
-                        if (isCloseTrigger) {
-                            backdrop.remove();
-                        }
-                    }
-                });
-            });
-
-            htmlElement = btnElement;
-            childAppendElement = btnElement;
-            mainElementForAttributes = btnElement;
-            requiresRecursiveRender = false;
-            postProcessFunction = null;
-        } else if ((tagName === 'CS01Knob' || tagName === 'CS03Knob') && (mergedAttributes['showFill'] === '0' || mergedAttributes['showTrack'] === '0' || mergedAttributes['showfill'] === '0' || mergedAttributes['showtrack'] === '0')) {
+        if ((tagName === 'CS01Knob' || tagName === 'CS03Knob') && (mergedAttributes['showFill'] === '0' || mergedAttributes['showTrack'] === '0' || mergedAttributes['showfill'] === '0' || mergedAttributes['showtrack'] === '0')) {
             const boxElement = document.createElement('div');
             boxElement.classList.add('gui-knob-text-box');
             boxElement.style.position = 'absolute';
@@ -705,6 +844,72 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     }
                 });
 
+                // Define and run Dynamic Routing
+                window.updateDynamicRouting = function() {
+                    if (window.csViewConfigManagers && window.csViewConfigSets) {
+                        let hiddenStash = document.getElementById('cs-gui-hidden-stash');
+                        if (!hiddenStash) {
+                            hiddenStash = document.createElement('div');
+                            hiddenStash.id = 'cs-gui-hidden-stash';
+                            hiddenStash.style.display = 'none';
+                            document.body.appendChild(hiddenStash);
+                        }
+
+                        window.csViewConfigManagers.forEach(manager => {
+                            const paramId = manager.param;
+                            const configSetName = manager.configSetName;
+                            const configSetData = window.csViewConfigSets[configSetName];
+                            if (!configSetData) return;
+
+                            // Read from central State or knob dataset directly as fallback
+                            let currentVal = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
+                            if (currentVal === null || currentVal === undefined) {
+                                const knobEl = document.querySelector(`[data-param-id="${paramId}"]`);
+                                if (knobEl && knobEl.dataset.currentValue) currentVal = knobEl.dataset.currentValue;
+                                else currentVal = 0;
+                            }
+                            
+                            currentVal = Math.round(parseFloat(currentVal)).toString();
+
+                            const config = configSetData.configs[currentVal] || configSetData.configs['default'];
+                            if (!config) return;
+
+                            const activeContainees = new Set();
+
+                            config.forEach(assoc => {
+                                if (assoc.containee !== 'none' && assoc.container !== 'none') {
+                                    activeContainees.add(assoc.containee);
+                                    const containerEl = document.querySelector(`[data-xml-attr_identifier="${assoc.container}"]`);
+                                    const containeeEl = document.querySelector(`[data-xml-attr_identifier="${assoc.containee}"]`);
+                                    
+                                    if (containerEl && containeeEl) {
+                                        if (containeeEl.parentElement !== containerEl) {
+                                            containerEl.appendChild(containeeEl);
+                                            containeeEl.style.position = 'absolute';
+                                            containeeEl.style.left = '0px';
+                                            containeeEl.style.top = '0px';
+                                        }
+                                        containeeEl.style.display = 'block';
+                                    }
+                                }
+                            });
+
+                            configSetData.allContainees.forEach(containeeId => {
+                                if (!activeContainees.has(containeeId)) {
+                                    const containeeEl = document.querySelector(`[data-xml-attr_identifier="${containeeId}"]`);
+                                    if (containeeEl && containeeEl.parentElement !== hiddenStash) {
+                                        hiddenStash.appendChild(containeeEl);
+                                        containeeEl.style.display = 'none';
+                                    }
+                                }
+                            });
+                        });
+                    }
+                };
+                
+                // Run it once on initialization
+                window.updateDynamicRouting();
+
                 // Manage Style-Tinted Disabled Object Overlays for Containers
                 document.querySelectorAll('.gui-view-container, .gui-view-container1').forEach(container => {
                     const onOffBtn = container.querySelector('[data-role="onOff"]');
@@ -776,9 +981,14 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     }
                 });
 
-                // Style CS01OnOffButton elements as solid circle indicators matching original plugin
+                // Style CS01OnOffButton elements as indicators matching original plugin shapes
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
-                    btn.style.borderRadius = '50%';
+                    const hAttr = parseInt(btn.getAttribute('h') || btn.style.height || btn.offsetHeight || '20', 10);
+                    const wAttr = parseInt(btn.getAttribute('w') || btn.style.width || btn.offsetWidth || '20', 10);
+                    const rRatioAttr = btn.getAttribute('roundedRatio') || btn.getAttribute('roundedrectratio') || btn.getAttribute('fill_roundedratio') || '0.5';
+                    const radius = parseFloat(rRatioAttr) * Math.min(hAttr, wAttr);
+                    btn.style.borderRadius = `${radius}px`;
+                    
                     const paramId = btn.dataset.param;
                     const isActive = btn.classList.contains('active') || 
                         (paramId && typeof State.getElementState === 'function' && (State.getElementState(paramId) === 1 || State.getElementState(paramId) === '1'));
@@ -846,7 +1056,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             if (parentHtmlElement && typeof parentHtmlElement.appendChild === 'function') {
                 parentHtmlElement.appendChild(errorDiv);
             }
-} catch (e_placeholder) {
+        } catch (e_placeholder) {
             console.error(`[uiRenderer] FATAL: Could not append error placeholder for <${tagName}>. Placeholder error:`, e_placeholder);
         }
     }

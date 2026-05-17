@@ -8,16 +8,16 @@
  * MODIFIED: Ensure setupConfigModalListeners is called from handleConfigToggle.
  * ADDED: Logging for close button and grid toggle clicks.
  */
-import * as State from './core/state.js';
-import { applyCurrentBackgroundColor, showToast, logError } from './core/domUtils.js';
-import { toggleModalVisibility } from './managers/modalManager.js';
+import * as State from '../core/state.js';
+import { applyCurrentBackgroundColor, showToast, logError } from '../core/domUtils.js';
+import { toggleModalVisibility } from '../managers/modalManager.js';
 
 import {
     getConfigModal, getCloseConfigBtn, getGridToggle, getGridToggleCheckbox,
     getMainContentArea, getBgColorInput, getBgColorValue,
     getBgModeToggle, getBgModeCheckbox,
     getGuiZoomCanvas
-} from './core/domUtils.js';
+} from '../core/domUtils.js';
 
 let configListenersSetup = false;
 
@@ -39,12 +39,25 @@ export function setupConfigModalListeners() {
     const bgModeCheckbox = getBgModeCheckbox();
     const splashToggle = document.getElementById('simulate-splash-toggle');
     const splashCheckbox = document.getElementById('simulate-splash-checkbox');
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeCheckbox = document.getElementById('theme-toggle-checkbox');
 
-    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox) {
+    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox || !themeToggle || !themeCheckbox) {
         logError("[configModal setup] CRITICAL: One or more config modal elements not found during listener setup! Listeners NOT attached.", null, true);
         configListenersSetup = false; // Explicitly keep false if setup fails
         return;
     }
+
+    // Theme toggle
+    themeToggle.addEventListener('click', () => {
+        console.log("[configModal] themeToggle clicked!");
+        const isDark = !themeToggle.getAttribute('aria-checked') || themeToggle.getAttribute('aria-checked') === 'false';
+        themeToggle.setAttribute('aria-checked', String(isDark));
+        themeCheckbox.checked = isDark;
+        const themeValue = isDark ? 'dark' : 'light';
+        document.body.setAttribute('data-app-theme', themeValue);
+        localStorage.setItem('chipsynth-editor-theme', themeValue);
+    });
 
     // Close button
     closeBtn.addEventListener('click', (event) => {

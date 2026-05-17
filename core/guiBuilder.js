@@ -49,6 +49,11 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
     } else {
         console.warn("[guiBuilder] visibilityController.clearRegisteredContainers not available during reset.");
     }
+    
+    // Clear dynamic routing managers for clean reload
+    window.csViewConfigManagers = [];
+    window.csViewConfigSets = {};
+
     mainViewport.classList.remove('loaded');
     mainViewport.scrollTop = 0;
     mainViewport.scrollLeft = 0;

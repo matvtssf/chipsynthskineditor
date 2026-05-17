@@ -11,6 +11,53 @@
     -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
+
+body[data-app-theme="dark"] #sidebar {
+    background-color: rgba(30, 30, 30, 0.85) !important;
+    border-color: rgba(68, 68, 68, 0.5) !important;
+    color: #ffffff !important;
+}
+
+body[data-app-theme="dark"] #sidebar label,
+body[data-app-theme="dark"] #sidebar h2,
+body[data-app-theme="dark"] #sidebar .text-gray-700 {
+    color: #e5e7eb !important;
+}
+
+body[data-app-theme="dark"] #file-browser-container,
+body[data-app-theme="dark"] #preview-area-container,
+body[data-app-theme="dark"] #preview-area {
+    background-color: #252526 !important;
+    color: #ffffff !important;
+    border-color: #3e3e42 !important;
+}
+
+body[data-app-theme="dark"] #skin-selector {
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+    border-color: #444444 !important;
+}
+
+body[data-app-theme="dark"] #file-tree li span:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+body[data-app-theme="dark"] #sidebar {
+    background-color: rgba(26, 26, 26, 0.85);
+    border-color: rgba(44, 44, 44, 0.5);
+    color: #e0e0e0;
+}
+body[data-app-theme="dark"] #file-browser-container,
+body[data-app-theme="dark"] #preview-area-container,
+body[data-app-theme="dark"] #preview-area {
+    background-color: rgba(45, 45, 45, 0.7);
+    color: #ffffff;
+    border-color: #444444;
+}
+body[data-app-theme="dark"] #skin-selector {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-color: #444444;
+}
 #sidebar.collapsed { width: 48px; padding: 0; overflow: visible; }
 
 /* --- Sidebar Header --- */

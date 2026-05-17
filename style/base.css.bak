@@ -1,12 +1,5 @@
 /* File: style/base.css */
 
-@font-face {
-    font-family: 'DesignSystemDW01-500R';
-    src: url('./DesignSystemDW01-500R.woff2') format('woff2');
-    font-weight: normal;
-    font-style: normal;
-}
-
 /* --- Custom Resets & Base Styles --- */
 html { box-sizing: border-box; }
 *, *:before, *:after { box-sizing: inherit; }

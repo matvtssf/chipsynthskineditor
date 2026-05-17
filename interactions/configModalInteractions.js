@@ -39,12 +39,25 @@ export function setupConfigModalListeners() {
     const bgModeCheckbox = getBgModeCheckbox();
     const splashToggle = document.getElementById('simulate-splash-toggle');
     const splashCheckbox = document.getElementById('simulate-splash-checkbox');
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeCheckbox = document.getElementById('theme-toggle-checkbox');
 
-    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox) {
+    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox || !themeToggle || !themeCheckbox) {
         logError("[configModal setup] CRITICAL: One or more config modal elements not found during listener setup! Listeners NOT attached.", null, true);
         configListenersSetup = false; // Explicitly keep false if setup fails
         return;
     }
+
+    // Theme toggle
+    themeToggle.addEventListener('click', () => {
+        console.log("[configModal] themeToggle clicked!");
+        const isDark = !themeToggle.getAttribute('aria-checked') || themeToggle.getAttribute('aria-checked') === 'false';
+        themeToggle.setAttribute('aria-checked', String(isDark));
+        themeCheckbox.checked = isDark;
+        const themeValue = isDark ? 'dark' : 'light';
+        document.body.setAttribute('data-app-theme', themeValue);
+        localStorage.setItem('chipsynth-editor-theme', themeValue);
+    });
 
     // Close button
     closeBtn.addEventListener('click', (event) => {
@@ -183,6 +196,17 @@ function initConfigModalValues() {
         const useDefaultBg = State.getUseDefaultBackgroundColor();
         bgModeToggle.setAttribute('aria-checked', String(useDefaultBg));
         bgModeCheckbox.checked = useDefaultBg;
+
+        // Init Theme Toggle
+        const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+        const isThemeDark = (savedTheme === 'dark');
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeCheckbox = document.getElementById('theme-toggle-checkbox');
+        if (themeToggle && themeCheckbox) {
+            themeToggle.setAttribute('aria-checked', String(isThemeDark));
+            themeCheckbox.checked = isThemeDark;
+            document.body.setAttribute('data-app-theme', savedTheme);
+        }
 
         // Init Simulate Splash/Overlay Toggle
         const simulateSplash = State.getSimulateSplashOverlay();

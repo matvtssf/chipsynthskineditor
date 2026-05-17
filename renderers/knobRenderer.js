@@ -238,8 +238,9 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
 
         if (valueIndicatorType === 1) {
             procIndicator = document.createElementNS(SVG_NS, "rect");
-            procIndicator.setAttribute('width', String(p_ind_w)); procIndicator.setAttribute('height', String(p_ind_h));
-            procIndicator.setAttribute('x', String(-p_ind_w / 2)); procIndicator.setAttribute('y', String(-p_ind_h / 2));
+            const lineLength = proceduralIndicatorOrbitRadius > 0 ? proceduralIndicatorOrbitRadius : knobBodyVisualRadius;
+            procIndicator.setAttribute('width', String(lineLength)); procIndicator.setAttribute('height', String(p_ind_h));
+            procIndicator.setAttribute('x', '0'); procIndicator.setAttribute('y', String(-p_ind_h / 2));
         } else {
             procIndicator = document.createElementNS(SVG_NS, "circle");
             procIndicator.setAttribute('r', String(Math.min(p_ind_w, p_ind_h) / 2));
@@ -365,13 +366,17 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
                 indicatorElementTransformTarget.style.top = `${(indicatorPos.y - knob_h / 2).toFixed(3)}px`;
                 indicatorElementTransformTarget.style.transform = `rotate(${finalAngle.toFixed(3)}deg)`;
             } else {
-                let svgRotation = 0;
-                if (valueIndicatorSvgPath && indicatorElementTransformTarget.firstChild && indicatorElementTransformTarget.firstChild.tagName === 'image') {
-                    svgRotation = finalAngle;
-                } else if (valueIndicatorType === 1) {
-                    svgRotation = finalAngle;
+                if (valueIndicatorType === 1 && !valueIndicatorSvgPath) {
+                    indicatorElementTransformTarget.setAttribute('transform', `translate(${knobBodyVisualCenterX.toFixed(3)}, ${knobBodyVisualCenterY.toFixed(3)}) rotate(${angle.toFixed(3)})`);
+                } else {
+                    let svgRotation = 0;
+                    if (valueIndicatorSvgPath && indicatorElementTransformTarget.firstChild && indicatorElementTransformTarget.firstChild.tagName === 'image') {
+                        svgRotation = finalAngle;
+                    } else if (valueIndicatorType === 1) {
+                        svgRotation = finalAngle;
+                    }
+                    indicatorElementTransformTarget.setAttribute('transform', `translate(${indicatorPos.x.toFixed(3)}, ${indicatorPos.y.toFixed(3)}) rotate(${svgRotation.toFixed(3)})`);
                 }
-                indicatorElementTransformTarget.setAttribute('transform', `translate(${indicatorPos.x.toFixed(3)}, ${indicatorPos.y.toFixed(3)}) rotate(${svgRotation.toFixed(3)})`);
             }
         }
 
@@ -409,6 +414,18 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
             container.dataset.currentValue = currentValue;
             labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
             if (triggerUpdate) updateVisuals(currentValue);
+
+            // Force state update and dynamic routing re-calc
+            if (typeof State.setElementState === 'function') {
+                State.setElementState(paramId, currentValue);
+            }
+            if (typeof window.updateDynamicRouting === 'function') {
+                window.updateDynamicRouting();
+            }
+            if (window.visibilityController && typeof window.visibilityController.updateControllerVisibilities === 'function') {
+                window.visibilityController.updateControllerVisibilities();
+            }
+
             container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
         }
     }
@@ -423,6 +440,18 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
         container.dataset.currentValue = currentValue;
         labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
         updateVisuals(currentValue);
+
+        // Force state update and dynamic routing re-calc
+        if (typeof State.setElementState === 'function') {
+            State.setElementState(paramId, currentValue);
+        }
+        if (typeof window.updateDynamicRouting === 'function') {
+            window.updateDynamicRouting();
+        }
+        if (window.visibilityController && typeof window.visibilityController.updateControllerVisibilities === 'function') {
+            window.visibilityController.updateControllerVisibilities();
+        }
+
         container.dispatchEvent(new CustomEvent('knobValueChanged', { detail: { paramId, value: currentValue } }));
         if (showValueTextOnHL) updateLabelTextWithValue(currentValue);
     }

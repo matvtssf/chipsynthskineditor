@@ -5,20 +5,40 @@ import * as State from '../core/state.js';
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function renderRect(xmlNode, mergedAttributes) {
-    const htmlElement = document.createElement('div');
-    htmlElement.classList.add('gui-rect');
-    
-    // Restore masking/clipping capabilities for rectangles
-    if (mergedAttributes['mask'] === '1' || mergedAttributes['clip'] === '1') {
-        htmlElement.style.overflow = 'hidden';
+    let drawMode = mergedAttributes['drawmode'] || mergedAttributes['drawMode'];
+    if (!drawMode) {
+        if (mergedAttributes['fill_color'] || mergedAttributes['color_fill']) drawMode = 'filled';
+        else if (mergedAttributes['border_color'] || mergedAttributes['color_frame']) drawMode = 'stroked';
+        else drawMode = 'filled'; 
     }
 
-    // Force exact border sizing so it doesn't break CSS box models
-    htmlElement.style.boxSizing = 'border-box';
+    const outerDiv = document.createElement('div');
+    outerDiv.classList.add('gui-rect-container');
+    outerDiv.style.position = 'absolute';
+    outerDiv.style.boxSizing = 'border-box';
+    
+    if (mergedAttributes['mask'] === '1' || mergedAttributes['clip'] === '1') {
+        outerDiv.style.overflow = 'hidden';
+    }
+
+    if (drawMode === 'filled' || drawMode === 'strokedFilled') {
+        const fillColor = DomUtils.parseColor(mergedAttributes['fill_color'] || mergedAttributes['color_fill'] || mergedAttributes['color'] || 'transparent');
+        outerDiv.style.backgroundColor = fillColor;
+    }
+    
+    if (drawMode === 'stroked' || drawMode === 'strokedFilled') {
+        const borderColor = DomUtils.parseColor(mergedAttributes['border_color'] || mergedAttributes['color_frame'] || mergedAttributes['color'] || 'transparent');
+        const frameWidth = parseFloat(mergedAttributes['framewidth'] || mergedAttributes['frameWidth'] || '1');
+        
+        // Prevent drawing inner borders if the frame color identically matches the fill (it's just a solid block)
+        if (drawMode === 'stroked' || outerDiv.style.backgroundColor !== borderColor) {
+            outerDiv.style.border = `${frameWidth}px solid ${borderColor}`;
+        }
+    }
 
     return {
-        htmlElement: htmlElement,
-        mainElementForAttributes: htmlElement,
+        htmlElement: outerDiv,
+        mainElementForAttributes: outerDiv,
         requiresRecursiveRender: true, 
         postProcessFunction: null
     };
@@ -101,47 +121,55 @@ function renderStaticImage(xmlNode, mergedAttributes) {
 }
 
 function renderLine(xmlNode, mergedAttributes) {
+    const outerDiv = document.createElement('div');
+    outerDiv.classList.add('gui-line-container');
+    outerDiv.style.position = 'absolute';
+    outerDiv.style.setProperty('background-color', 'transparent', 'important');
+    outerDiv.style.setProperty('border', 'none', 'important');
+    outerDiv.style.setProperty('padding', '0px', 'important');
+
     const svgElement = document.createElementNS(SVG_NS, "svg");
     const lineElement = document.createElementNS(SVG_NS, "line");
 
+    svgElement.style.pointerEvents = 'none'; 
+    svgElement.style.position = 'absolute';
+    svgElement.style.left = '0px';
+    svgElement.style.top = '0px';
+    svgElement.style.setProperty('background-color', 'transparent', 'important');
+    svgElement.style.setProperty('border', 'none', 'important');
+    svgElement.style.overflow = "visible"; 
+    svgElement.classList.add('gui-line-svg');
+
     let wAttr = parseFloat(mergedAttributes['w'] || '0');
     let hAttr = parseFloat(mergedAttributes['h'] || '0');
-    let frameWidth = parseFloat(mergedAttributes['frameWidth'] || '1');
+    
+    let frameWidth = parseFloat(mergedAttributes['framewidth'] || mergedAttributes['frameWidth'] || '1');
     if (frameWidth === 0 && (wAttr > 0 || hAttr > 0)) { 
         frameWidth = 1; 
     }
 
-    const borderColor = DomUtils.parseColor(mergedAttributes['border_color'] || mergedAttributes['color_frame'] || '#FFFFFFFF');
+    const borderColor = DomUtils.parseColor(mergedAttributes['border_color'] || mergedAttributes['color_frame'] || mergedAttributes['color'] || '#FFFFFFFF');
 
-    let x1, y1, x2, y2;
-    let svgActualW = wAttr;
-    let svgActualH = hAttr;
+    let x1 = 0, y1 = 0, x2 = wAttr, y2 = hAttr;
 
-    // Handle horizontal/vertical straight lines seamlessly
-    if (hAttr <= frameWidth && wAttr > 0) { 
-        svgActualH = Math.max(frameWidth, 1); 
-        x1 = 0; y1 = svgActualH / 2; x2 = wAttr; y2 = svgActualH / 2;
-    } else if (wAttr <= frameWidth && hAttr > 0) { 
-        svgActualW = Math.max(frameWidth, 1); 
-        x1 = svgActualW / 2; y1 = 0; x2 = svgActualW / 2; y2 = hAttr;
-    } else if (wAttr === 0 && hAttr === 0 && frameWidth > 0) { 
-        svgActualW = frameWidth; 
-        svgActualH = frameWidth;
+    if (mergedAttributes['reversepoints'] === '1' || mergedAttributes['reversePoints'] === '1') {
+        x1 = 0; y1 = hAttr; x2 = wAttr; y2 = 0;
+    }
+
+    // Handle 0-length lines (dots)
+    if (wAttr === 0 && hAttr === 0 && frameWidth > 0) { 
         const rectElement = document.createElementNS(SVG_NS, "rect");
-        rectElement.setAttribute("x", "0"); rectElement.setAttribute("y", "0");
+        rectElement.setAttribute("x", String(-frameWidth/2)); 
+        rectElement.setAttribute("y", String(-frameWidth/2));
         rectElement.setAttribute("width", String(frameWidth));
         rectElement.setAttribute("height", String(frameWidth));
         rectElement.setAttribute("fill", borderColor);
         svgElement.appendChild(rectElement);
         
-        svgElement.setAttribute("width", String(svgActualW));
-        svgElement.setAttribute("height", String(svgActualH));
-        svgElement.style.overflow = "visible";
-        return { htmlElement: svgElement, mainElementForAttributes: svgElement, requiresRecursiveRender: false, postProcessFunction: null };
-    } else { 
-        x1 = 0; y1 = 0; x2 = wAttr; y2 = hAttr; 
-        svgActualW = wAttr;
-        svgActualH = hAttr;
+        svgElement.setAttribute("width", "1");
+        svgElement.setAttribute("height", "1");
+        outerDiv.appendChild(svgElement);
+        return { htmlElement: outerDiv, mainElementForAttributes: outerDiv, requiresRecursiveRender: false, postProcessFunction: null };
     }
 
     lineElement.setAttribute("x1", String(x1));
@@ -150,18 +178,28 @@ function renderLine(xmlNode, mergedAttributes) {
     lineElement.setAttribute("y2", String(y2));
     lineElement.setAttribute("stroke", borderColor);
     lineElement.setAttribute("stroke-width", String(frameWidth));
-    lineElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || "butt");
+    
+    const isDiagonal = (wAttr > 0 && hAttr > 0);
+    lineElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || (isDiagonal ? "round" : "butt"));
     
     svgElement.appendChild(lineElement);
-    svgElement.setAttribute("width", String(svgActualW));
-    svgElement.setAttribute("height", String(svgActualH));
-    svgElement.style.overflow = "visible"; 
+    
+    svgElement.setAttribute("width", String(wAttr || 1));
+    svgElement.setAttribute("height", String(hAttr || 1));
+
+    outerDiv.appendChild(svgElement);
 
     return {
-        htmlElement: svgElement,
-        mainElementForAttributes: svgElement,
+        htmlElement: outerDiv,
+        mainElementForAttributes: outerDiv,
         requiresRecursiveRender: false,
-        postProcessFunction: null 
+        postProcessFunction: (element) => {
+            element.style.setProperty('background-color', 'transparent', 'important');
+            element.style.setProperty('border', 'none', 'important');
+            element.style.setProperty('outline', 'none', 'important');
+            element.style.setProperty('box-shadow', 'none', 'important');
+            element.style.setProperty('overflow', 'visible', 'important');
+        }
     };
 }
 
@@ -169,11 +207,13 @@ function renderShape(xmlNode, mergedAttributes) {
     const outerDiv = document.createElement('div');
     outerDiv.classList.add('gui-shape-container');
     
+    // uiRenderer handles standard positioning, so we just set defaults for the container
+    outerDiv.style.position = 'absolute';
+    outerDiv.style.setProperty('background-color', 'transparent', 'important');
     outerDiv.style.setProperty('border', 'none', 'important'); 
     outerDiv.style.setProperty('padding', '0px', 'important');
 
     const pointsData = [];
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
     for (const childNode of xmlNode.children) {
         if (childNode.nodeType === Node.ELEMENT_NODE && childNode.tagName === 'Point') {
@@ -181,25 +221,19 @@ function renderShape(xmlNode, mergedAttributes) {
             const py = parseFloat(childNode.getAttribute('y'));
             if (!isNaN(px) && !isNaN(py)) {
                 pointsData.push({ x: px, y: py });
-                minX = Math.min(minX, px);
-                minY = Math.min(minY, py);
-                maxX = Math.max(maxX, px);
-                maxY = Math.max(maxY, py);
             }
         }
     }
 
-    if (pointsData.length < 2 || minX === Infinity) {
+    if (pointsData.length < 2) {
         return { htmlElement: outerDiv, mainElementForAttributes: outerDiv, requiresRecursiveRender: false, postProcessFunction: null };
     }
 
-    const geomW = Math.max(0, maxX - minX);
-    const geomH = Math.max(0, maxY - minY);
-    const closeShape = mergedAttributes['closeShape'] === '1';
-    const drawMode = mergedAttributes['drawMode'] || (closeShape ? 'strokedFilled' : 'stroked');
+    const closeShape = mergedAttributes['closeshape'] === '1' || mergedAttributes['closeShape'] === '1';
+    let drawMode = mergedAttributes['drawmode'] || mergedAttributes['drawMode'] || (closeShape ? 'strokedFilled' : 'stroked');
 
-    let finalStrokeWidth = parseFloat(mergedAttributes['frameWidth'] || mergedAttributes['stroke-width'] || '0');
-    let strokeColorVal = mergedAttributes['color_frame'] || mergedAttributes['border_color'];
+    let finalStrokeWidth = parseFloat(mergedAttributes['framewidth'] || mergedAttributes['frameWidth'] || mergedAttributes['stroke-width'] || '0');
+    let strokeColorVal = mergedAttributes['color_frame'] || mergedAttributes['border_color'] || mergedAttributes['color'];
     let fillColorVal = mergedAttributes['color_fill'] || mergedAttributes['fill_color'];
 
     let finalStroke = 'none';
@@ -222,19 +256,14 @@ function renderShape(xmlNode, mergedAttributes) {
         }
     }
 
-    const strokeHalfW = (finalStroke !== 'none' && finalStrokeWidth > 0) ? finalStrokeWidth / 2 : 0;
-    const svgActualW = Math.max(1, geomW + finalStrokeWidth);
-    const svgActualH = Math.max(1, geomH + finalStrokeWidth);
-
-    if (mergedAttributes['x'] === undefined) { outerDiv.style.left = `${minX - strokeHalfW}px`; }
-    if (mergedAttributes['y'] === undefined) { outerDiv.style.top = `${minY - strokeHalfW}px`; }
-    if (mergedAttributes['w'] === undefined) { outerDiv.style.width = `${svgActualW}px`; }
-    if (mergedAttributes['h'] === undefined) { outerDiv.style.height = `${svgActualH}px`; }
-
     const svgElement = document.createElementNS(SVG_NS, "svg");
+    svgElement.style.position = 'absolute';
+    svgElement.style.left = '0';
+    svgElement.style.top = '0';
+    svgElement.style.setProperty('background-color', 'transparent', 'important');
+    svgElement.style.setProperty('border', 'none', 'important');
     svgElement.setAttribute('width', "100%"); 
     svgElement.setAttribute('height', "100%");
-    svgElement.setAttribute('viewBox', `${minX - strokeHalfW} ${minY - strokeHalfW} ${svgActualW} ${svgActualH}`);
     svgElement.style.overflow = 'visible';
 
     const pathElement = document.createElementNS(SVG_NS, closeShape ? "polygon" : "polyline");
@@ -244,7 +273,8 @@ function renderShape(xmlNode, mergedAttributes) {
     pathElement.setAttribute('stroke-width', String(finalStrokeWidth));
 
     if (finalStroke !== 'none' && finalStrokeWidth > 0) {
-        pathElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || "butt");
+        // Use square caps and sharp miters to fuse corners identically with straight rect lines
+        pathElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || "square");
         pathElement.setAttribute("stroke-linejoin", mergedAttributes['stroke-linejoin'] || "miter");
     }
 

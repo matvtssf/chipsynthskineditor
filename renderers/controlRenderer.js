@@ -1,8 +1,11 @@
 // File: cs/renderers/controlRenderer.js
+import * as State from '../core/state.js';
+import * as DomUtils from '../core/domUtils.js';
 import { renderCS01Slider, renderCS03Slider } from './sliderRenderer.js?v=2';
 import { renderCS03Knob } from './knobRenderer.js?v=2';
 import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton } from './buttonRenderer.js?v=2';
 import { renderCS01ExpandViewButton } from './expandViewButtonRenderer.js?v=2';
+import { createModulationLinksContainer } from './modulationLinksRenderer.js';
 
 export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourcePath, mergedAttributes) {
     switch (tagName) {
@@ -16,15 +19,319 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             return renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01OnOffButton':
             return renderCS01OnOffButton(xmlNode, mergedAttributes, currentParams, sourcePath);
-        case 'CS01ExpandViewButton':
-            return renderCS01ExpandViewButton(xmlNode, mergedAttributes, currentParams, sourcePath, parentHtmlElement);
+        case 'CS01CheckButtons':
+            return renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'CS01ExpandViewButton': {
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('gui-expand-view-button-wrapper');
+            wrapper.style.position = 'absolute';
+
+            const btn = document.createElement('button');
+            btn.classList.add('gui-expand-view-trigger');
+            btn.style.width = '100%';
+            btn.style.height = '100%';
+            btn.style.cursor = 'pointer';
+            btn.style.border = 'none';
+            btn.style.padding = '0';
+            btn.style.boxSizing = 'border-box';
+            btn.textContent = mergedAttributes['text'] || 'Settings';
+
+            wrapper.appendChild(btn);
+
+            // Popover viewport canvas frame positioned absolutely over the active GUI workspace
+            const popoverPanel = document.createElement('div');
+            popoverPanel.classList.add('gui-expand-view-popover-panel');
+            popoverPanel.style.position = 'absolute';
+            popoverPanel.style.display = 'none';
+            popoverPanel.style.zIndex = '5000';
+
+            // Convert popover to a full-bleed overlay anchored at 0,0 of the main GUI
+            // We DO NOT set left/top offsets here, because the native UI engine will read xoffset="0" yoffset="40"
+            // and apply them directly to the inner layout container, avoiding a double or triple offset shift.
+            popoverPanel.style.left = '0px';
+            popoverPanel.style.top = '0px';
+            popoverPanel.style.width = '100%';
+            popoverPanel.style.height = '100%';
+            popoverPanel.style.pointerEvents = 'none'; // Let clicks pass through to the main GUI elements below
+
+            // Traverse to the absolute highest plugin faceplate container to ensure layout offsets anchor to the screen's 0,0
+            let synthRoot = parentHtmlElement.closest ? parentHtmlElement.closest('[data-xml-tag-name="GUI"]') : null;
+            if (!synthRoot) {
+                let curr = parentHtmlElement;
+                let highestContainer = null;
+                while (curr) {
+                    if (curr.classList && (curr.classList.contains('gui-view-container') || curr.classList.contains('gui-view-container1'))) {
+                        highestContainer = curr;
+                    }
+                    curr = curr.parentElement;
+                }
+                synthRoot = highestContainer;
+            }
+            const targetAppendSurface = synthRoot || parentHtmlElement;
+
+            // Append popover directly to the top-level GUI surface to resolve alignment strictly from the left window edge
+            if (targetAppendSurface && typeof targetAppendSurface.appendChild === 'function') {
+                targetAppendSurface.appendChild(popoverPanel);
+            }
+
+            const closeTag = xmlNode.getAttribute('close_button_tag') || xmlNode.getAttribute('controlTag') || xmlNode.getAttribute('controltag');
+
+            return {
+                htmlElement: wrapper,
+                childAppendElement: popoverPanel,
+                mainElementForAttributes: wrapper,
+                requiresRecursiveRender: true,
+                postProcessFunction: (element, attrs) => {
+                    const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055';
+                    const colorPushed = attrs['color_pushed'] || attrs['color_pushed'] || '#ffffff';
+                    const colorText = attrs['color_text'] || attrs['color_text'] || '#cbcbd8';
+                    const fontAttr = attrs['font'];
+                    const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0.2');
+
+                    btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                    btn.style.color = DomUtils.parseColor ? DomUtils.parseColor(colorText) : colorText;
+
+                    if (fontAttr && DomUtils.applyFont) {
+                        DomUtils.applyFont(btn, fontAttr);
+                    }
+
+                    const h = parseFloat(attrs['h'] || '22');
+                    btn.style.borderRadius = `${rRatio * h}px`;
+
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isCurrentlyOpen = popoverPanel.style.display === 'block';
+                        if (isCurrentlyOpen) {
+                            popoverPanel.style.display = 'none';
+                            btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                            btn.classList.remove('expanded');
+                        } else {
+                            // Synchronize display channels by auto-hiding other loose panels
+                            document.querySelectorAll('.gui-expand-view-popover-panel').forEach(p => p.style.display = 'none');
+                            
+                            // Parse live environment specifications from the browser user agent context
+                            const ua = navigator.userAgent;
+                            let browserName = "Web Browser";
+                            let browserVersion = "Internal";
+                            let jsEngineName = "ECMAScript Engine";
+
+                            if (/Edg\/([\d.]+)/.test(ua)) {
+                                browserName = "Microsoft Edge";
+                                browserVersion = ua.match(/Edg\/([\d.]+)/)[1];
+                                jsEngineName = "V8 Engine";
+                            } else if (/Chrome\/([\d.]+)/.test(ua)) {
+                                browserName = "Google Chrome";
+                                browserVersion = ua.match(/Chrome\/([\d.]+)/)[1];
+                                jsEngineName = "V8 Engine";
+                            } else if (/Firefox\/([\d.]+)/.test(ua)) {
+                                browserName = "Mozilla Firefox";
+                                browserVersion = ua.match(/Firefox\/([\d.]+)/)[1];
+                                jsEngineName = "SpiderMonkey";
+                            } else if (/Version\/([\d.]+).*Safari/.test(ua)) {
+                                browserName = "Apple Safari";
+                                browserVersion = ua.match(/Version\/([\d.]+)/)[1];
+                                jsEngineName = "JavaScriptCore";
+                            }
+
+                            // Dynamically substitute parameters inside the popup container view branch
+                            popoverPanel.querySelectorAll('[data-xml-attr_param]').forEach(label => {
+                                const pName = label.dataset.xmlAttr_param;
+                                if (pName === 'DID_SAMPLERATE') label.textContent = '48000 Hz';
+                                if (pName === 'DID_CURBUFFERSIZE') label.textContent = '4096';
+                                if (pName === 'DID_MAXBUFFERSIZE') label.textContent = '4096';
+                                if (pName === 'DID_NOTES') label.textContent = '0';
+                                
+                                if (pName === 'DID_PRODUCTVERSION') {
+                                    let inferredProduct = 'chipsynth Plugin';
+                                    const rootPath = (typeof State.getCurrentSkinRoot === 'function' ? State.getCurrentSkinRoot() : '') || '';
+                                    if (rootPath) {
+                                        const normalized = rootPath.replace(/\\/g, '/');
+                                        const parts = normalized.split('/').filter(Boolean);
+                                        if (parts.length > 0) {
+                                            let folderToken = parts[parts.length - 1];
+                                            if ((folderToken.toLowerCase() === 'gui' || folderToken.toLowerCase() === 'skin' || folderToken.toLowerCase() === 'contents') && parts.length > 1) {
+                                                folderToken = parts[parts.length - 2];
+                                            }
+                                            inferredProduct = folderToken;
+                                        }
+                                    }
+                                    label.textContent = inferredProduct;
+                                }
+                                
+                                if (pName === 'DID_VERSION') {
+                                    label.textContent = `${browserName} v${browserVersion}`;
+                                }
+                                
+                                if (pName === 'DID_WRAPPERVERSION') {
+                                    label.textContent = `${jsEngineName} Environment`;
+                                }
+                            });
+
+                            popoverPanel.style.display = 'block';
+                            btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(colorPushed) : colorPushed;
+                            btn.classList.add('expanded');
+                        }
+                    });
+
+                    // Auto-dismiss when a child control matching close_button_tag is selected inside the layout sheets
+                    if (closeTag) {
+                        popoverPanel.addEventListener('click', (evt) => {
+                            const targetBtn = evt.target.closest('[data-xml-attr_controltag], [data-xml-attr_controlTag], [data-xml-attr_tag]');
+                            const tagVal = targetBtn?.dataset.xmlAttr_controltag || targetBtn?.dataset.xmlAttr_controlTag || targetBtn?.dataset.xmlAttr_tag;
+                            if (tagVal === String(closeTag)) {
+                                popoverPanel.style.display = 'none';
+                                btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                                btn.classList.remove('expanded');
+                            }
+                        });
+                    }
+
+                    // Intercept clicks using capturing mode (true) so parameter elements cannot swallow the event stream
+                    document.addEventListener('click', (event) => {
+                        if (popoverPanel.style.display === 'block') {
+                            const rootGui = targetAppendSurface;
+                            if (rootGui.contains(event.target) && !btn.contains(event.target) && !popoverPanel.contains(event.target)) {
+                                popoverPanel.style.display = 'none';
+                                btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+                                btn.classList.remove('expanded');
+                            }
+                        }
+                    }, true);
+                }
+            };
+        }
+        case 'CS01BrowserContainer':
+            return {
+                htmlElement: document.createElement('div'),
+                mainElementForAttributes: null,
+                requiresRecursiveRender: true,
+                postProcessFunction: (element, attrs) => {
+                    if (xmlNode.getAttribute('drawFill') !== '1' && attrs['drawFill'] !== '1' && attrs['drawfill'] !== '1') {
+                        element.style.setProperty('background-color', 'transparent', 'important');
+                    }
+                }
+            };
+        case 'CS01ModulationLinksContainer':
+            const modContainer = createModulationLinksContainer(xmlNode, mergedAttributes);
+            return { 
+                htmlElement: modContainer, 
+                mainElementForAttributes: modContainer, 
+                requiresRecursiveRender: false, 
+                postProcessFunction: (element, attrs) => {
+                    if (xmlNode.getAttribute('drawFrame') === '0' || attrs['drawFrame'] === '0' || attrs['drawframe'] === '0') {
+                        element.style.setProperty('border', 'none', 'important');
+                        element.style.setProperty('box-shadow', 'none', 'important');
+                        element.style.setProperty('outline', 'none', 'important');
+                    }
+                } 
+            };
         case 'Button':
         case 'OnOffButton':
         case 'CommandButton':
-        case 'HoldButton':
-            return renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'HoldButton': {
+            const result = renderImageButton(tagName, xmlNode, mergedAttributes, currentParams, sourcePath);
+            const originalPostProcess = result.postProcessFunction;
+            
+            result.postProcessFunction = (...args) => {
+                // Run the native rule engine first so conditional stacking/visibility rules evaluate perfectly
+                if (originalPostProcess) originalPostProcess(...args);
+                
+                // Safely apply transparency overrides second without locking out engine states
+                const element = args[0];
+                if (element) {
+                    element.style.setProperty('background-color', 'transparent', 'important');
+                    element.style.setProperty('border', 'none', 'important');
+                    element.style.setProperty('outline', 'none', 'important');
+                    element.style.setProperty('box-shadow', 'none', 'important');
+                    element.style.setProperty('padding', '0', 'important');
+                    
+                    element.querySelectorAll('img, svg').forEach(child => {
+                        child.style.setProperty('background-color', 'transparent', 'important');
+                    });
+                }
+            };
+            return result;
+        }
         default:
             console.warn(`[controlRenderer] Attempted to render unhandled tag: ${tagName}`);
             return { htmlElement: null, mainElementForAttributes: null, requiresRecursiveRender: true, postProcessFunction: null };
     }
+}
+
+function renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const container = document.createElement('div');
+    container.classList.add('gui-check-buttons-container');
+    container.style.position = 'absolute';
+
+    const paramId = mergedAttributes['param'] || (currentParams ? currentParams.paramOffset : 0);
+    const vDefault = mergedAttributes['vdefault'] || '0';
+
+    for (const child of xmlNode.children) {
+        if (child.tagName === 'OptionItem') {
+            const btn = document.createElement('button');
+            btn.classList.add('gui-check-option-button');
+            btn.style.position = 'absolute';
+            
+            const cx = child.getAttribute('x');
+            const cy = child.getAttribute('y');
+            const cw = child.getAttribute('w');
+            const ch = child.getAttribute('h');
+            if (cx) btn.style.left = `${cx}px`;
+            if (cy) btn.style.top = `${cy}px`;
+            if (cw) btn.style.width = `${cw}px`;
+            if (ch) btn.style.height = `${ch}px`;
+
+            btn.style.background = 'transparent';
+            btn.style.border = 'none';
+            btn.style.padding = '0';
+            btn.style.cursor = 'pointer';
+
+            const optVal = child.getAttribute('value');
+            const imgOn = child.getAttribute('image_on');
+            const imgOff = child.getAttribute('image_off');
+
+            const updateBtnImage = () => {
+                const currentStored = typeof State?.getElementState === 'function' ? State.getElementState(paramId) : null;
+                const activeVal = currentStored !== null ? String(currentStored) : String(vDefault);
+                const isSelected = String(optVal) === activeVal;
+                const targetImg = isSelected ? (imgOn || imgOff) : imgOff;
+                if (targetImg) {
+                    const blob = typeof State?.getAssetBlobUrl === 'function' ? State.getAssetBlobUrl(State.normalizePath(targetImg, State.getCurrentSkinRoot())) : null;
+                    if (blob) {
+                        btn.style.backgroundImage = `url(${blob})`;
+                        btn.style.backgroundSize = '100% 100%';
+                    }
+                }
+                if (isSelected) btn.classList.add('active');
+                else btn.classList.remove('active');
+            };
+
+            btn.addEventListener('click', () => {
+                if (typeof State?.setElementState === 'function' && paramId) {
+                    State.setElementState(paramId, optVal);
+                }
+                container.querySelectorAll('.gui-check-option-button').forEach(b => {
+                    if (typeof b.updateVisualState === 'function') b.updateVisualState();
+                });
+                if (typeof window?.updateControllerVisibilities === 'function') {
+                    window.updateControllerVisibilities();
+                }
+            });
+
+            btn.updateVisualState = updateBtnImage;
+            updateBtnImage();
+            container.appendChild(btn);
+        }
+    }
+
+    return {
+        htmlElement: container,
+        mainElementForAttributes: container,
+        requiresRecursiveRender: false,
+        postProcessFunction: (element) => {
+            element.querySelectorAll('.gui-check-option-button').forEach(b => {
+                if (typeof b.updateVisualState === 'function') b.updateVisualState();
+            });
+        }
+    };
 }

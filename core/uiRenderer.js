@@ -18,6 +18,73 @@ import * as TextDisplayRenderer from '../renderers/textDisplayRenderer.js';
 import * as ContainerRenderer from '../renderers/containerRenderer.js';
 import * as DropDownRenderer from '../renderers/dropDownRenderer.js';
 
+// Unpack and layer semicolon-delimited compound styles from left to right safely without mutating read-only module namespace objects
+function localApplyStyles(htmlElement, styleName, xmlNode, mergedAttributes) {
+    if (styleName && typeof styleName === 'string' && styleName.includes(';')) {
+        const parts = styleName.split(';').map(s => s.trim()).filter(Boolean);
+        for (const part of parts) {
+            DomUtils.applyStyles(htmlElement, part, xmlNode, mergedAttributes);
+        }
+    } else {
+        DomUtils.applyStyles(htmlElement, styleName, xmlNode, mergedAttributes);
+    }
+}
+
+let cachedStyleMacros = null;
+function resolveStyleMacros(attributes) {
+    if (!cachedStyleMacros) {
+        cachedStyleMacros = {};
+        try {
+            const pathsToTry = ['GUI/styles.xml', 'gui/styles.xml', 'GUI/Styles.xml', 'gui/Styles.xml'];
+            let stylesContent = null;
+            for (const p of pathsToTry) {
+                stylesContent = State.getFileContent(p);
+                if (stylesContent) break;
+            }
+            if (!stylesContent && typeof State.getCurrentSkinRoot === 'function') {
+                const root = State.getCurrentSkinRoot();
+                for (const p of pathsToTry) {
+                    stylesContent = State.getFileContent(State.normalizePath(p, root));
+                    if (stylesContent) break;
+                }
+            }
+            if (!stylesContent && typeof State.getXmlMacros === 'function') {
+                const macros = State.getXmlMacros();
+                if (macros && typeof macros.get === 'function') {
+                    stylesContent = macros.get('styles.xml') || macros.get('Styles.xml');
+                }
+            }
+
+            if (stylesContent) {
+                const macroRegex = /<StyleMacro\s+name="([^"]+)"\s+value="([^"]+)"/g;
+                let match;
+                while ((match = macroRegex.exec(stylesContent)) !== null) {
+                    cachedStyleMacros[match[1]] = match[2];
+                }
+            }
+        } catch (err) {
+            console.warn("[uiRenderer] Failed to pre-parse StyleMacros:", err);
+        }
+    }
+
+    for (const key in attributes) {
+        if (typeof attributes[key] === 'string') {
+            const trimmedVal = attributes[key].trim();
+            if (cachedStyleMacros[trimmedVal]) {
+                attributes[key] = cachedStyleMacros[trimmedVal];
+            }
+        }
+    }
+    
+    // Map custom Plogue boxColor property to standard backgroundColor so it applies to the HTML track container background
+    const bColor = attributes['boxColor'] || attributes['boxcolor'];
+    if (bColor && !attributes['backgroundColor'] && !attributes['backgroundcolor']) {
+        attributes['backgroundColor'] = bColor;
+    }
+    
+    return attributes;
+}
+
 const tagToRendererMap = {
     // DrawRenderer tags
     'Rect': DrawRenderer,
@@ -34,10 +101,12 @@ const tagToRendererMap = {
     'CS01TextButton': ControlRenderer,
     'CS01OnOffButton': ControlRenderer,
     'CS01ExpandViewButton': ControlRenderer,
+    'CS01ModulationLinksContainer': ControlRenderer,
     'Button': ControlRenderer,
     'OnOffButton': ControlRenderer,
     'CommandButton': ControlRenderer,
     'HoldButton': ControlRenderer,
+    'CS01CheckButtons': ControlRenderer,
 
     // KeyboardRenderer tags
     'CS01Keyboard': KeyboardRenderer,
@@ -49,6 +118,7 @@ const tagToRendererMap = {
     'DisplayStringOption': TextDisplayRenderer, 
 
     // ContainerRenderer tags
+    'GUI': ContainerRenderer,
     'CS01ViewContainer': ContainerRenderer,
     'CS01ViewContainer1': ContainerRenderer,
     'VisibilityContainer': ContainerRenderer,
@@ -58,6 +128,10 @@ const tagToRendererMap = {
     'CS01ScrollViewPageController': ContainerRenderer,
     'PopupOverlay': ContainerRenderer,
     'Splash': ContainerRenderer,
+    'CS01BrowserContainer': ContainerRenderer,
+    'CS01Browser': ContainerRenderer,
+    'CS01WaveEditorContainer': ContainerRenderer,
+    'CS01WaveEditor': ContainerRenderer,
 
     // DropDownRenderer tags
     'PresetMenu': DropDownRenderer,
@@ -75,7 +149,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
     const tagName = xmlNode.tagName;
     const styleName = xmlNode.getAttribute('style'); 
 
-    if (tagName === 'GUIMacro') {
+    if (tagName === 'GUIMacro' || tagName === 'GUIContainer') {
         const macroPath_relative = xmlNode.getAttribute('path');
         const xoffset = xmlNode.getAttribute('xoffset');
         const yoffset = xmlNode.getAttribute('yoffset');
@@ -100,9 +174,112 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
         }
 
         try {
+            let sanitizedMacro = macroContent;
+
+            // Extract text compilation variables from child Define elements
+            const macroDefsLocal = {};
+            xmlNode.querySelectorAll('Define').forEach(def => {
+                const name = def.getAttribute('name');
+                const value = def.getAttribute('value');
+                if (name) macroDefsLocal[name] = value || '';
+            });
+
+            // If compiler flags are acting as layout comments, strip the inactive blocks cleanly to protect the DOM structure
+            if (macroDefsLocal['$MUTEIN']?.includes('')) {
+                const regexPattern = /\$MUTEIN([\s\S]*?)\$MUTEOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+            if (macroDefsLocal['$DACIN']?.includes('')) {
+                const regexPattern = /\$DACIN([\s\S]*?)\$DACOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+            if (macroDefsLocal['$SIDIN']?.includes('')) {
+                const regexPattern = /\$SIDIN([\s\S]*?)\$SIDOUT/g;
+                sanitizedMacro = sanitizedMacro.replace(regexPattern, '');
+            }
+
+            // Clean up remaining flag anchors
+            for (const defKey in macroDefsLocal) {
+                sanitizedMacro = sanitizedMacro.replaceAll(defKey, macroDefsLocal[defKey]);
+            }
+
+            // 1. Repair missing delimiter spacing between concatenated attributes (e.g., w="10"h="20" -> w="10" h="20")
+            sanitizedMacro = sanitizedMacro.replace(/"([a-zA-Z_][a-zA-Z0-9_\-]*)=/g, '" $1=');
+            sanitizedMacro = sanitizedMacro.replace(/'([a-zA-Z_][a-zA-].*)=/g, "' $1=");
+            // 2. Repair unescaped '<' inside attribute values before parsing
+            sanitizedMacro = sanitizedMacro.replace(/=\s*"([^"]*)"/g, (m, p1) => '="' + p1.replace(/</g, '&lt;') + '"');
+            sanitizedMacro = sanitizedMacro.replace(/=\s*'([^']*)'/g, (m, p1) => "='" + p1.replace(/</g, '&lt;') + "'");
+            // 3. Automatically encode unescaped ampersands that disrupt standard document generation trees
+            sanitizedMacro = sanitizedMacro.replace(/&(?!([a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)/g, '&amp;');
+
             const parser = new DOMParser();
-            const macroDoc = parser.parseFromString(macroContent, "application/xml");
-            const parseErrorNode = macroDoc.querySelector("parsererror");
+            let macroDoc = parser.parseFromString(sanitizedMacro, "application/xml");
+            let parseErrorNode = macroDoc.querySelector("parsererror");
+
+            // Fallback Recovery: If strict parsing fails (e.g. multi-root include or leading junk lines), wrap in a virtual container
+            if (parseErrorNode) {
+                let cleanBody = sanitizedMacro.replace(/<\?xml[^>]*\?>/gi, '').trim();
+                let wrappedBody = `<virtual-macro-root>${cleanBody}</virtual-macro-root>`;
+                const recoveryDoc = parser.parseFromString(wrappedBody, "application/xml");
+                if (!recoveryDoc.querySelector("parsererror")) {
+                    macroDoc = recoveryDoc;
+                    parseErrorNode = null;
+                }
+            }
+
+            // Fallback Recovery 2: Parse via lenient HTML parser and rebuild a compliant case-sensitive XML DOM tree
+            if (parseErrorNode) {
+                try {
+                    const htmlDoc = parser.parseFromString(sanitizedMacro, "text/html");
+                    if (htmlDoc && htmlDoc.body) {
+                        const xmlDocInstance = document.implementation.createDocument(null, "virtual-macro-root", null);
+                        const xmlRoot = xmlDocInstance.documentElement;
+                        
+                        const tagMap = {};
+                        Object.keys(tagToRendererMap).forEach(k => { tagMap[k.toLowerCase()] = k; });
+                        ['font', 'styles', 'property', 'define', 'xmlmacrotext', 'style', 'stylemacro', 'optionitem', 'displaystringoptionitem', 'point', 'pagename', 'cs01assignmentmaptarget', 'guimacro', 'guicontainer'].forEach(t => {
+                            tagMap[t] = t === 'guimacro' ? 'GUIMacro' : (t === 'guicontainer' ? 'GUIContainer' : (t === 'xmlmacrotext' ? 'XMLMacroText' : (t === 'displaystringoptionitem' ? 'DisplayStringOptionItem' : t)));
+                        });
+
+                        function convertHtmlToXml(htmlNode, xmlParent) {
+                            for (const child of htmlNode.childNodes) {
+                                if (child.nodeType === Node.ELEMENT_NODE) {
+                                    const htmlTag = child.tagName.toLowerCase();
+                                    const correctTag = tagMap[htmlTag] || child.tagName;
+                                    const xmlChild = xmlDocInstance.createElement(correctTag);
+                                    
+                                    for (const attr of child.attributes) {
+                                        let attrName = attr.name;
+                                        if (attrName === 'framewidth') attrName = 'frameWidth';
+                                        if (attrName === 'drawmode') attrName = 'drawMode';
+                                        if (attrName === 'reversepoints') attrName = 'reversePoints';
+                                        if (attrName === 'closeshape') attrName = 'closeShape';
+                                        if (attrName === 'valueindicator_x') attrName = 'valueIndicator_x';
+                                        if (attrName === 'textedit_backcolor') attrName = 'textEdit_backColor';
+                                        if (attrName === 'visibilitychangename') attrName = 'visibilityChangeName';
+                                        if (attrName === 'visibilitychangedirection') attrName = 'visibilityChangeDirection';
+                                        if (attrName === 'roundedrectratio') attrName = 'roundedRectRatio';
+                                        if (attrName === 'configsetname') attrName = 'configSetName';
+                                        xmlChild.setAttribute(attrName, attr.value);
+                                    }
+                                    
+                                    xmlParent.appendChild(xmlChild);
+                                    convertHtmlToXml(child, xmlChild);
+                                } else if (child.nodeType === Node.TEXT_NODE) {
+                                    xmlParent.appendChild(xmlDocInstance.createTextNode(child.textContent));
+                                }
+                            }
+                        }
+                        
+                        convertHtmlToXml(htmlDoc.body, xmlRoot);
+                        macroDoc = xmlDocInstance;
+                        parseErrorNode = null;
+                    }
+                } catch (htmlError) {
+                    console.warn("[uiRenderer] Lenient HTML recovery parsing failed:", htmlError);
+                }
+            }
+
             if (parseErrorNode && parseErrorNode.textContent.trim() !== "") {
                 let errorDetails = parseErrorNode.textContent;
                 const srcTextNode = Array.from(parseErrorNode.childNodes).find(node => node.nodeName === 'sourcetext');
@@ -112,7 +289,13 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 throw new Error(`GUIMacro "${fullMacroPath}" parse error: ${errorDetails}`);
             }
             
-            const macroRootNode = macroDoc.documentElement;
+            let macroRootNode = macroDoc.documentElement;
+            if (macroRootNode && macroRootNode.tagName === 'virtual-macro-root') {
+                if (macroRootNode.children.length === 1) {
+                    macroRootNode = macroRootNode.firstElementChild;
+                }
+            }
+
             if (!macroRootNode || !macroRootNode.tagName) { 
                 throw new Error(`GUIMacro "${fullMacroPath}" content is empty or has invalid root XML structure.`);
             }
@@ -128,13 +311,28 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 if (yoffset) macroHostDiv.style.top = yoffset.endsWith('px') ? yoffset : yoffset + 'px';
             }
             
-            const macroRootW = macroRootNode.getAttribute('w');
-            const macroRootH = macroRootNode.getAttribute('h');
+            let macroRootW = macroRootNode.getAttribute('w');
+            let macroRootH = macroRootNode.getAttribute('h');
+            
+            // Recompute bounding box maxima if wrapped inside a multi-root recovery container
+            if (!macroRootW || !macroRootH) {
+                let maxW = 0, maxH = 0;
+                for (const child of macroRootNode.children) {
+                    const cw = parseFloat(child.getAttribute('w') || '0');
+                    const ch = parseFloat(child.getAttribute('h') || '0');
+                    if (cw > maxW) maxW = cw;
+                    if (ch > maxH) maxH = ch;
+                }
+                if (maxW > 0 && !macroRootW) macroRootW = String(maxW);
+                if (maxH > 0 && !macroRootH) macroRootH = String(maxH);
+            }
+
             if (macroRootW) macroHostDiv.style.width = macroRootW.endsWith('px') ? macroRootW : macroRootW + 'px';
             if (macroRootH) macroHostDiv.style.height = macroRootH.endsWith('px') ? macroRootH : macroRootH + 'px';
             
-            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles())); 
-            DomUtils.applyStyles(macroHostDiv, styleName, xmlNode, DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles())); 
+            const macroMergedAttrs = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
+            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, macroMergedAttrs); 
+            localApplyStyles(macroHostDiv, styleName, xmlNode, macroMergedAttrs); 
 
             parentHtmlElement.appendChild(macroHostDiv);
 
@@ -146,17 +344,10 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 }
             }
 
-            const localDefs = {};
-            xmlNode.querySelectorAll('Define').forEach(def => {
-                const name = def.getAttribute('name');
-                const value = def.getAttribute('value');
-                if (name) localDefs[name] = value || '';
-            });
-
             const newCurrentParams = { 
                 ...currentParams, 
                 paramOffset: newParamOffset,
-                macroDefs: { ...(currentParams.macroDefs || {}), ...localDefs }
+                macroDefs: { ...(currentParams.macroDefs || {}), ...macroDefsLocal }
             };
 
             for (const elNode of macroRootNode.children) {
@@ -177,12 +368,58 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
         'Font', 'Styles', 'Property', 'Define', 'XMLMacroText', 
         'Style', 'StyleMacro', 'OptionItem', 'DisplayStringOptionItem', 
         'Point', 'PageName',
-        'CS01AssignmentMapTarget', 
-        'CS01ViewConfigurationSet', 'CSViewConfiguration', 'CS01ViewAssoc' 
+        'CS01AssignmentMapTarget'
     ];
 
     if (ignoredTags.includes(tagName)) {
         return;
+    }
+
+    if (!window.csViewConfigManagers) window.csViewConfigManagers = [];
+    if (!window.csViewConfigSets) window.csViewConfigSets = {};
+
+    if (tagName === 'CS01ViewContainerManager') {
+        const paramId = DomUtils.getParamValue(xmlNode, currentParams ? currentParams.paramOffset : 0);
+        const configSetName = xmlNode.getAttribute('configSetName');
+        if (!window.csViewConfigManagers.find(m => m.configSetName === configSetName)) {
+            window.csViewConfigManagers.push({ param: paramId, configSetName: configSetName });
+        }
+        return;
+    }
+
+    if (tagName === 'CS01ViewConfigurationSet') {
+        const setName = xmlNode.getAttribute('name');
+        const setObj = {};
+        const allContainees = new Set();
+
+        for (const configNode of xmlNode.children) {
+            if (configNode.tagName === 'CSViewConfiguration') {
+                const configName = configNode.getAttribute('name');
+                const assocs = [];
+                for (const assocNode of configNode.children) {
+                    if (assocNode.tagName === 'CS01ViewAssoc') {
+                        const containee = assocNode.getAttribute('containee');
+                        if (containee && containee !== 'none') allContainees.add(containee);
+                        assocs.push({
+                            container: assocNode.getAttribute('container'),
+                            containee: containee,
+                            defines: assocNode.getAttribute('defines')
+                        });
+                    }
+                }
+                setObj[configName] = assocs;
+            }
+        }
+        
+        window.csViewConfigSets[setName] = {
+            configs: setObj,
+            allContainees: Array.from(allContainees)
+        };
+        return;
+    }
+
+    if (tagName === 'CSViewConfiguration' || tagName === 'CS01ViewAssoc') {
+        return; 
     }
 
     let htmlElement = null;
@@ -191,7 +428,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
     let requiresRecursiveRender = true; 
     let postProcessFunction = null;     
 
-    const mergedAttributes = DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles());
+    const mergedAttributes = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
 
     if (currentParams && currentParams.macroDefs) {
         for (const key in mergedAttributes) {
@@ -226,7 +463,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             boxElement.style.webkitUserSelect = 'none';
             
             DomUtils.applyCommonAttributes(boxElement, xmlNode, mergedAttributes);
-            DomUtils.applyStyles(boxElement, styleName, xmlNode, mergedAttributes);
+            localApplyStyles(boxElement, styleName, xmlNode, mergedAttributes);
 
             let isEditing = false;
 
@@ -460,10 +697,17 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             }
             if (styleName) {
                 mainElementForAttributes.dataset.appliedStyles = styleName;
+                
+                // Break compound styles down into clean individual parts for the xml-editor lookup engine
+                const styleParts = styleName.split(';').map(s => s.trim()).filter(Boolean);
+                mainElementForAttributes.dataset.styleParts = JSON.stringify(styleParts);
+                if (styleParts.length > 0) {
+                    mainElementForAttributes.dataset.primaryStyle = styleParts[0];
+                }
             }
             
             DomUtils.applyCommonAttributes(mainElementForAttributes, xmlNode, mergedAttributes);
-            DomUtils.applyStyles(mainElementForAttributes, styleName, xmlNode, mergedAttributes); 
+            localApplyStyles(mainElementForAttributes, styleName, xmlNode, mergedAttributes); 
 
             if (mergedAttributes['command']) {
                 mainElementForAttributes.dataset.command = mergedAttributes['command'];
@@ -552,6 +796,72 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     }
                 });
 
+                // Define and run Dynamic Routing
+                window.updateDynamicRouting = function() {
+                    if (window.csViewConfigManagers && window.csViewConfigSets) {
+                        let hiddenStash = document.getElementById('cs-gui-hidden-stash');
+                        if (!hiddenStash) {
+                            hiddenStash = document.createElement('div');
+                            hiddenStash.id = 'cs-gui-hidden-stash';
+                            hiddenStash.style.display = 'none';
+                            document.body.appendChild(hiddenStash);
+                        }
+
+                        window.csViewConfigManagers.forEach(manager => {
+                            const paramId = manager.param;
+                            const configSetName = manager.configSetName;
+                            const configSetData = window.csViewConfigSets[configSetName];
+                            if (!configSetData) return;
+
+                            // Read from central State or knob dataset directly as fallback
+                            let currentVal = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
+                            if (currentVal === null || currentVal === undefined) {
+                                const knobEl = document.querySelector(`[data-param-id="${paramId}"]`);
+                                if (knobEl && knobEl.dataset.currentValue) currentVal = knobEl.dataset.currentValue;
+                                else currentVal = 0;
+                            }
+                            
+                            currentVal = Math.round(parseFloat(currentVal)).toString();
+
+                            const config = configSetData.configs[currentVal] || configSetData.configs['default'];
+                            if (!config) return;
+
+                            const activeContainees = new Set();
+
+                            config.forEach(assoc => {
+                                if (assoc.containee !== 'none' && assoc.container !== 'none') {
+                                    activeContainees.add(assoc.containee);
+                                    const containerEl = document.querySelector(`[data-xml-attr_identifier="${assoc.container}"]`);
+                                    const containeeEl = document.querySelector(`[data-xml-attr_identifier="${assoc.containee}"]`);
+                                    
+                                    if (containerEl && containeeEl) {
+                                        if (containeeEl.parentElement !== containerEl) {
+                                            containerEl.appendChild(containeeEl);
+                                            containeeEl.style.position = 'absolute';
+                                            containeeEl.style.left = '0px';
+                                            containeeEl.style.top = '0px';
+                                        }
+                                        containeeEl.style.display = 'block';
+                                    }
+                                }
+                            });
+
+                            configSetData.allContainees.forEach(containeeId => {
+                                if (!activeContainees.has(containeeId)) {
+                                    const containeeEl = document.querySelector(`[data-xml-attr_identifier="${containeeId}"]`);
+                                    if (containeeEl && containeeEl.parentElement !== hiddenStash) {
+                                        hiddenStash.appendChild(containeeEl);
+                                        containeeEl.style.display = 'none';
+                                    }
+                                }
+                            });
+                        });
+                    }
+                };
+                
+                // Run it once on initialization
+                window.updateDynamicRouting();
+
                 // Manage Style-Tinted Disabled Object Overlays for Containers
                 document.querySelectorAll('.gui-view-container, .gui-view-container1').forEach(container => {
                     const onOffBtn = container.querySelector('[data-role="onOff"]');
@@ -623,9 +933,14 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     }
                 });
 
-                // Style CS01OnOffButton elements as solid circle indicators matching original plugin
+                // Style CS01OnOffButton elements as indicators matching original plugin shapes
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
-                    btn.style.borderRadius = '50%';
+                    const hAttr = parseInt(btn.getAttribute('h') || btn.style.height || btn.offsetHeight || '20', 10);
+                    const wAttr = parseInt(btn.getAttribute('w') || btn.style.width || btn.offsetWidth || '20', 10);
+                    const rRatioAttr = btn.getAttribute('roundedRatio') || btn.getAttribute('roundedrectratio') || btn.getAttribute('fill_roundedratio') || '0.5';
+                    const radius = parseFloat(rRatioAttr) * Math.min(hAttr, wAttr);
+                    btn.style.borderRadius = `${radius}px`;
+                    
                     const paramId = btn.dataset.param;
                     const isActive = btn.classList.contains('active') || 
                         (paramId && typeof State.getElementState === 'function' && (State.getElementState(paramId) === 1 || State.getElementState(paramId) === '1'));

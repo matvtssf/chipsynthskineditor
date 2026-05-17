@@ -1,5 +1,5 @@
 // File: cs/renderers/sliderRenderer.js
-import * as DomUtils from '../domUtils.js';
+import * as DomUtils from '../core/domUtils.js';
 
 export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('div');
@@ -43,6 +43,7 @@ export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourc
     const knobY = parseFloat(mergedAttributes['knob_y'] || 0);
     const knobH = parseFloat(mergedAttributes['knob_h'] || 4);
     const knobColor = DomUtils.parseColor(mergedAttributes['knobColor'] || '#696969FF');
+    const fillColor = DomUtils.parseColor(mergedAttributes['fillColor'] || 'transparent');
 
     htmlElement.dataset.param = paramId || '';
     htmlElement.dataset.vmin = vmin;
@@ -61,6 +62,19 @@ export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourc
     htmlElement.dataset.knobH = knobH;
     htmlElement.dataset.knobY = knobY;
 
+    // Extract fill color (used to show the active progress behind the knob)
+    const fillColor = DomUtils.parseColor(mergedAttributes['fillColor'] || 'transparent');
+    
+    // Create the active fill track
+    const fill = document.createElement('div');
+    fill.classList.add('gui-slider-fill');
+    fill.style.position = 'absolute';
+    fill.style.left = '0px';
+    fill.style.bottom = '0px'; // Anchored to the bottom
+    fill.style.width = '100%';
+    fill.style.backgroundColor = fillColor;
+    fill.style.pointerEvents = 'none'; // Clicks should pass through to the track
+    
     const knob = document.createElement('div');
     knob.classList.add('gui-slider-knob');
     knob.style.position = 'absolute';
@@ -69,6 +83,7 @@ export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourc
     knob.style.height = `${knobH}px`;
     knob.style.backgroundColor = knobColor;
     knob.style.cursor = 'grab';
+    knob.style.zIndex = '2'; // Ensure knob draws on top of the fill
 
     const trackHeight = containerH - knobH;
     const valueRange = vmax - vmin;
@@ -85,6 +100,13 @@ export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourc
     const maxKnobTopAllowed = Math.max(0, containerH - knobH);
     finalKnobPosition = DomUtils.clamp(finalKnobPosition, minKnobTopAllowed, maxKnobTopAllowed);
     knob.style.top = `${finalKnobPosition}px`;
+
+    // Calculate the initial height of the active fill (bottom to knob center)
+    const fillHeight = containerH - finalKnobPosition - (knobH / 2);
+    fill.style.height = `${Math.max(0, fillHeight)}px`;
+
+    // Append fill before knob so it draws behind it
+    htmlElement.appendChild(fill);
 
     if (showText) {
         const valueText = document.createElement('span');

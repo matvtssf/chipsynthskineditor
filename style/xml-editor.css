@@ -7,14 +7,14 @@
     flex-grow: 1; display: flex; 
 }
 
-#xml-editor-line-numbers { 
+#xml-editor-line-numbers, [id^="xml-editor-line-numbers"] { 
     flex-shrink: 0; min-width: 40px; height: 100%; background-color: #f3f4f6; color: #6b7280; 
     padding: 8px 4px 15px 8px; text-align: right; overflow: hidden !important; user-select: none; 
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; 
     font-size: 13px !important; line-height: 21px !important; box-sizing: border-box; 
     border-right: 1px solid #d1d5db; position: relative; white-space: pre; 
 }
-#xml-editor-line-numbers .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; transition: background-color 0.8s ease-out; }
+#xml-editor-line-numbers .lineNumberEntry, [id^="xml-editor-line-numbers"] .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; transition: background-color 0.8s ease-out; }
 
 @keyframes rowFlashActive {
     0% { background-color: rgba(234, 179, 8, 0.25); box-shadow: 0 0 8px rgba(234, 179, 8, 0.4); }
@@ -45,6 +45,8 @@
 
 /* --- Syntax Highlighting Overlay --- */
 .xml-highlight-overlay-instance {
+    top: 1px !important;
+    left: 1px !important;
     z-index: 3 !important; pointer-events: none; user-select: none; 
     color: #333; background-color: transparent;
     -ms-overflow-style: none; scrollbar-width: none; 
@@ -201,3 +203,65 @@ body:not(.ctrl-active) .hl-color-rgba-text {
     z-index: 8000; pointer-events: none; white-space: pre; 
 } 
 .debug-highlight { outline: 1px dashed red; outline-offset: -1px; }
+
+/* --- Dark Mode Syntax Highlighting (Brightened Light Mode Counterparts) --- */
+body[data-app-theme="dark"] #xml-editor-textarea-container {
+    background-color: #1e1e1e !important;
+    border-color: #333333 !important;
+}
+
+body[data-app-theme="dark"] #xml-editor-line-numbers,
+body[data-app-theme="dark"] [id^="xml-editor-line-numbers"] {
+    background-color: #1a1a1a !important;
+    color: #858585 !important;
+    border-color: #333333 !important;
+}
+
+body[data-app-theme="dark"] #xml-editor-textarea {
+    caret-color: #ffffff !important;
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance {
+    color: #e2e8f0 !important;
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance .hl-tag { 
+    color: #60a5fa !important; 
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance .hl-attr-name { 
+    color: #f87171 !important; 
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance .hl-attr-value { 
+    color: #4ade80 !important; 
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance .hl-param-value { 
+    color: #c084fc !important; 
+}
+
+body[data-app-theme="dark"] .xml-highlight-overlay-instance .hl-comment { 
+    color: #9ca3af !important; 
+}
+
+/* High Contrast Swatch Label Visibility Overrides when CTRL is Released */
+body[data-app-theme="dark"]:not(.ctrl-active) .hl-color-box-wrapper span,
+body[data-app-theme="dark"]:not(.ctrl-active) .hl-color-rgba-text,
+body[data-app-theme="dark"] .hl-color-rgb-warning-text {
+    color: #4ade80 !important;
+}
+
+body[data-app-theme="dark"] #xml-editor-status-bar {
+    background-color: #1e1e1e !important;
+    border-color: #333333 !important;
+}
+
+body[data-app-theme="dark"] #xml-editor-status-bar .status-description {
+    color: #cbd5e1 !important;
+}
+
+body[data-app-theme="dark"] #xml-editor-buttons {
+    background-color: #1a1a1a !important;
+    border-color: #333333 !important;
+}

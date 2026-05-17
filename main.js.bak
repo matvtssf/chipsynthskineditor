@@ -6,8 +6,6 @@
  * CORRECTED: Import and call for sidebar controls initialization.
  */
 
-// debugger; 
-
 import * as State from './core/state.js';
 import { loadInitialElementReferenceData, loadInitialParamReferenceData } from './core/references.js';
 import { initializeXmlEditor } from './core/xmlEditor.js'; 
@@ -54,6 +52,8 @@ function setupConsoleInterception() {
 /** Initialize application */
 async function initializeApp() {
     setupConsoleInterception();
+    const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+    document.body.setAttribute('data-app-theme', savedTheme);
     console.log('Initializing application...');
     updateStatus('Loading reference data...');
 
@@ -78,49 +78,21 @@ async function initializeApp() {
         setupSliderListeners(); 
         console.log("Interaction modules setup complete.");
 
-        // Disclaimer Logic
-        const ackButton = getAcknowledgeDisclaimerButton();
+        // Disclaimer Visibility State Control
         const discModal = getDisclaimerModal();
         const loadBtn = getLoadFolderButton();
 
-        if (ackButton && discModal && loadBtn) {
+        if (discModal && loadBtn) {
             if (discModal.classList.contains('visible')) {
                 loadBtn.disabled = true;
                 console.log("Disclaimer visible, load button disabled until acknowledged.");
-                ackButton.addEventListener('click', () => {
-                    console.log("Disclaimer acknowledged: Initiating blur dissolution and logo glitch.");
-                    
-                    // Trigger the text logo digital glitch block
-                    const textLogo = document.getElementById('text-logo');
-                    if (textLogo) {
-                        textLogo.classList.add('logo-glitch-active');
-                        textLogo.addEventListener('animationend', () => {
-                            textLogo.classList.remove('logo-glitch-active');
-                        }, { once: true });
-                    }
-
-                    if (discModal) {
-                        discModal.classList.add('dissolve-blur-active');
-                        discModal.addEventListener('animationend', () => {
-                            discModal.classList.remove('visible');
-                            discModal.classList.remove('dissolve-blur-active');
-                            discModal.style.display = 'none';
-                        }, { once: true });
-                    }
-                    if (loadBtn) {
-                        loadBtn.disabled = false; // Enable the load button
-                        console.log("Load button enabled after disclaimer.");
-                    }
-                }, { once: true });
             } else {
                 loadBtn.disabled = false; // Ensure load button is enabled if disclaimer isn't visible
                 console.log("Disclaimer not visible or not found, load button enabled.");
             }
-        } else {
-            if (!loadBtn) logError("Load folder button not found for disclaimer logic.");
-            if (!discModal) logError("Disclaimer modal not found for disclaimer logic.");
         }
 
+        initializeThemeManagement();
         updateStatus('Ready. Please load a product folder.', 0);
 
     } catch (error) {
@@ -130,7 +102,62 @@ async function initializeApp() {
     }
 }
 
-// Removed handleDisclaimerAcknowledge as its logic is now inline for clarity
+function initializeThemeManagement() {
+    const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+    document.body.setAttribute('data-app-theme', savedTheme);
+
+    const injectThemeControl = () => {
+        const configModal = document.getElementById('config-modal') || document.querySelector('.config-section') || document.querySelector('.sidebar');
+        if (!configModal || document.getElementById('theme-selector-row')) return;
+
+        const row = document.createElement('div');
+        row.id = 'theme-selector-row';
+        row.style.margin = '10px 0';
+        row.style.padding = '5px';
+        row.style.display = 'block';
+
+        const label = document.createElement('label');
+        label.textContent = 'Interface Theme: ';
+        label.style.marginRight = '10px';
+        label.style.display = 'inline-block';
+
+        const select = document.createElement('select');
+        select.id = 'app-theme-select';
+        select.style.padding = '3px';
+
+        const darkOpt = document.createElement('option');
+        darkOpt.value = 'dark';
+        darkOpt.textContent = 'Dark Mode';
+        darkOpt.selected = (savedTheme === 'dark');
+
+        const lightOpt = document.createElement('option');
+        lightOpt.value = 'light';
+        lightOpt.textContent = 'Light Mode';
+        lightOpt.selected = (savedTheme === 'light');
+
+        select.appendChild(darkOpt);
+        select.appendChild(lightOpt);
+        row.appendChild(label);
+        row.appendChild(select);
+
+        const targetContainer = configModal.querySelector('.modal-body') || configModal.querySelector('.config-body') || configModal;
+        if (targetContainer && targetContainer !== configModal) {
+            targetContainer.appendChild(row);
+        } else {
+            configModal.insertBefore(row, configModal.firstChild);
+        }
+
+        select.addEventListener('change', (e) => {
+            const newTheme = e.target.value;
+            document.body.setAttribute('data-app-theme', newTheme);
+            localStorage.setItem('chipsynth-editor-theme', newTheme);
+        });
+    };
+
+    injectThemeControl();
+    const observer = new MutationObserver(() => injectThemeControl());
+    observer.observe(document.body, { childList: true, subtree: true });
+}
 
 // --- Global error handlers ---
 window.addEventListener('error', (event) => {

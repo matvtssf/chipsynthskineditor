@@ -25,17 +25,5 @@
     padding: 0 !important;
 }
 
-/* Fix image-based SVG buttons showing an unwanted background frame */
-[data-xml-tag-name="Button"],
-[data-xml-tag-name="Button"] img,
-[data-xml-tag-name="Button"] svg {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-}
-
 /* 4. Animations & Effects */
 @import url('./animations.css');

@@ -221,10 +221,15 @@ export function getMergedAttributes(xmlNode, styleName, stylesMap) {
         merged[key] = globalDefaults[key];
     }
     
-    if (styleName && stylesMap && stylesMap[styleName]) {
-        const styleData = stylesMap[styleName];
-        for (const key in styleData) {
-            merged[key] = styleData[key];
+    if (styleName && stylesMap) {
+        const styleParts = styleName.split(';').map(s => s.trim()).filter(Boolean);
+        for (const part of styleParts) {
+            if (stylesMap[part]) {
+                const styleData = stylesMap[part];
+                for (const key in styleData) {
+                    merged[key] = styleData[key];
+                }
+            }
         }
     }
     
@@ -423,6 +428,9 @@ export function applyStyles(element, styleName, xmlNode) {
                         element.classList.contains('gui-visibility-container') ||
                         element.classList.contains('gui-expandable-content-container');
     const isOptionMenu = element.tagName?.toLowerCase() === 'select';
+    const isLineOrShape = element.classList.contains('gui-line-container') || 
+                          element.classList.contains('gui-shape-container') ||
+                          element.classList.contains('gui-line-svg');
 
     if (isButton) {
         element.style.boxSizing = 'border-box';
@@ -462,14 +470,18 @@ export function applyStyles(element, styleName, xmlNode) {
         return fallback;
     };
 
-    const borderColor = getFinalValue(['color_border', 'border_color', 'frameColor'], ['color_border', 'border_color', 'frameColor'], 'color_border');
-    const borderWidth = getFinalValue('frameWidth', 'frameWidth', null);
-    const drawMode = getFinalValue('drawMode', 'drawMode', null);
-    element.style.borderColor = borderColor ? parseColor(borderColor) : '';
-    element.style.borderWidth = borderWidth ? `${borderWidth}px` : '';
-    if (drawMode === 'stroked') { element.style.borderStyle = 'solid'; if (!element.style.borderWidth || element.style.borderWidth === '0px') element.style.borderWidth = '1px'; }
-    else if (drawMode === 'filled') { if (borderColor || (borderWidth && parseFloat(borderWidth) > 0)) { element.style.borderStyle = 'solid'; if (!element.style.borderWidth) element.style.borderWidth = '1px'; } else { element.style.borderStyle = 'none'; } }
-    else { if (borderColor || (borderWidth && parseFloat(borderWidth) > 0)) { element.style.borderStyle = 'solid'; if (!element.style.borderWidth) element.style.borderWidth = '1px'; } else { element.style.borderStyle = ''; } }
+    if (!isLineOrShape) {
+        const borderColor = getFinalValue(['color_border', 'border_color', 'frameColor'], ['color_border', 'border_color', 'frameColor'], 'color_border');
+        const borderWidth = getFinalValue('frameWidth', 'frameWidth', null);
+        const drawMode = getFinalValue('drawMode', 'drawMode', null);
+        element.style.borderColor = borderColor ? parseColor(borderColor) : '';
+        element.style.borderWidth = borderWidth ? `${borderWidth}px` : '';
+        if (drawMode === 'stroked') { element.style.borderStyle = 'solid'; if (!element.style.borderWidth || element.style.borderWidth === '0px') element.style.borderWidth = '1px'; }
+        else if (drawMode === 'filled') { if (borderColor || (borderWidth && parseFloat(borderWidth) > 0)) { element.style.borderStyle = 'solid'; if (!element.style.borderWidth) element.style.borderWidth = '1px'; } else { element.style.borderStyle = 'none'; } }
+        else { if (borderColor || (borderWidth && parseFloat(borderWidth) > 0)) { element.style.borderStyle = 'solid'; if (!element.style.borderWidth) element.style.borderWidth = '1px'; } else { element.style.borderStyle = ''; } }
+    } else {
+        element.style.border = 'none';
+    }
 
     const fontAlias = getFinalValue('font', 'font', 'font');
     if (fontAlias) { applyFont(element, fontAlias); }
@@ -532,23 +544,27 @@ export function applyStyles(element, styleName, xmlNode) {
         }
     }
 
-    if (isStaticText || isContainer) {
-        if (isTransparentAttr) { element.style.backgroundColor = 'transparent'; }
-        else if (explicitBgColor) { element.style.backgroundColor = parseColor(explicitBgColor); }
-        else { element.style.backgroundColor = 'transparent'; }
-    } else if (!bgHandledByImageStates && !isOptionMenu) {
-        let finalBgColor = '';
-        if (isTransparentAttr) { finalBgColor = 'transparent'; }
-        else if (explicitBgColor) { finalBgColor = parseColor(explicitBgColor); }
-        else { const globalBg = (isHtmlRect || isButton) ? globalDefaults['color_back'] : null; finalBgColor = globalBg ? parseColor(globalBg) : ''; }
-        if (finalBgColor && finalBgColor !== 'none') { element.style.backgroundColor = finalBgColor; }
-        else { element.style.backgroundColor = ''; }
-    } else if (isOptionMenu) {
-        if (explicitBgColor && explicitBgColor !== 'none' && !isTransparentAttr) {
-            element.style.backgroundColor = parseColor(explicitBgColor);
-        } else if (isTransparentAttr) {
-            element.style.backgroundColor = 'transparent';
+    if (!isLineOrShape) {
+        if (isStaticText || isContainer) {
+            if (isTransparentAttr) { element.style.backgroundColor = 'transparent'; }
+            else if (explicitBgColor) { element.style.backgroundColor = parseColor(explicitBgColor); }
+            else { element.style.backgroundColor = 'transparent'; }
+        } else if (!bgHandledByImageStates && !isOptionMenu) {
+            let finalBgColor = '';
+            if (isTransparentAttr) { finalBgColor = 'transparent'; }
+            else if (explicitBgColor) { finalBgColor = parseColor(explicitBgColor); }
+            else { const globalBg = (isHtmlRect || isButton) ? globalDefaults['color_back'] : null; finalBgColor = globalBg ? parseColor(globalBg) : ''; }
+            if (finalBgColor && finalBgColor !== 'none') { element.style.backgroundColor = finalBgColor; }
+            else { element.style.backgroundColor = ''; }
+        } else if (isOptionMenu) {
+            if (explicitBgColor && explicitBgColor !== 'none' && !isTransparentAttr) {
+                element.style.backgroundColor = parseColor(explicitBgColor);
+            } else if (isTransparentAttr) {
+                element.style.backgroundColor = 'transparent';
+            }
         }
+    } else {
+        element.style.backgroundColor = 'transparent';
     }
 }
 

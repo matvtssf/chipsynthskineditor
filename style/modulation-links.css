@@ -1,0 +1,189 @@
+/* File: cs/style/modulation-links.css */
+
+.gui-mod-container {
+    position: absolute;
+    box-sizing: border-box;
+    background-color: var(--fillColor, #4d5055);
+    font-family: 'SFC_11', Consolas, Monaco, monospace;
+    overflow: hidden;
+}
+
+.gui-mod-viewport {
+    position: absolute;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+/* Header Matrix - Transparent wrapper to maintain standalone discrete blocks */
+.gui-mod-header-row {
+    position: absolute;
+    height: 20px;
+    z-index: 10;
+    background-color: transparent !important;
+}
+
+/* Header Cells - Styled with distinct frames and rounded corners */
+.gui-mod-header-cell {
+    position: absolute;
+    height: 18px;
+    top: 1px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    color: var(--color_text, rgba(255,255,255,0.5));
+    font-size: 11px;
+    font-weight: normal;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.gui-mod-data-row {
+    position: absolute;
+    left: 0;
+    height: 22px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Cell-Specific Control Renderers - Horizontal padding dropped to 0 to align widths perfectly */
+.gui-mod-cell {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    height: 22px;
+    top: 0;
+    box-sizing: border-box;
+    padding: 2px 0px;
+}
+
+.gui-mod-dropdown-mock {
+    width: 100%;
+    height: 18px;
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    color: var(--color_text, #ffffff);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+/* Dual Range Slider Element */
+.gui-mod-range-wrapper {
+    width: 100%;
+    height: 18px;
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    font-size: 9px;
+    color: var(--color_text, rgba(255,255,255,0.6));
+}
+
+.gui-mod-range-track {
+    flex-grow: 1;
+    height: 10px;
+    background-color: var(--rangeSliderTrackColor, rgba(0, 0, 0, 0.4));
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    position: relative;
+    border-radius: 2px;
+    box-sizing: border-box;
+}
+
+.gui-mod-range-fill {
+    position: absolute;
+    height: 100%;
+    background-color: var(--rangeSliderFillColor, #b2add7cc);
+    border-radius: 1px;
+}
+
+.gui-mod-range-knob {
+    position: absolute;
+    width: 3px;
+    height: 14px;
+    top: -3px;
+    background-color: var(--rangeSliderKnobColor, #b2add7ff);
+    border-radius: 1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* Interactive Toggles & Closes */
+.gui-mod-checkbox-wrapper {
+    width: 100%;
+    height: 18px;
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.gui-mod-checkbox {
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background-color: var(--checkBoxOffColor, rgba(0,0,0,0.3));
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.gui-mod-checkbox.checked::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background-color: var(--checkBoxOnColor, #b2add7cc);
+}
+
+.gui-mod-delete-btn {
+    color: var(--deleteIconColor, rgba(255,255,255,0.4));
+    cursor: pointer;
+    font-size: 11px;
+    width: 100%;
+    text-align: center;
+    opacity: 0.5;
+    transition: opacity 0.1s;
+}
+.gui-mod-delete-btn:hover {
+    opacity: 1;
+    color: #f87171;
+}
+
+.gui-presentation-button {
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--color_text, #ffffff);
+    cursor: pointer;
+    border-radius: 3px;
+    height: 22px;
+    line-height: 20px;
+    box-sizing: border-box;
+    transition: background-color 0.1s;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+}
+.gui-presentation-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}

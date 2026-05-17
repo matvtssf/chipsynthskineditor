@@ -1,0 +1,257 @@
+// File: cs/renderers/modulationLinksRenderer.js
+
+// Static presenting lines constructed exactly around universal controller layouts
+const SAMPLE_MODULATION_ROWS = [
+    { src: "Step 1",  func: "N/A",     ctrl: "CC 1 (Mod)",  cfunc: "-",      dest: "[Voice] Detune",         rangeLeft: 0,  rangeRight: 45,  inv: false, math: "Offset" },
+    { src: "CC 110",  func: "Linear",  ctrl: "CC 110",      cfunc: "Linear", dest: "[Channel 1] Sample",     rangeLeft: 0,  rangeRight: 100, inv: false, math: "Replace" },
+    { src: "CC 110",  func: "Linear",  ctrl: "CC 110",      cfunc: "Linear", dest: "[Channel 2] Sample",     rangeLeft: 0,  rangeRight: 100, inv: false, math: "Replace" },
+    { src: "CC 7 (Vol)", func: "Squared", ctrl: "None",     cfunc: "Linear", dest: "[Channel 1] Amp (Steps)", rangeLeft: 0,  rangeRight: 100, inv: false, math: "Scale" },
+    { src: "CC 10 (Pan)", func: "Linear",  ctrl: "None",    cfunc: "Linear", dest: "[Voice] Pan",            rangeLeft: 25, rangeRight: 75,  inv: true,  math: "Offset" }
+];
+
+/**
+ * Parses and maps a complete visual instance of the ModulationLinksContainer layout tree
+ * @param {Element} xmlNode - The native XML node entry block
+ * @param {Object} activeStyleSheetTokens - Style map variables extracted from definitions
+ * @returns {HTMLElement} Bound container element ready for insertion onto the canvas
+ */
+export function createModulationLinksContainer(xmlNode, activeStyleSheetTokens = {}) {
+    const container = document.createElement('div');
+    container.classList.add('gui-mod-container');
+    
+    // Apply layout boundaries directly from properties
+    const cw = xmlNode.getAttribute('w') || '900';
+    const ch = xmlNode.getAttribute('h') || '430';
+    container.style.left = `${xmlNode.getAttribute('x') || 0}px`;
+    container.style.top = `${xmlNode.getAttribute('y') || 0}px`;
+    container.style.width = `${cw}px`;
+    container.style.height = `${ch}px`;
+    
+    if (xmlNode.getAttribute('fill_roundedRatio')) {
+        const radius = parseFloat(xmlNode.getAttribute('fill_roundedRatio')) * 20;
+        container.style.borderRadius = `${radius}px`;
+    }
+
+    const fontAttr = xmlNode.getAttribute('font');
+    if (fontAttr) {
+        container.style.fontFamily = `"${fontAttr}", Consolas, Monaco, monospace`;
+    }
+
+    // Force outline removal when drawFrame is "0"
+    if (xmlNode.getAttribute('drawFrame') === '0') {
+        container.style.setProperty('border', 'none', 'important');
+        container.style.setProperty('box-shadow', 'none', 'important');
+        container.style.setProperty('outline', 'none', 'important');
+    } else {
+        const fWidth = xmlNode.getAttribute('frameWidth') || '1';
+        const fColor = xmlNode.getAttribute('frameColor') || 'rgba(255,255,255,0.2)';
+        container.style.border = `${fWidth}px solid ${fColor}`;
+    }
+
+    // Bind custom stylesheet tokens to internal CSS properties lookup variables
+    const defaultStyles = {
+        fillColor: '#4d5055',
+        rangeSliderTrackColor: 'rgba(0, 0, 0, 0.4)',
+        rangeSliderFillColor: '#b2add7cc',
+        rangeSliderKnobColor: '#b2add7ff',
+        checkBoxOffColor: 'rgba(0,0,0,0.3)',
+        checkBoxOnColor: '#b2add7cc',
+        deleteIconColor: 'rgba(255,255,255,0.4)',
+        color_text: '#ffffffbb'
+    };
+
+    // Case-insensitive token lookup function
+    const getNormalizedToken = (key, fallback) => {
+        if (xmlNode.getAttribute(key) !== null) return xmlNode.getAttribute(key);
+        if (activeStyleSheetTokens[key] !== undefined) return activeStyleSheetTokens[key];
+        const lowerKey = key.toLowerCase();
+        if (activeStyleSheetTokens[lowerKey] !== undefined) return activeStyleSheetTokens[lowerKey];
+        if (xmlNode.getAttribute(lowerKey) !== null) return xmlNode.getAttribute(lowerKey);
+        return fallback;
+    };
+
+    const styles = {};
+    Object.keys(defaultStyles).forEach(key => {
+        let val = getNormalizedToken(key, defaultStyles[key]);
+        if (key === 'fillColor' && xmlNode.getAttribute('backgroundColor')) {
+            val = xmlNode.getAttribute('backgroundColor');
+        }
+        styles[key] = val;
+        container.style.setProperty(`--${key}`, styles[key]);
+    });
+
+    // Create Viewport Scroll Container Layout
+    const vx = parseInt(xmlNode.getAttribute('links_x') || '0');
+    const vy = parseInt(xmlNode.getAttribute('links_y') || '20');
+    const vw = parseInt(xmlNode.getAttribute('links_w') || '845');
+    const vh = parseInt(xmlNode.getAttribute('links_h') || '346');
+
+    const viewport = document.createElement('div');
+    viewport.classList.add('gui-mod-viewport');
+    viewport.style.left = `${vx}px`;
+    viewport.style.top = `${vy}px`;
+    viewport.style.width = `${vw}px`;
+    viewport.style.height = `${vh}px`;
+    
+    // Process Child Columns Definitions strictly adhering to XML attributes
+    const rawColumns = Array.from(xmlNode.getElementsByTagName('CS01ModulationLinksColumn')).map(col => ({
+        name: col.getAttribute('name') || '',
+        x: parseInt(col.getAttribute('x') || '0'),
+        w: parseInt(col.getAttribute('w') || '50'),
+        type: col.getAttribute('controltype') || 'dynamicMenu'
+    }));
+
+    // Dynamically track the rightmost edge of data columns to handle Plogue's auto-append rule
+    let maxRightEdge = 0;
+    rawColumns.forEach(col => {
+        if (col.type !== 'deleteRow') {
+            const rightEdge = col.x + col.w;
+            if (rightEdge > maxRightEdge) {
+                maxRightEdge = rightEdge;
+            }
+        }
+    });
+
+    const columns = rawColumns.map(col => {
+        if (col.type === 'deleteRow') {
+            return {
+                ...col,
+                // Automatically append after the last active column using the 5px standard layout token gap
+                x: maxRightEdge + 5
+            };
+        }
+        return col;
+    });
+
+    // Build the Grid Columns Header Layout Element - Fixed on container above viewport
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('gui-mod-header-row');
+    headerRow.style.left = `${vx}px`;
+    headerRow.style.top = `${vy - 20}px`; 
+    headerRow.style.width = `${vw}px`;
+
+    columns.forEach(col => {
+        const headerCell = document.createElement('div');
+        headerCell.classList.add('gui-mod-header-cell');
+        headerCell.style.left = `${col.x}px`;
+        headerCell.style.width = `${col.w}px`;
+        headerCell.textContent = col.name; 
+        headerRow.appendChild(headerCell);
+    });
+    container.appendChild(headerRow);
+
+    const rowHeight = 22;
+
+    // Populate Visual Loop Elements (5 rows)
+    SAMPLE_MODULATION_ROWS.forEach((rowData, rowIndex) => {
+        const row = document.createElement('div');
+        row.classList.add('gui-mod-data-row');
+        row.style.width = `${vw}px`;
+        row.style.top = `${rowIndex * rowHeight}px`; 
+
+        columns.forEach(col => {
+            const cell = document.createElement('div');
+            cell.classList.add('gui-mod-cell');
+            cell.style.left = `${col.x}px`;
+            cell.style.width = `${col.w}px`;
+
+            if (col.type === 'dynamicMenu') {
+                const drop = document.createElement('div');
+                drop.classList.add('gui-mod-dropdown-mock');
+                
+                if (col.name === "Source") drop.textContent = rowData.src;
+                else if (col.name === "Function" && col.x < 150) drop.textContent = rowData.func;
+                else if (col.name === "Control") drop.textContent = rowData.ctrl;
+                else if (col.name === "Function") drop.textContent = rowData.cfunc;
+                else if (col.name === "Destination") drop.textContent = rowData.dest;
+                else if (col.name === "Math") drop.textContent = rowData.math;
+
+                cell.appendChild(drop);
+            } 
+            else if (col.type === 'rangeSliderEdit') {
+                const wrap = document.createElement('div');
+                wrap.classList.add('gui-mod-range-wrapper');
+
+                const minLabel = document.createElement('span');
+                minLabel.textContent = "0%";
+
+                const track = document.createElement('div');
+                track.classList.add('gui-mod-range-track');
+
+                const fill = document.createElement('div');
+                fill.classList.add('gui-mod-range-fill');
+                fill.style.left = `${rowData.rangeLeft}%`;
+                fill.style.width = `${rowData.rangeRight - rowData.rangeLeft}%`;
+
+                const knob = document.createElement('div');
+                knob.classList.add('gui-mod-range-knob');
+                knob.style.left = `${rowData.rangeRight}%`;
+
+                track.appendChild(fill);
+                track.appendChild(knob);
+
+                const maxLabel = document.createElement('span');
+                maxLabel.textContent = "100%";
+
+                wrap.appendChild(minLabel);
+                wrap.appendChild(track);
+                wrap.appendChild(maxLabel);
+                cell.appendChild(wrap);
+            } 
+            else if (col.type === 'checkBox') {
+                const wrap = document.createElement('div');
+                wrap.classList.add('gui-mod-checkbox-wrapper');
+
+                const cb = document.createElement('div');
+                cb.classList.add('gui-mod-checkbox');
+                if (rowData.inv) cb.classList.add('checked');
+
+                const cbW = xmlNode.getAttribute('checkBox_w');
+                const cbH = xmlNode.getAttribute('checkBox_h');
+                const cbX = xmlNode.getAttribute('checkBox_x');
+                const cbY = xmlNode.getAttribute('checkBox_y');
+
+                if (cbW) cb.style.width = `${cbW}px`;
+                if (cbH) cb.style.height = `${cbH}px`;
+                if (cbX !== null) {
+                    cb.style.position = 'absolute';
+                    cb.style.left = `${cbX}px`;
+                }
+                if (cbY !== null) {
+                    cb.style.position = 'absolute';
+                    cb.style.top = `${cbY}px`;
+                }
+
+                wrap.appendChild(cb);
+                cell.appendChild(wrap);
+            } 
+            else if (col.type === 'deleteRow') {
+                const del = document.createElement('div');
+                del.classList.add('gui-mod-delete-btn');
+                del.innerHTML = '&#x2715;'; 
+                cell.appendChild(del);
+            }
+
+            row.appendChild(cell);
+        });
+
+        viewport.appendChild(row);
+    });
+
+    container.appendChild(viewport);
+
+    // Position action buttons absolutely using precise coordinates from XML attributes
+    const footerButtons = xmlNode.getElementsByTagName('CS01TextButton');
+    Array.from(footerButtons).forEach(btnNode => {
+        const btn = document.createElement('button');
+        btn.className = 'gui-presentation-button'; 
+        btn.style.position = 'absolute';
+        btn.style.left = `${btnNode.getAttribute('x') || 0}px`;
+        btn.style.top = `${btnNode.getAttribute('y') || 0}px`;
+        btn.style.width = `${btnNode.getAttribute('w') || 100}px`;
+        btn.textContent = btnNode.getAttribute('text') || 'Action';
+        container.appendChild(btn);
+    });
+
+    return container;
+}

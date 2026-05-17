@@ -17,6 +17,63 @@
     user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; 
     min-width: 400px; min-height: 300px; 
 }
+body[data-app-theme="dark"] .modal-content-container {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border: 1px solid #333333 !important;
+}
+
+body[data-app-theme="dark"] .modal-content-container label,
+body[data-app-theme="dark"] .modal-content-container h2,
+body[data-app-theme="dark"] .modal-content-container h3,
+body[data-app-theme="dark"] .modal-content-container p,
+body[data-app-theme="dark"] .modal-content-container span,
+body[data-app-theme="dark"] .modal-content-container .text-gray-500,
+body[data-app-theme="dark"] .modal-content-container .text-gray-600,
+body[data-app-theme="dark"] .modal-content-container .text-gray-700,
+body[data-app-theme="dark"] .modal-content-container .text-gray-800,
+body[data-app-theme="dark"] .modal-content-container .text-gray-900 {
+    color: #f3f4f6 !important;
+}
+
+body[data-app-theme="dark"] .modal-content-container input,
+body[data-app-theme="dark"] .modal-content-container select,
+body[data-app-theme="dark"] .modal-content-container textarea {
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+    border: 1px solid #444444 !important;
+}
+
+body[data-app-theme="dark"] .modal-content-container button:not(.config-toggle-btn) {
+    background-color: #333333 !important;
+    color: #ffffff !important;
+    border: 1px solid #444444 !important;
+}
+
+body[data-app-theme="dark"] .modal-content-container button:not(.config-toggle-btn):hover {
+    background-color: #444444 !important;
+}
+
+body[data-app-theme="dark"] #attribute-editor-list,
+body[data-app-theme="dark"] .reference-column {
+    background-color: #252526 !important;
+    border-color: #3c3c3c !important;
+}
+
+body[data-app-theme="dark"] .reference-column-header,
+body[data-app-theme="dark"] .element-category-header,
+body[data-app-theme="dark"] .attribute-category-header {
+    background-color: #2d2d30 !important;
+    border-color: #3e3e42 !important;
+    color: #e0e0e0 !important;
+}
+
+body[data-app-theme="dark"] #reference-element-list li:not(.element-category-header):hover,
+body[data-app-theme="dark"] #reference-attribute-list li:not(.attribute-category-header):hover,
+body[data-app-theme="dark"] #param-list li:hover,
+body[data-app-theme="dark"] #attribute-editor-list li:hover {
+    background-color: #333337 !important;
+}
 .modal-overlay.visible .modal-content-container { transform: scale(1); }
 .modal-content-container input, .modal-content-container textarea, .modal-content-container pre { 
     user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; 
@@ -200,6 +257,47 @@
     font-size: 1rem; line-height: 1; padding: 0; font-weight: bold; transition: background-color 0.2s; 
 } 
 .toast-close-btn:hover { background-color: rgba(0, 0, 0, 0.4); }
+
+/* Accessibility Enhancements for Config Toggle Switches */
+.config-toggle-btn {
+    position: relative !important;
+    display: inline-block !important;
+    width: 48px !important;
+    height: 24px !important;
+    background-color: #cbd5e1 !important;
+    border-radius: 9999px !important;
+    border: 1px solid #94a3b8 !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    transition: background-color 0.2s ease, border-color 0.2s ease !important;
+}
+
+body[data-app-theme="dark"] .config-toggle-btn {
+    background-color: #374151 !important;
+    border-color: #4b5563 !important;
+}
+
+.config-toggle-btn[aria-checked="true"] {
+    background-color: #10b981 !important;
+    border-color: #059669 !important;
+}
+
+.toggle-circle {
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
+    width: 18px !important;
+    height: 18px !important;
+    background-color: #ffffff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    pointer-events: none !important;
+}
+
+.config-toggle-btn[aria-checked="true"] .toggle-circle {
+    transform: translateX(24px) !important;
+}
 
 /* Unsaved Changes specific to modals */
 #export-reference-btn.unsaved-changes, #export-param-ref-btn.unsaved-changes { 

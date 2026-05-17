@@ -15,7 +15,7 @@ import * as State from './state.js';
 import { getDirectory } from './state.js'; // Keep this import, might be needed elsewhere
 import * as DomUtils from './domUtils.js';
 import { renderElement } from './uiRenderer.js';
-import { setupButtonListeners } from '../buttonInteractions.js';
+import { setupButtonListeners } from '../interactions/buttonInteractions.js';
 import { initializeAllContainerStates } from './visibilityController.js';
 
 /**

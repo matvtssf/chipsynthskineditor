@@ -48,9 +48,7 @@ body.logo-hover #text-logo { opacity: 0.1; }
     flex-grow: 1; 
     min-height: 0; 
     overflow: auto; 
-    display: flex; 
-    align-items: center;
-    justify-content: center;
+    display: block; 
     position: relative;
     background-color: var(--canvas-bg, #4B5563); 
 }
@@ -68,8 +66,8 @@ body.logo-hover #text-logo { opacity: 0.1; }
 
 /* --- GUI Zoom Canvas --- */
 #gui-zoom-canvas {
-    width: 100%; 
-    height: 100%; 
+    width: 3000px; 
+    height: 3000px; 
     position: relative; 
     display: flex;
     align-items: center;
@@ -82,8 +80,8 @@ body.logo-hover #text-logo { opacity: 0.1; }
 
 /* --- Fixed Dimension Content --- */
 #fixed-dimension-content {
-    width: 2500px;
-    height: 2500px; 
+    width: 3000px;
+    height: 3000px; 
     position: relative; 
     display: flex;
     align-items: center;

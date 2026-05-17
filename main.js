@@ -52,6 +52,8 @@ function setupConsoleInterception() {
 /** Initialize application */
 async function initializeApp() {
     setupConsoleInterception();
+    const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+    document.body.setAttribute('data-app-theme', savedTheme);
     console.log('Initializing application...');
     updateStatus('Loading reference data...');
 
@@ -90,6 +92,7 @@ async function initializeApp() {
             }
         }
 
+        initializeThemeManagement();
         updateStatus('Ready. Please load a product folder.', 0);
 
     } catch (error) {
@@ -97,6 +100,11 @@ async function initializeApp() {
         updateStatus('Initialization Error! Check console.', 0);
         showToast('Critical error during initialization. Check console.', 'error', 0);
     }
+}
+
+function initializeThemeManagement() {
+    const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+    document.body.setAttribute('data-app-theme', savedTheme);
 }
 
 // --- Global error handlers ---

@@ -718,7 +718,25 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                     finalAttributeValueHtml = `<span class="hl-param-value" data-name="${escapeHtml(unescapedOriginalValue)}" ${paramDataAttrs}>${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
                 } else if (attrNameEscaped.toLowerCase() === 'style' || attrNameEscaped.toLowerCase() === 'class') {
                     const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
-                    finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                    if (unescapedOriginalValue.includes(';')) {
+                        const styleParts = unescapedOriginalValue.split(';');
+                        let multiStyleHtml = "";
+                        styleParts.forEach((part, pIdx) => {
+                            const trimmed = part.trim();
+                            if (trimmed) {
+                                // Deconstruct into interactive sub-tokens so clicking specific style parts jumps cleanly
+                                multiStyleHtml += `<span class="hl-style-value compound-sub-style" data-name="${escapeHtml(trimmed)}">${escapeHtml(part)}${iconPlaceholderHtml}</span>`;
+                            } else {
+                                multiStyleHtml += escapeHtml(part);
+                            }
+                            if (pIdx < styleParts.length - 1) {
+                                multiStyleHtml += ";";
+                            }
+                        });
+                        finalAttributeValueHtml = multiStyleHtml;
+                    } else {
+                        finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                    }
                 }
 
                 return `${attrNameHtml}${separatorEscaped}${openingQuoteEscaped}${finalAttributeValueHtml}${closingQuoteEscaped}`;

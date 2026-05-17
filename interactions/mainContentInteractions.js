@@ -91,6 +91,7 @@ function handlePanStart(e) {
     console.log("[mainContent] Pan start.");
 }
 
+// --- Panning Move Logic ---
 function handlePanMove(e) {
     if (!isPanning) return;
     e.preventDefault();
@@ -238,9 +239,22 @@ export function updateGuiZoom(zoomLevel, origin = null) {
         if (origin) {
             zoomTargetElement.style.transformOrigin = origin;
         } else {
-             if (!zoomTargetElement.style.transformOrigin || zoomTargetElement.style.transformOrigin === "50% 50%" ||  zoomTargetElement.style.transformOrigin === "center center") {
+            const canvasViewport = document.getElementById('canvas-viewport');
+            if (canvasViewport) {
+                const currentZoom = State.getCurrentZoomLevel() || 1;
+                const rect = zoomTargetElement.getBoundingClientRect();
+                const viewRect = canvasViewport.getBoundingClientRect();
+                
+                const viewCenterX = viewRect.left + viewRect.width / 2;
+                const viewCenterY = viewRect.top + viewRect.height / 2;
+                
+                const originX = (viewCenterX - rect.left) / currentZoom;
+                const originY = (viewCenterY - rect.top) / currentZoom;
+                
+                zoomTargetElement.style.transformOrigin = `${originX.toFixed(2)}px ${originY.toFixed(2)}px`;
+            } else if (!zoomTargetElement.style.transformOrigin || zoomTargetElement.style.transformOrigin === "50% 50%" ||  zoomTargetElement.style.transformOrigin === "center center") {
                 zoomTargetElement.style.transformOrigin = 'top left';
-             }
+            }
         }
         zoomTargetElement.style.transform = `scale(${zoomLevel})`;
         State.setCurrentZoomLevel(zoomLevel); // FIXED: Use setCurrentZoomLevel
