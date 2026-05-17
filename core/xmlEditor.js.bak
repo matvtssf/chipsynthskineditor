@@ -10,20 +10,20 @@
  * MODIFIED: updateLineNumbersForInstance to wrap each number in a DIV with a class and dynamically adjust column width.
  * MODIFIED: checkAndRerender to correctly compare against main skin file path and add verbose debug logs.
  */
-import * as State from './core/state.js';
+import * as State from './state.js';
 import {
     getXmlEditorModal as getXmlEditorModalTemplate,
     showToast,
     logError,
     normalizePath as domNormalizePath
-} from './core/domUtils.js';
+} from './domUtils.js';
 import { loadSkin } from './skinManager.js';
-import { makeModalDraggable, makeModalResizable } from './managers/modalManager.js';
+import { makeModalDraggable, makeModalResizable } from '../managers/modalManager.js';
 import {
     setupXmlEditorListeners as setupSharedXmlEditorInteractionListeners,
     setupInstanceHoverListeners,
     updateStatusBarDescription
-} from './xmlEditorInteractions.js';
+} from '../interactions/xmlEditorInteractions.js';
 
 const DEBUG_OPEN_EDITOR = true;
 const DEBUG_LINE_NUMBERS = true;
@@ -647,8 +647,8 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 });
 
                 const rawAttrRange = rawTextRanges.find(r => r.type === 'attribute' && r.name === attrNameEscaped && r.start === bestGuessRawAttrStartIndex);
-                const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}" data-name="${escapeHtml(attrNameEscaped)}"` : '';
-                const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" ${attrDataAttrs}>${attrNameEscaped}</span>`;
+                const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}"` : '';
+                const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" data-name="${escapeHtml(attrNameEscaped)}" ${attrDataAttrs}>${attrNameEscaped}${iconPlaceholderHtml}</span>`;
 
                 let finalAttributeValueHtml = "";
                 const originalEscapedValue = valueInsideDoubleQuotesEscaped;
@@ -714,8 +714,11 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 if (attrNameEscaped.toLowerCase() === 'param') {
                     const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
                     const rawParamRange = rawTextRanges.find(r => r.type === 'param' && r.name === unescapedOriginalValue && rawAttrRange && r.start > rawAttrRange.start);
-                    const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}" data-name="${escapeHtml(rawParamRange.name)}"` : '';
-                    finalAttributeValueHtml = `<span class="hl-param-value" ${paramDataAttrs}>${finalAttributeValueHtml}</span>`;
+                    const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}"` : '';
+                    finalAttributeValueHtml = `<span class="hl-param-value" data-name="${escapeHtml(unescapedOriginalValue)}" ${paramDataAttrs}>${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                } else if (attrNameEscaped.toLowerCase() === 'style' || attrNameEscaped.toLowerCase() === 'class') {
+                    const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
+                    finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
                 }
 
                 return `${attrNameHtml}${separatorEscaped}${openingQuoteEscaped}${finalAttributeValueHtml}${closingQuoteEscaped}`;
@@ -734,9 +737,9 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 r.name === tagNameEscaped &&
                 Math.abs(offsetInEscaped - (r.start - (rawXmlText.length - textForHighlighting.length))) < 20
             );
-            const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}" data-name="${escapeHtml(tagNameEscaped)}"` : '';
+            const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}"` : '';
 
-            return `${prefixAndSlash}<span class="${tagClasses}" ${elemDataAttrs}>${tagNameEscaped}</span>`;
+            return `${prefixAndSlash}<span class="${tagClasses}" data-name="${escapeHtml(tagNameEscaped)}" ${elemDataAttrs}>${tagNameEscaped}${iconPlaceholderHtml}</span>`;
         });
 
         tempHighlighted = tempHighlighted.replace(/(\/?&gt;)/g, '<span class="hl-tag">$1</span>');
@@ -772,8 +775,8 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
 
             if (region.type === 'rgba') {
                 wrapperClass = 'hl-color-box-wrapper';
-                wrapperStyleVariables = `style="--box-bg-color: ${originalHex}; --box-border-color: ${originalHex.substring(0, 7)};"`;
-                innerContent = `<span style="color: ${contrastColor}; text-shadow: ${textShadow};">${hashSign}</span><span class="hl-color-rgba-text" style="color: ${contrastColor}; text-shadow: ${textShadow};">${hexDigits}</span>`;
+                wrapperStyleVariables = `style="--box-bg-color: ${originalHex}; --box-border-color: ${originalHex.substring(0, 7)}; --contrast-color: ${contrastColor}; --text-shadow: ${textShadow};"`;
+                innerContent = `<span>${hashSign}</span><span class="hl-color-rgba-text">${hexDigits}</span>`;
             } else {
                 wrapperClass = 'hl-color-rgb-warning-box';
                 wrapperStyleVariables = `style="--box-border-color-warning: red;"`;

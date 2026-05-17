@@ -647,8 +647,8 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 });
 
                 const rawAttrRange = rawTextRanges.find(r => r.type === 'attribute' && r.name === attrNameEscaped && r.start === bestGuessRawAttrStartIndex);
-                const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}" data-name="${escapeHtml(attrNameEscaped)}"` : '';
-                const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" ${attrDataAttrs}>${attrNameEscaped}</span>`;
+                const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}"` : '';
+                const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" data-name="${escapeHtml(attrNameEscaped)}" ${attrDataAttrs}>${attrNameEscaped}${iconPlaceholderHtml}</span>`;
 
                 let finalAttributeValueHtml = "";
                 const originalEscapedValue = valueInsideDoubleQuotesEscaped;
@@ -714,8 +714,11 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 if (attrNameEscaped.toLowerCase() === 'param') {
                     const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
                     const rawParamRange = rawTextRanges.find(r => r.type === 'param' && r.name === unescapedOriginalValue && rawAttrRange && r.start > rawAttrRange.start);
-                    const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}" data-name="${escapeHtml(rawParamRange.name)}"` : '';
-                    finalAttributeValueHtml = `<span class="hl-param-value" ${paramDataAttrs}>${finalAttributeValueHtml}</span>`;
+                    const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}"` : '';
+                    finalAttributeValueHtml = `<span class="hl-param-value" data-name="${escapeHtml(unescapedOriginalValue)}" ${paramDataAttrs}>${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                } else if (attrNameEscaped.toLowerCase() === 'style' || attrNameEscaped.toLowerCase() === 'class') {
+                    const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
+                    finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
                 }
 
                 return `${attrNameHtml}${separatorEscaped}${openingQuoteEscaped}${finalAttributeValueHtml}${closingQuoteEscaped}`;
@@ -734,9 +737,9 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 r.name === tagNameEscaped &&
                 Math.abs(offsetInEscaped - (r.start - (rawXmlText.length - textForHighlighting.length))) < 20
             );
-            const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}" data-name="${escapeHtml(tagNameEscaped)}"` : '';
+            const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}"` : '';
 
-            return `${prefixAndSlash}<span class="${tagClasses}" ${elemDataAttrs}>${tagNameEscaped}</span>`;
+            return `${prefixAndSlash}<span class="${tagClasses}" data-name="${escapeHtml(tagNameEscaped)}" ${elemDataAttrs}>${tagNameEscaped}${iconPlaceholderHtml}</span>`;
         });
 
         tempHighlighted = tempHighlighted.replace(/(\/?&gt;)/g, '<span class="hl-tag">$1</span>');

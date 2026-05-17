@@ -70,32 +70,11 @@
     position: relative; pointer-events: none;
 }
 
-/* Hide background swatches and jump triggers by default, NOT the text container */
+/* Hide interactive visuals by default */
 .xml-highlight-overlay-instance svg,
-.hl-color-box-wrapper::before,
-.hl-color-box-wrapper::after,
-.hl-color-rgb-warning-box::before,
-.hl-color-rgb-warning-box::after {
-    opacity: 0; 
-    transition: opacity 0.2s ease-in-out;
-}
-
-/* Keep the color text fully opaque, but default it to black when CTRL is not held */
-.hl-color-box-wrapper {
-    opacity: 1 !important;
-}
-body:not(.ctrl-active) .hl-color-box-wrapper span {
-    color: #000000 !important;
-    text-shadow: none !important;
-}
-
-/* Reveal the background swatches and jump triggers when holding CTRL */
-body.ctrl-active .xml-highlight-overlay-instance svg,
-body.ctrl-active .hl-color-box-wrapper::before,
-body.ctrl-active .hl-color-box-wrapper::after,
-body.ctrl-active .hl-color-rgb-warning-box::before,
-body.ctrl-active .hl-color-rgb-warning-box::after {
-    opacity: 1;
+.hl-color-box-wrapper,
+.hl-color-rgb-warning-box {
+    opacity: 0; transition: opacity 0.2s ease-in-out;
 }
 
 /* Enable pointer events when CTRL is held down */

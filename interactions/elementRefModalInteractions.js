@@ -113,9 +113,88 @@ export function setupReferenceModalListeners() {
         }
     }
     // --- End Make Modal Draggable ---
+
+    // Listen for jump events from the XML editor
+    document.addEventListener('jumpToReference', handleJumpToReference);
+    document.addEventListener('jumpToParam', handleJumpToParam);
 }
 
 // --- Core UI Logic ---
+
+/** Handles jumping directly to a specific element or attribute in the reference modal */
+function handleJumpToReference(event) {
+    const { type, name, parentElement } = event.detail;
+    const referenceModal = getReferenceModal();
+    if (!referenceModal) return;
+
+    if (!referenceModal.classList.contains('visible')) {
+        handleReferenceToggle(); // Properly open and populate it
+    }
+
+    setTimeout(() => {
+        if (type === 'element' || (type === 'attribute' && parentElement)) {
+            const targetElementName = type === 'element' ? name : parentElement;
+            const elementList = getReferenceElementList();
+            const elemLi = elementList.querySelector(`li[data-element-name="${targetElementName}"]`);
+
+            if (elemLi) {
+                elemLi.click();
+                setTimeout(() => {
+                    elemLi.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    elemLi.classList.add('hl-row-flash');
+                    setTimeout(() => elemLi.classList.remove('hl-row-flash'), 1300);
+                }, 10);
+
+                if (type === 'attribute') {
+                    setTimeout(() => {
+                        const attrList = getReferenceAttributeList();
+                        const attrLi = attrList.querySelector(`li[data-attribute-name="${name}"]`);
+                        if (attrLi) {
+                            attrLi.click();
+                            setTimeout(() => {
+                                attrLi.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                attrLi.classList.add('hl-row-flash');
+                                setTimeout(() => attrLi.classList.remove('hl-row-flash'), 1300);
+                            }, 10);
+                        } else {
+                            showToast(`Attribute '${name}' not found for <${targetElementName}>.`, 'warn');
+                        }
+                    }, 50); // Give time for attribute list to render
+                }
+            } else {
+                showToast(`Element <${targetElementName}> not found in reference.`, 'warn');
+            }
+        }
+    }, 50);
+}
+
+/** Handles jumping directly to a parameter in the param reference modal */
+function handleJumpToParam(event) {
+    const paramId = event.detail.id;
+    const paramBtn = getParamReferenceButton();
+    if (paramBtn) {
+        paramBtn.click(); // Uses the existing handler to open the modal
+        
+        setTimeout(() => {
+            const paramList = document.getElementById('param-list');
+            if (paramList) {
+                const paramLi = paramList.querySelector(`li[data-param-id="${paramId}"]`);
+                if (paramLi) {
+                    paramLi.click();
+                    setTimeout(() => {
+                        paramLi.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        paramLi.classList.add('hl-row-flash');
+                        setTimeout(() => paramLi.classList.remove('hl-row-flash'), 1300);
+                    }, 10);
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast(`Parameter '${paramId}' could not be located in current category view.`, 'info');
+                    }
+                }
+            }
+        }, 100);
+    }
+}
 
 /** Toggles the visibility of the Element Reference modal */
 export function handleReferenceToggle() {
@@ -318,7 +397,7 @@ function handleAttributeListItemClick(event) {
     const hasOverride = targetLi.dataset.hasOverride === 'true';
 
     if (selectedAttributeListItem && selectedAttributeListItem !== targetLi) selectedAttributeListItem.classList.remove('selected');
-    if (selectedElementListItem) selectedElementListItem.classList.remove('selected'); // Deselect element
+    // DO NOT deselect the element, so both can be highlighted at once
     targetLi.classList.add('selected'); selectedAttributeListItem = targetLi;
     currentSelectedAttributeName = attributeName; currentSelectedAttributeType = attributeType;
     currentAttributeIsOverridden = hasOverride;

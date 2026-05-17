@@ -12,7 +12,7 @@
 
 console.log('[xmlEditorInteractions.js] SCRIPT PARSED AND EXECUTED (Top Level Log)');
 
-import * as State from './core/state.js';
+import * as State from '../core/state.js';
 import {
     getInsertElementXmlBtn,
     getXmlInsertElementModal, getCloseXmlInsertBtn, getXmlInsertElementList,
@@ -21,14 +21,14 @@ import {
     logError,
     showToast,
     normalizePath as domNormalizePath
-} from './core/domUtils.js';
+} from '../core/domUtils.js';
 import {
     insertXmlText,
     openXmlEditor,
     getCachedElementReferenceDataForHover,
     getCachedCommonAttributesForHover,
     getCachedParamReferenceDataForHover,
-} from './core/xmlEditor.js';
+} from '../core/xmlEditor.js';
 
 const DEBUG_INTERACTIONS = true;
 
@@ -50,6 +50,7 @@ export function setupXmlEditorListeners() {
         insertList.removeEventListener('click', handleInsertElementXml); // Ensure no duplicates
         insertList.addEventListener('click', handleInsertElementXml);
     }
+    document.addEventListener('jumpToStyle', handleJumpToStyle);
 }
 
 export function setupInstanceHoverListeners(textareaElement, highlightOverlayElement, instanceId) {
@@ -125,7 +126,7 @@ function hideActiveActionIcon() {
 }
 
 function handleOverlayMouseOver(event) {
-    const qualifiedSpan = event.target.closest('.hl-color-box-wrapper, .hl-color-rgb-warning-box, .hl-filepath');
+    const qualifiedSpan = event.target.closest('.hl-color-box-wrapper, .hl-color-rgb-warning-box, .hl-filepath, .hl-tag[data-name], .hl-attr-name, .hl-param-value[data-name], .hl-style-value[data-name]');
     if (qualifiedSpan) {
         if (qualifiedSpan !== activeIconTargetSpan) {
             showActionIconForSpan(qualifiedSpan);
@@ -335,8 +336,44 @@ function handleOverlayIconClick(event) {
         } else {
             showToast(`Preview for this file type (${filePath.split('.').pop()}) not implemented.`, "info");
         }
+    } else if (parentSpan.classList.contains('hl-tag') || parentSpan.classList.contains('hl-attr-name') || parentSpan.classList.contains('hl-param-value') || parentSpan.classList.contains('hl-style-value')) {
+        const isElement = parentSpan.classList.contains('hl-tag');
+        const isParam = parentSpan.classList.contains('hl-param-value');
+        const isStyle = parentSpan.classList.contains('hl-style-value');
+        const itemName = parentSpan.dataset.name;
+        if (!itemName) return;
+
+        if (isParam) {
+            document.dispatchEvent(new CustomEvent('jumpToParam', { detail: { id: itemName } }));
+            return;
+        }
+        if (isStyle) {
+            document.dispatchEvent(new CustomEvent('jumpToStyle', { detail: { name: itemName } }));
+            return;
+        }
+
+        let parentElementName = null;
+        if (!isElement) {
+            // Traverse backwards to find the enclosing tag
+            let current = parentSpan.previousElementSibling;
+            while (current) {
+                if (current.classList.contains('hl-tag')) {
+                    parentElementName = current.dataset.name;
+                    break;
+                }
+                current = current.previousElementSibling;
+            }
+        }
+
+        document.dispatchEvent(new CustomEvent('jumpToReference', { 
+            detail: { 
+                type: isElement ? 'element' : 'attribute', 
+                name: itemName, 
+                parentElement: parentElementName 
+            } 
+        }));
     } else {
-         if (DEBUG_INTERACTIONS) console.warn("[IconClick] Icon clicked, but parent is not a recognized color or filepath span.", parentSpan);
+         if (DEBUG_INTERACTIONS) console.warn("[IconClick] Icon clicked, but parent is not a recognized color, filepath span, tag, attribute, or param.", parentSpan);
     }
 }
 
@@ -474,6 +511,94 @@ function updatePreviewModal(contentElement, titleText) {
     } else {
         logError("[xmlEditorInteractions] Could not display item in preview modal - modal elements not found.");
         showToast("Could not open preview modal.", "error");
+    }
+}
+
+function handleJumpToStyle(event) {
+    const styleName = event.detail.name;
+    let stylesFilePath = null;
+    const fileMap = State.getFileMap();
+    const skinRoot = State.getCurrentSkinRoot() ? domNormalizePath(State.getCurrentSkinRoot()) : '';
+    const expectedPath = skinRoot ? `${skinRoot}/styles.xml` : 'styles.xml';
+
+    // 1. Try exact expected path
+    if (fileMap.has(expectedPath)) {
+        stylesFilePath = expectedPath;
+    } else {
+        // 2. Search for any styles.xml within the current skin's folder
+        for (const key of fileMap.keys()) {
+            if (key.endsWith('/styles.xml') || key === 'styles.xml') {
+                if (!skinRoot || key.startsWith(skinRoot)) {
+                    stylesFilePath = key;
+                    break;
+                }
+            }
+        }
+        // 3. Fallback: Any styles.xml loaded anywhere in the workspace
+        if (!stylesFilePath) {
+            for (const key of fileMap.keys()) {
+                if (key.endsWith('/styles.xml') || key === 'styles.xml') {
+                    stylesFilePath = key;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!stylesFilePath) {
+        if (typeof showToast === 'function') showToast(`styles.xml not found in loaded files`, 'warn', 3000);
+        return;
+    }
+
+    openXmlEditor(stylesFilePath);
+
+    const instance = State.getEditorInstanceByPath(stylesFilePath);
+    if (instance && instance.uniqueId) {
+        setTimeout(() => {
+            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+            if (textarea) {
+                const textContent = textarea.value;
+                const searchStr = `<Style name="${styleName}"`;
+                let index = textContent.indexOf(searchStr);
+                
+                // Fallback regex if formatting differs
+                if (index === -1) {
+                    const regex = new RegExp(`<Style\\s+name=["']${styleName}["']`, 'i');
+                    const match = textContent.match(regex);
+                    if (match) index = match.index;
+                }
+
+                if (index !== -1) {
+                    textarea.focus();
+                    textarea.setSelectionRange(index, index + searchStr.length);
+
+                    const numLines = textContent.substring(0, index).split('\n').length;
+                    const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 16;
+                    textarea.scrollTop = Math.max(0, (numLines - 2) * lineHeight);
+
+                    textarea.dispatchEvent(new Event('scroll'));
+
+                    setTimeout(() => {
+                        const lineContainer = document.getElementById(`xml-editor-line-numbers-${instance.uniqueId}`);
+                        if (lineContainer) {
+                            const lines = lineContainer.getElementsByClassName('lineNumberEntry');
+                            if (lines[numLines - 1]) {
+                                lines[numLines - 1].classList.add('hl-row-flash');
+                                setTimeout(() => lines[numLines - 1].classList.remove('hl-row-flash'), 1300);
+                            }
+                        }
+                    }, 50);
+
+                    if (typeof showToast === 'function') {
+                        showToast(`Jumped to Style '${styleName}'`, 'info', 2000);
+                    }
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast(`Style '${styleName}' not found in styles.xml`, 'warn', 3000);
+                    }
+                }
+            }
+        }, 120); // slight delay to allow editor to render
     }
 }
 

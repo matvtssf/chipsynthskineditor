@@ -9,6 +9,10 @@ import * as State from '../core/state.js'; // For setIsMouseButtonDown
 import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton, showToast } from '../core/domUtils.js';
 import { handlePanEnd } from './mainContentInteractions.js'; // Sibling interaction import
 import { flashModalBorder } from '../managers/modalManager.js'; // Moved up one level
+import { openXmlEditor } from '../core/xmlEditor.js'; // Added for middle-click jump
+
+let middleMouseDownX = 0;
+let middleMouseDownY = 0;
 
 // --- Initialization ---
 
@@ -133,6 +137,10 @@ function handleGlobalMouseDown(e) {
     if (e.button === 0) {
         State.setIsMouseButtonDown(true);
     }
+    if (e.button === 1) {
+        middleMouseDownX = e.clientX;
+        middleMouseDownY = e.clientY;
+    }
 }
 
 /** Tracks global mouse up state and potentially ends panning */
@@ -145,6 +153,113 @@ function handleGlobalMouseUp(e) {
     if (e.button === 1) {
         // Call imported function directly
          handlePanEnd(e); // <<< UPDATED CALL
+         
+         // Check if it was a click (not a drag) to trigger XML jump
+         const dx = Math.abs(e.clientX - middleMouseDownX);
+         const dy = Math.abs(e.clientY - middleMouseDownY);
+         if (dx < 5 && dy < 5) {
+             handleGlobalMiddleClickOpenEditor(e);
+         }
+    }
+}
+
+/** Handles middle-click on GUI elements in debug mode to open them directly in the XML editor */
+function handleGlobalMiddleClickOpenEditor(event) {
+    let isDebug = false;
+    if (typeof State.getDebugEnabled === 'function') isDebug = isDebug || State.getDebugEnabled();
+    if (typeof State.getDebugMode === 'function') isDebug = isDebug || State.getDebugMode();
+    if (State.debugMode !== undefined) isDebug = isDebug || State.debugMode;
+    if (window.debugMode !== undefined) isDebug = isDebug || window.debugMode;
+    if (document.body.classList.contains('debug-mode')) isDebug = true;
+
+    if (!isDebug) return;
+
+    const guiElement = event.target.closest('.gui-element');
+    if (!guiElement) return;
+
+    const filePath = guiElement.dataset.sourcePath;
+    if (!filePath) {
+        console.warn("[globalListeners] Missing dataset.sourcePath on element:", guiElement);
+        return;
+    }
+
+    openXmlEditor(filePath);
+    
+    const instance = State.getEditorInstanceByPath(filePath);
+    if (instance && instance.uniqueId) {
+        setTimeout(() => {
+            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+            if (textarea) {
+                const rawXml = guiElement.dataset.rawXml || "";
+                const textContent = textarea.value;
+                let index = textContent.indexOf(rawXml);
+                let highlightLength = rawXml.length;
+                
+                // Fallback: If browser reformatting broke the exact match, use smart Regex
+                if (index === -1) {
+                    const tagName = guiElement.dataset.xmlTagName;
+                    if (tagName) {
+                        const param = guiElement.dataset.xmlAttr_param;
+                        const name = guiElement.dataset.xmlAttr_name;
+                        const x = guiElement.dataset.xmlAttr_x;
+                        const y = guiElement.dataset.xmlAttr_y;
+
+                        let regexStr = `<${tagName}\\b`;
+                        if (param) regexStr = `<${tagName}\\b[^>]*?param=["']${param}["']`;
+                        else if (name) regexStr = `<${tagName}\\b[^>]*?name=["']${name}["']`;
+                        else if (x && y) regexStr = `<${tagName}\\b[^>]*?x=["']${x}["'][^>]*?y=["']${y}["']`;
+
+                        try {
+                            let match = textContent.match(new RegExp(regexStr, 'i'));
+                            // Absolute fallback: just find the first instance of the tag
+                            if (!match) match = textContent.match(new RegExp(`<${tagName}\\b`, 'i'));
+                            
+                            if (match) {
+                                index = match.index;
+                                highlightLength = match[0].length; // Highlight just the opening tag
+                            }
+                        } catch (e) {
+                            console.warn("[globalListeners] Regex fallback failed:", e);
+                        }
+                    }
+                }
+
+                if (index !== -1) {
+                    textarea.focus();
+                    textarea.setSelectionRange(index, index + highlightLength);
+                    
+                    const numLines = textContent.substring(0, index).split('\n').length;
+                    const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 16;
+                    textarea.scrollTop = Math.max(0, (numLines - 2) * lineHeight);
+                    
+                    textarea.dispatchEvent(new Event('scroll'));
+
+                    setTimeout(() => {
+                        const overlay = document.getElementById(`xml-editor-highlight-overlay-${instance.uniqueId}`);
+                        if (overlay) {
+                            const targetSpan = overlay.querySelector(`[data-raw-start="${index}"]`);
+                            if (targetSpan) {
+                                targetSpan.classList.add('hl-row-flash');
+                                setTimeout(() => targetSpan.classList.remove('hl-row-flash'), 1300);
+                            } else {
+                                const lineContainer = document.getElementById(`xml-editor-line-numbers-${instance.uniqueId}`);
+                                if (lineContainer) {
+                                    const lines = lineContainer.getElementsByClassName('lineNumberEntry');
+                                    if (lines[numLines - 1]) {
+                                        lines[numLines - 1].classList.add('hl-row-flash');
+                                        setTimeout(() => lines[numLines - 1].classList.remove('hl-row-flash'), 1300);
+                                    }
+                                }
+                            }
+                        }
+                    }, 50);
+                    
+                    if (typeof showToast === 'function') {
+                        showToast(`Jumped to element in ${filePath.split('/').pop()}`, 'info', 2000);
+                    }
+                }
+            }
+        }, 80);
     }
 }
 
