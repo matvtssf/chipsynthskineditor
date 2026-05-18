@@ -279,23 +279,28 @@ function createTreeElement(node) {
         const previewArea = getPreviewArea();
         if (!fileTreeContainer || !previewArea) { console.error("Missing elements in click handler!"); return; }
 
-        const previouslySelected = fileTreeContainer.querySelector('.file.highlighted');
-        if (previouslySelected && previouslySelected !== fileLi) { previouslySelected.classList.remove('highlighted'); }
-        if (fileLi) { fileLi.classList.add('highlighted'); }
-
-        if (liveEditButton) { liveEditButton.disabled = !(fileLi && fileLi.dataset.isEditable === 'true'); }
+        const previouslySelected = fileTreeContainer.querySelector('.highlighted');
+        if (previouslySelected) { previouslySelected.classList.remove('highlighted'); }
 
         if (fileLi) {
+            fileLi.classList.add('highlighted');
+            if (liveEditButton) { liveEditButton.disabled = !(fileLi.dataset.isEditable === 'true'); }
             const selectedPath = fileLi.dataset.filePath; 
             const fileType = fileLi.dataset.fileType;
             if (selectedPath) { 
-                // console.log(`[sidebarManager] File clicked: ${selectedPath}, Type: ${fileType}, Editable: ${fileLi.dataset.isEditable}`); // Reduce noise
                 displayPreview(selectedPath, fileType); 
             } else {
-                 console.warn("[sidebarManager] Clicked file LI missing 'data-file-path'. Cannot preview.");
                  if (previewArea) previewArea.innerHTML = 'Error: File path missing.';
             }
+        } else if (folderLi) {
+            folderLi.classList.add('highlighted');
+            if (liveEditButton) { liveEditButton.disabled = true; }
+            if (previewArea) {
+                previewArea.innerHTML = '<div class="text-gray-400 italic p-2">Folder selected. Actions will apply inside this directory branch.</div>';
+                previewArea.classList.remove('image-preview-bg');
+            }
         } else {
+            if (liveEditButton) { liveEditButton.disabled = true; }
             if (previewArea) {
                  previewArea.innerHTML = 'Select a file to preview.';
                  previewArea.classList.remove('image-preview-bg'); 

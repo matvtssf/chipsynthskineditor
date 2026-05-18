@@ -1008,13 +1008,16 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     const currentState = currentStored !== null ? String(currentStored) : String(vDefault);
                     
                     const isActive = (currentState === String(onValue) || currentState === '1' || currentState === '1.0');
-                    
-                    if (isActive) {
-                        btn.classList.add('active');
-                        btn.setAttribute('aria-checked', 'true');
-                    } else {
-                        btn.classList.remove('active');
-                        btn.setAttribute('aria-checked', 'false');
+                    const hasActiveChanged = btn.classList.contains('active') !== isActive;
+
+                    if (hasActiveChanged) {
+                        if (isActive) {
+                            btn.classList.add('active');
+                            btn.setAttribute('aria-checked', 'true');
+                        } else {
+                            btn.classList.remove('active');
+                            btn.setAttribute('aria-checked', 'false');
+                        }
                     }
 
                     const imgKey = isActive ? 'xmlAttr_image_on' : 'xmlAttr_image_off';
@@ -1045,11 +1048,12 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
                     const hAttr = parseInt(btn.style.height || btn.offsetHeight || '16', 10);
                     const rRatioAttr = btn.dataset.roundedRatio || '0';
-                    const radius = parseFloat(rRatioAttr) * hAttr;
-                    if (radius > 0) {
-                        btn.style.borderRadius = `${radius}px`;
-                    } else {
-                        btn.style.borderRadius = '0px';
+                    const radius = `${parseFloat(rRatioAttr) * hAttr}px`;
+                    if (btn.style.borderRadius !== radius) {
+                        btn.style.borderRadius = radius;
+                    }
+                    if (btn.style.border !== 'none') {
+                        btn.style.border = 'none';
                     }
                     
                     const paramId = btn.dataset.param;
@@ -1058,8 +1062,12 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     
                     const onColor = btn.dataset.onColor || '#F7BA0B';
                     const offColor = btn.dataset.offColor || '#555555';
-                    btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
-                    btn.style.border = 'none';
+                    const targetColorRaw = isActive ? onColor : offColor;
+                    const targetColor = DomUtils.parseColor ? DomUtils.parseColor(targetColorRaw) : targetColorRaw;
+                    
+                    if (btn.style.backgroundColor !== targetColor) {
+                        btn.style.backgroundColor = targetColor;
+                    }
                 });
             };
 

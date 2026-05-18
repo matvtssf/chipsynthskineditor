@@ -170,7 +170,12 @@ body[data-app-theme="dark"] #skin-selector {
 #sidebar-controls > div.mb-2,
 #reference-button,
 #debug-toggle-button,
-#console-button {
+#console-button,
+#new-xml-btn,
+#new-folder-btn,
+#import-file-btn,
+#remove-item-btn,
+#export-item-btn {
     transition: opacity 0.4s ease-in-out, visibility 0.4s ease-in-out;
 }
 
@@ -257,4 +262,8 @@ body:not(.app-loaded) #console-button {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
+}
+
+body:not([data-app-theme="dark"]):not(.app-loaded) #sidebar-header {
+    color: #374151 !important;
 }

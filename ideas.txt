@@ -1,0 +1,63 @@
+Canvas Buttons:
+
+-the buttons use the same style as the buttons in the sidebar
+-We need an undo history backwards and forwards. CTRL-Z undoes, ctrl shift z redoes. Let's make two buttons at the left of the canvas. Undo iconoir icon = "undo-circle". Redo button just under it, iconoir icon is "redo-circle"
+-ONLY SHOWS ICON IN EDIT MODE: new icon, creates an element using the element. Placeholder button for now, we will add functionality later. Iconoir icon "plus-circle-solid"
+
+place the icons in a logical ux friendly area but do not obscure the status line at hte bottom left
+
+
+Add new working buttons above the file list in the sidebar:
+-"New XML" (creates a new file for the product) Icoinoir icon = "page-plus-in")
+-"New Folder" (creates a new folder in the tree based on which sub folder you have clicked. Iconoir icon = "folder-plus")
+-"Import" (imports an XML, TTF, OTF, PNG, SVG.. though it will allow any other file if forced. Icoinoir icon = "import")
+-"Remove" (removes a file or folder from the blob and the project. Iconoir icon = "page-minus-in")
+-"Export" (Downloads the individual selected file. If a folder is selected, it downloads the folder zipped. Iconoir icon = "download")
+
+The Open button at the bottom:
+-We need to make the open button smaller and make a new "Save" button. It will download the entire project zipped up. If a project has a change that hasn't been saved, make sure to colour this up green. the icon that it uses will be "INSERTICONHERE"
+When opening a new project:
+-warn if there are changes that need to be saved and to download the project
+-edit mode should shut off, all windows should be closed. It's a clean slate.
+-Iconoir icon for saving: regular project save is "download-square". When there are unsaved changes, use the icon "download-square-solid"
+
+
+When an element is selected:
+-Show small buttons under the element (or above if the canvas border is too close): buttons include: "copy", "duplicate", 
+-When element is selected by default, a status msg at the bottom should say "Press + or - to move item up or down a layer in the container (moves element before or after next element in XML)"
+-
+
+When Scaling Elements:
+-The x/y/w/h coordinates should display under the element
+-holding CTRL will centre scale
+
+
+Dragging elements:
+-Drag and drop element to another container if it exists (this might be hard)
+-holding ctrl will duplicate the element
+-holding ctrl while dragging an element will force the element to drag along a horizontal or vertical path depending on how the mouse is moved
+-Turn on snapping mode with sensitivity gauge (done in config)
+-holding shift while dragging the element will bypass the snapping
+-holding alt while dragging an element will clone/duplicate the element (create a new element in the XML
+
+
+Possible local Ollama AI features:
+-In config, "enable AI" can be a toggle
+-In XML Editor: Clean up XML / validate syntax
+-In XML Editor: when text is highlighted, allow the AI to see the code blocks and manipulate them (easy way to better spread out and align elements? like buttons, quickly fix the alignment of elements to other elements? etc)
+
+Element Editor:
+-Make nothing selectable
+-Button to sort the attributes more humanly (ie: coordinates / dimensions first, labels next, style sheet linking next, colours, then do the same for other groupsets ie label coordinates, etc..it needs to be whatever makes most logical sense that a human would want to see first when they're editing the element). Then the attribute order would dynamically change in the element  menu)
+-allow the user to drag attribute orders around (will need handles)
+-If a style= attribute is detected, show the attributes from styles.xml
+
+... Lists:
+-Needs a filter bar so the user can zero in on it easier
+
+XML Editor:
+-implement a word wrap
+-implement a differential system if possible
+
+Styles Editing:
+-When editing styles.xml (it must match the styles path defined in gui.xml), open new Styles Editor (XML editor with extra content on the right)

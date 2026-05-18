@@ -35,6 +35,35 @@ let transformStartWidth = 0, transformStartHeight = 0;
 // --- Initialization ---
 export function setupMainContentInteractions() {
     console.log("[mainContent] Setting up Main Content listeners...");
+    
+    // Globally expose the reconciliation hook so detached modules (like SelectionManager nudging) can fire it safely
+    window.syncElementChangesToXmlSource = syncElementChangesToXmlSource;
+
+    if (!document.body.dataset.historyEngineAttached) {
+        document.addEventListener('applyHistoryState', (e) => {
+            const { path, content } = e.detail;
+            if (!content || !path) return;
+
+            State.addFile(path, content);
+            
+            const instance = State.getEditorInstanceByPath(path);
+            if (instance) {
+                 State.updateEditorInstance(instance.uniqueId, { currentContent: content });
+                 const activeTextarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                 if (activeTextarea) {
+                     activeTextarea.value = content;
+                     activeTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                 }
+            }
+
+            // Immediately force layout engine redraw off the fresh memory state
+            if (typeof window.renderMainGui === 'function') {
+                window.renderMainGui();
+            }
+        });
+        document.body.dataset.historyEngineAttached = 'true';
+    }
+
     const mainContentArea = getMainContentArea();
     const guiZoomCanvas = getGuiZoomCanvas();
 
@@ -238,6 +267,9 @@ export function syncElementChangesToXmlSource(el) {
     let fileContent = fileMap.get(normalizedPath);
     
     if (fileContent && fileContent.includes(oldRawXml)) {
+        if (typeof State.pushHistoryState === 'function') {
+            State.pushHistoryState(normalizedPath, fileContent);
+        }
         fileContent = fileContent.replace(oldRawXml, newRawXml);
         fileMap.set(normalizedPath, fileContent);
     }
@@ -264,6 +296,9 @@ export function syncElementChangesToXmlSource(el) {
 }
 
 export function updateSelectionOutline() {
+    if (SelectionManager && typeof SelectionManager.updatePosition === 'function') {
+        SelectionManager.updatePosition();
+    }
     const zoomCanvas = getGuiZoomCanvas();
     if (!zoomCanvas) return;
     let outline = document.getElementById('selection-outline-overlay');

@@ -427,6 +427,7 @@ function closeEditor(instanceId) {
 
 // --- Main Exported Functions ---
 export function initializeXmlEditor() {
+    window.checkAndRerender = checkAndRerender;
     setupSharedXmlEditorInteractionListeners();
     populateCaches();
     document.addEventListener('referenceDataUpdated', () => {
@@ -1036,9 +1037,12 @@ function attachInstanceListeners(instanceId) {
         scroll: () => handleEditorScroll(instanceId),
         caretActivity: () => {
             updateStatusBarForInstance(instanceId);
-            checkAndUpdateHexWarnings(instanceId);
-            updateColorBoxFocusEffect(instanceId);
-            updateStatusBarDescription(instanceId);
+            if (elements._caretTimeout) clearTimeout(elements._caretTimeout);
+            elements._caretTimeout = setTimeout(() => {
+                checkAndUpdateHexWarnings(instanceId);
+                updateColorBoxFocusEffect(instanceId);
+                updateStatusBarDescription(instanceId);
+            }, 80);
         },
         textareaFocus: () => {
             updateColorBoxFocusEffect(instanceId);

@@ -221,6 +221,10 @@ export function handleReferenceToggle() {
         } else {
             cleanupModalState(); // Clear selections on close
         }
+        const icon = getReferenceButton()?.querySelector('i');
+        if (icon) {
+            icon.className = show ? 'iconoir-book-solid' : 'iconoir-book';
+        }
     } catch (e) {
         logError("[elementRefModal] Error toggling 'visible' class", e);
     }
@@ -397,7 +401,7 @@ function handleAttributeListItemClick(event) {
     const hasOverride = targetLi.dataset.hasOverride === 'true';
 
     if (selectedAttributeListItem && selectedAttributeListItem !== targetLi) selectedAttributeListItem.classList.remove('selected');
-    if (selectedElementListItem) selectedElementListItem.classList.remove('selected'); // Deselect element
+    // DO NOT deselect the element, so both can be highlighted at once
     targetLi.classList.add('selected'); selectedAttributeListItem = targetLi;
     currentSelectedAttributeName = attributeName; currentSelectedAttributeType = attributeType;
     currentAttributeIsOverridden = hasOverride;

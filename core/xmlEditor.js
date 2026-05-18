@@ -291,6 +291,11 @@ function saveChanges(instanceId) {
 
     const newContent = elements.textarea.value;
     try {
+        const prevContent = State.getFileContent(instance.filePath);
+        if (prevContent && prevContent !== newContent && typeof State.pushHistoryState === 'function') {
+            State.pushHistoryState(prevContent);
+        }
+        
         State.addFile(instance.filePath, newContent);
         State.updateEditorInstance(instanceId, {
             originalContent: newContent,
@@ -427,6 +432,7 @@ function closeEditor(instanceId) {
 
 // --- Main Exported Functions ---
 export function initializeXmlEditor() {
+    window.checkAndRerender = checkAndRerender;
     setupSharedXmlEditorInteractionListeners();
     populateCaches();
     document.addEventListener('referenceDataUpdated', () => {

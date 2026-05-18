@@ -16,7 +16,7 @@ import {
     getConfigModal, getCloseConfigBtn, getGridToggle, getGridToggleCheckbox,
     getMainContentArea, getBgColorInput, getBgColorValue,
     getBgModeToggle, getBgModeCheckbox,
-    getGuiZoomCanvas
+    getGuiZoomCanvas, getConfigButton
 } from '../core/domUtils.js';
 
 let configListenersSetup = false;
@@ -153,6 +153,10 @@ export function handleConfigToggle() {
     const visibilityChanged = toggleModalVisibility(modal, shouldShow);
     if(visibilityChanged){
         console.log(`[configModal] Visibility toggle successful. Modal is now ${shouldShow ? 'visible' : 'hidden'}.`);
+        const btn = getConfigButton();
+        if (btn) {
+            btn.classList.toggle('active', shouldShow);
+        }
     } else {
         console.log(`[configModal] Visibility toggle did not result in a change (already in desired state or cancelled). Current visible state: ${modal.classList.contains('visible')}`);
     }

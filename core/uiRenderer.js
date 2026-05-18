@@ -1008,80 +1008,44 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     const currentState = currentStored !== null ? String(currentStored) : String(vDefault);
                     
                     const isActive = (currentState === String(onValue) || currentState === '1' || currentState === '1.0');
-                    
-                    if (isActive) {
-                        btn.classList.add('active');
-                        btn.setAttribute('aria-checked', 'true');
-                    } else {
-                        btn.classList.remove('active');
-                        btn.setAttribute('aria-checked', 'false');
+                    const hasActiveChanged = btn.classList.contains('active') !== isActive;
+
+                    if (hasActiveChanged) {
+                        if (isActive) {
+                            btn.classList.add('active');
+                            btn.setAttribute('aria-checked', 'true');
+                        } else {
+                            btn.classList.remove('active');
+                            btn.setAttribute('aria-checked', 'false');
+                        }
                     }
 
                     const imgKey = isActive ? 'xmlAttr_image_on' : 'xmlAttr_image_off';
                     const imgPath = btn.dataset[imgKey] || btn.dataset['xmlAttr_image'];
-                    if (imgPath) {
-                        const sourcePath = btn.dataset.sourcePath;
-                        let imgFullPath = imgPath;
-                        if (sourcePath && sourcePath.includes('/')) {
-                            const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
-                            imgFullPath = dir + imgPath;
-                        }
-                        let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath));
-                        if (!blob) {
-                            blob = State.getAssetBlobUrl(State.normalizePath(imgPath));
-                        }
-                        if (blob) {
-                            const newUrl = `url("${blob}")`;
-                            if (btn.style.backgroundImage !== newUrl) {
-                                btn.style.backgroundImage = newUrl;
-                                btn.style.backgroundSize = '100% 100%';
-                                btn.style.backgroundRepeat = 'no-repeat';
+                    
+                    const cacheKey = `lastProcessed_${imgKey}`;
+                    if (btn.dataset[cacheKey] === imgPath && !hasActiveChanged) {
+                        // Skip if image path and state are identical to avoid triggering asset lookups
+                    } else {
+                        btn.dataset[cacheKey] = imgPath || '';
+                        if (imgPath) {
+                            const sourcePath = btn.dataset.sourcePath;
+                            let imgFullPath = imgPath;
+                            if (sourcePath && sourcePath.includes('/')) {
+                                const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
+                                imgFullPath = dir + imgPath;
                             }
-                        }
-                    }
-                });
-
-                // Update standard Image Buttons (Button, OnOffButton, CommandButton, HoldButton)
-                document.querySelectorAll('[data-xml-tag-name="Button"], [data-xml-tag-name="OnOffButton"], [data-xml-tag-name="CommandButton"], [data-xml-tag-name="HoldButton"]').forEach(btn => {
-                    const paramId = btn.dataset.param;
-                    if (!paramId) return;
-
-                    const onValue = btn.dataset.xmlAttr_on_value || '1.0';
-                    const offValue = btn.dataset.xmlAttr_off_value || '0.0';
-                    const vDefault = btn.dataset.xmlAttr_vdefault || offValue;
-
-                    const currentStored = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
-                    const currentState = currentStored !== null ? String(currentStored) : String(vDefault);
-                    
-                    const isActive = (currentState === String(onValue) || currentState === '1' || currentState === '1.0');
-                    
-                    if (isActive) {
-                        btn.classList.add('active');
-                        btn.setAttribute('aria-checked', 'true');
-                    } else {
-                        btn.classList.remove('active');
-                        btn.setAttribute('aria-checked', 'false');
-                    }
-
-                    const imgKey = isActive ? 'xmlAttr_image_on' : 'xmlAttr_image_off';
-                    const imgPath = btn.dataset[imgKey] || btn.dataset['xmlAttr_image'];
-                    if (imgPath) {
-                        const sourcePath = btn.dataset.sourcePath;
-                        let imgFullPath = imgPath;
-                        if (sourcePath && sourcePath.includes('/')) {
-                            const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
-                            imgFullPath = dir + imgPath;
-                        }
-                        let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath));
-                        if (!blob) {
-                            blob = State.getAssetBlobUrl(State.normalizePath(imgPath));
-                        }
-                        if (blob) {
-                            const newUrl = `url("${blob}")`;
-                            if (btn.style.backgroundImage !== newUrl) {
-                                btn.style.backgroundImage = newUrl;
-                                btn.style.backgroundSize = '100% 100%';
-                                btn.style.backgroundRepeat = 'no-repeat';
+                            let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath));
+                            if (!blob) {
+                                blob = State.getAssetBlobUrl(State.normalizePath(imgPath));
+                            }
+                            if (blob) {
+                                const newUrl = `url("${blob}")`;
+                                if (btn.style.backgroundImage !== newUrl) {
+                                    btn.style.backgroundImage = newUrl;
+                                    btn.style.backgroundSize = '100% 100%';
+                                    btn.style.backgroundRepeat = 'no-repeat';
+                                }
                             }
                         }
                     }
@@ -1091,11 +1055,12 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
                     const hAttr = parseInt(btn.style.height || btn.offsetHeight || '16', 10);
                     const rRatioAttr = btn.dataset.roundedRatio || '0';
-                    const radius = parseFloat(rRatioAttr) * hAttr;
-                    if (radius > 0) {
-                        btn.style.borderRadius = `${radius}px`;
-                    } else {
-                        btn.style.borderRadius = '0px';
+                    const radius = `${parseFloat(rRatioAttr) * hAttr}px`;
+                    if (btn.style.borderRadius !== radius) {
+                        btn.style.borderRadius = radius;
+                    }
+                    if (btn.style.border !== 'none') {
+                        btn.style.border = 'none';
                     }
                     
                     const paramId = btn.dataset.param;
@@ -1104,8 +1069,12 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     
                     const onColor = btn.dataset.onColor || '#F7BA0B';
                     const offColor = btn.dataset.offColor || '#555555';
-                    btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
-                    btn.style.border = 'none';
+                    const targetColorRaw = isActive ? onColor : offColor;
+                    const targetColor = DomUtils.parseColor ? DomUtils.parseColor(targetColorRaw) : targetColorRaw;
+                    
+                    if (btn.style.backgroundColor !== targetColor) {
+                        btn.style.backgroundColor = targetColor;
+                    }
                 });
             };
 

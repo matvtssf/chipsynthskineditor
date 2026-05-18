@@ -21,6 +21,7 @@ import {
     getSidebar, getSidebarToggleBtn
 } from '../core/domUtils.js';
 import { handleFileSelection } from '../core/fileLoader.js';
+import { populateFileBrowser } from '../managers/sidebarManager.js';
 import { handleReferenceToggle } from './elementRefModalInteractions.js';
 import { handleConfigToggle } from './configModalInteractions.js';
 import { makeModalDraggable, toggleModalVisibility } from '../managers/modalManager.js';
@@ -122,6 +123,10 @@ export function initializeSidebarControls() {
             closeConsoleBtn.addEventListener('click', () => {
                 State.setIsConsoleVisible(false);
                 toggleModalVisibility(getConsoleModal(), false);
+                const icon = getConsoleButton()?.querySelector('i');
+                if (icon) {
+                    icon.className = 'iconoir-terminal-tag';
+                }
             });
         }
         const clearConsoleBtn = getClearConsoleBtn();
@@ -135,7 +140,7 @@ export function initializeSidebarControls() {
 
         // Console Filter Listeners
         ['console-filter-info', 'console-filter-warn', 'console-filter-error'].forEach(id => {
-            document.getElementById(id)?.addEventListener('change', updateConsoleView);
+            document.getElementById(id)?.addEventListener('change', () => updateConsoleView(true));
         });
     } else {
         logError("Console button not found.", null, true);
@@ -146,6 +151,14 @@ export function initializeSidebarControls() {
     } else {
         logError("Reference button not found.", null, true);
     }
+
+    // New File Browser Action Buttons
+    document.getElementById('new-xml-btn')?.addEventListener('click', handleNewXml);
+    document.getElementById('new-folder-btn')?.addEventListener('click', handleNewFolder);
+    document.getElementById('import-file-btn')?.addEventListener('click', () => document.getElementById('sidebar-import-input')?.click());
+    document.getElementById('sidebar-import-input')?.addEventListener('change', handleSidebarImport);
+    document.getElementById('remove-item-btn')?.addEventListener('click', handleRemoveItem);
+    document.getElementById('export-item-btn')?.addEventListener('click', handleExportItem);
      if (configButton) {
         configButton.addEventListener('click', handleConfigToggle);
     } else {
@@ -256,6 +269,206 @@ async function processFileEntry(entry, filesArray, currentPath = "") {
 }
 
 
+function getSelectedTreeItemInfo() {
+    const fileTreeContainer = document.getElementById('file-tree');
+    const selectedLi = fileTreeContainer?.querySelector('.highlighted');
+    if (!selectedLi) return { path: '', isFolder: false };
+
+    const isFolder = selectedLi.classList.contains('folder');
+    let path = selectedLi.dataset.filePath || "";
+    
+    if (isFolder && !path) {
+        let current = selectedLi;
+        let pathParts = [];
+        while (current && current.id !== 'file-tree') {
+            if (current.tagName === 'LI' && current.classList.contains('folder')) {
+                // Clone node to strip nested ul/li elements text when reading container text
+                const span = current.querySelector('span');
+                if (span) {
+                    let text = span.childNodes[0]?.textContent || span.textContent;
+                    text = text.replace(/[▸\s]+/g, '').trim();
+                    if (text) pathParts.unshift(text);
+                }
+            }
+            current = current.parentElement?.closest('li');
+        }
+        path = pathParts.join('/');
+    }
+    return { path, isFolder, element: selectedLi };
+}
+
+function handleNewXml() {
+    const info = getSelectedTreeItemInfo();
+    let defaultDir = State.getCurrentSkinRoot() || "default/gui";
+    if (info.isFolder && info.path) {
+        defaultDir = info.path;
+    } else if (!info.isFolder && info.path.includes('/')) {
+        defaultDir = info.path.substring(0, info.path.lastIndexOf('/'));
+    }
+
+    const filename = prompt("Enter new XML filename (e.g. template.xml):", "new_skin.xml");
+    if (!filename) return;
+
+    const finalPath = defaultDir.endsWith('/') ? `${defaultDir}${filename}` : `${defaultDir}/${filename}`;
+    const normalized = finalPath.toLowerCase();
+
+    if (State.getFileMap().has(normalized)) {
+        showToast("File already exists!", "warning");
+        return;
+    }
+
+    const initialXml = `<?xml version="1.0" encoding="utf-8"?>\n<Skin>\n    \n</Skin>`;
+    State.getFileMap().set(normalized, initialXml);
+    populateFileBrowser();
+    showToast(`Created new XML: ${filename}`, "info");
+}
+
+function handleNewFolder() {
+    const info = getSelectedTreeItemInfo();
+    let defaultDir = State.getCurrentSkinRoot() || "default/gui";
+    if (info.isFolder && info.path) {
+        defaultDir = info.path;
+    } else if (!info.isFolder && info.path.includes('/')) {
+        defaultDir = info.path.substring(0, info.path.lastIndexOf('/'));
+    }
+
+    const folderName = prompt("Enter new folder name:", "NewFolder");
+    if (!folderName) return;
+
+    const placeholderPath = defaultDir.endsWith('/') ? `${defaultDir}${folderName}/.init.xml` : `${defaultDir}/${folderName}/.init.xml`;
+    const initialXml = `<?xml version="1.0" encoding="utf-8"?>\n<FolderInit />`;
+    State.getFileMap().set(placeholderPath.toLowerCase(), initialXml);
+    populateFileBrowser();
+    showToast(`Created new folder structure: ${folderName}`, "info");
+}
+
+function handleSidebarImport(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const info = getSelectedTreeItemInfo();
+    let targetDir = State.getCurrentSkinRoot() || "default/gui";
+    if (info.isFolder && info.path) {
+        targetDir = info.path;
+    } else if (!info.isFolder && info.path.includes('/')) {
+        targetDir = info.path.substring(0, info.path.lastIndexOf('/'));
+    }
+
+    let loadedCount = 0;
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        const finalPath = targetDir.endsWith('/') ? `${targetDir}${file.name}` : `${targetDir}/${file.name}`;
+        const normalizedPath = finalPath.toLowerCase();
+
+        if (['.png', '.jpg', '.jpeg', '.svg'].includes(extension)) {
+            reader.onload = (e) => {
+                const blob = new Blob([e.target.result], { type: file.type });
+                const blobUrl = URL.createObjectURL(blob);
+                State.getImageBlobUrls().set(normalizedPath, blobUrl);
+                State.getFileMap().set(normalizedPath, "");
+                loadedCount++;
+                if (loadedCount === files.length) {
+                    populateFileBrowser();
+                    showToast(`Imported ${files.length} asset(s) successfully`, "info");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (['.ttf', '.otf'].includes(extension)) {
+            reader.onload = (e) => {
+                const blob = new Blob([e.target.result], { type: file.type });
+                const blobUrl = URL.createObjectURL(blob);
+                State.getFontBlobUrls().set(normalizedPath, blobUrl);
+                State.getFileMap().set(normalizedPath, "");
+                loadedCount++;
+                if (loadedCount === files.length) {
+                    populateFileBrowser();
+                    showToast(`Imported ${files.length} asset(s) successfully`, "info");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.onload = (e) => {
+                State.getFileMap().set(normalizedPath, e.target.result);
+                loadedCount++;
+                if (loadedCount === files.length) {
+                    populateFileBrowser();
+                    showToast(`Imported ${files.length} asset(s) successfully`, "info");
+                }
+            };
+            reader.readAsText(file);
+        }
+    });
+}
+
+function handleRemoveItem() {
+    const info = getSelectedTreeItemInfo();
+    if (!info.path) {
+        showToast("Select a file or folder to remove.", "warning");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to remove: ${info.path}?`)) return;
+
+    const normalizedTarget = info.path.toLowerCase();
+    if (info.isFolder) {
+        const prefix = normalizedTarget + '/';
+        State.getFileMap().forEach((_, key) => {
+            if (key.startsWith(prefix)) State.getFileMap().delete(key);
+        });
+        State.getImageBlobUrls().forEach((_, key) => {
+            if (key.startsWith(prefix)) State.getImageBlobUrls().delete(key);
+        });
+        State.getFontBlobUrls().forEach((_, key) => {
+            if (key.startsWith(prefix)) State.getFontBlobUrls().delete(key);
+        });
+        showToast(`Removed folder branch: ${info.path}`, "info");
+    } else {
+        State.getFileMap().delete(normalizedTarget);
+        State.getImageBlobUrls().delete(normalizedTarget);
+        State.getFontBlobUrls().delete(normalizedTarget);
+        showToast(`Removed file: ${info.path}`, "info");
+    }
+    populateFileBrowser();
+}
+
+function handleExportItem() {
+    const info = getSelectedTreeItemInfo();
+    if (!info.path) {
+        showToast("Select a file or folder to export.", "warning");
+        return;
+    }
+
+    const normalizedTarget = info.path.toLowerCase();
+    if (info.isFolder) {
+        showToast("Zipping folders natively fallback: Downloading discoverable sub-tree elements.", "info");
+        const prefix = normalizedTarget + '/';
+        let count = 0;
+        State.getFileMap().forEach((content, key) => {
+            if (key.startsWith(prefix) && !key.endsWith('.keep')) {
+                triggerDownload(key.substring(key.lastIndexOf('/') + 1), content);
+                count++;
+            }
+        });
+        if(count === 0) showToast("No text files found inside folder branch.", "warning");
+    } else {
+        const content = State.getFileMap().get(normalizedTarget) || "";
+        const filename = info.path.substring(info.path.lastIndexOf('/') + 1);
+        triggerDownload(filename, content);
+        showToast(`Exported asset: ${filename}`, "info");
+    }
+}
+
+function triggerDownload(filename, content) {
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+    element.setAttribute('download', filename);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+}
+
 function handleDebugToggle() {
     const debugCheckbox = getDebugCheckbox();
     const debugToggleButton = getDebugToggleButton();
@@ -271,8 +484,7 @@ function handleDebugToggle() {
         debugToggleButton.title = newCheckedState ? "Disable Edit Mode" : "Toggle Edit Mode";
         const debugIcon = debugToggleButton.querySelector('i');
         if (debugIcon) {
-            debugIcon.classList.toggle('iconoir-bug', !newCheckedState);
-            debugIcon.classList.toggle('iconoir-bug-solid', newCheckedState);
+            debugIcon.className = newCheckedState ? 'iconoir-pen-connect-wifi' : 'iconoir-edit-pencil';
         }
         State.setDebugEnabled(newCheckedState); // Update global state
         document.body.classList.toggle('edit-mode-active', newCheckedState);

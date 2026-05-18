@@ -23,6 +23,7 @@ import {
     getParamReferenceButton, getElementRefNameInput,
     getAttributeDescriptionTextarea, getOverrideAttributeDescriptionBtn,
     getReferenceModalContent, getReferenceModalHeader,
+    getReferenceButton,
     // Utility functions
     logError, showToast, getAttributeCategory
 } from '../core/domUtils.js';
@@ -220,6 +221,10 @@ export function handleReferenceToggle() {
             loadElementReferenceUI();
         } else {
             cleanupModalState(); // Clear selections on close
+        }
+        const icon = getReferenceButton()?.querySelector('i');
+        if (icon) {
+            icon.className = show ? 'iconoir-book-solid' : 'iconoir-book';
         }
     } catch (e) {
         logError("[elementRefModal] Error toggling 'visible' class", e);

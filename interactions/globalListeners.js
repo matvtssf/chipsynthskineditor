@@ -9,7 +9,7 @@ import * as State from '../core/state.js'; // For setIsMouseButtonDown
 import * as Refs from '../core/references.js';
 import { getTextLogo, getSidebar, getDisclaimerModal, getAcknowledgeDisclaimerButton, getLoadFolderButton, showToast } from '../core/domUtils.js';
 import { handlePanEnd } from './mainContentInteractions.js'; // Sibling interaction import
-import { flashModalBorder } from '../managers/modalManager.js'; // Moved up one level
+import { flashModalBorder, toggleModalVisibility } from '../managers/modalManager.js'; // Moved up one level
 import { openXmlEditor, getCachedParamReferenceDataForHover } from '../core/xmlEditor.js'; // Added for middle-click jump
 import { syncElementChangesToXmlSource, updateGuiZoom } from './mainContentInteractions.js';
 window.syncElementChangesToXmlSource = syncElementChangesToXmlSource;
@@ -24,6 +24,22 @@ let middleMouseDownY = 0;
  */
 export function setupGlobalListeners() {
     console.log("[globalListeners] Setting up Global listeners...");
+
+    // Stream native browser runtime exceptions directly into the application log view
+    if (!document.body.dataset.browserErrorListenersAttached) {
+        window.addEventListener('error', (event) => {
+            const errorMsg = event.error ? (event.error.message || event.message) : event.message;
+            const fileSource = event.filename ? event.filename.substring(event.filename.lastIndexOf('/') + 1) : 'unknown';
+            const lineNumber = event.lineno || 0;
+            State.addConsoleLogEntry(`Browser Error: ${errorMsg} at ${fileSource}:${lineNumber}`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            const rejectReason = event.reason ? (event.reason.message || String(event.reason)) : 'Unknown promise rejection';
+            State.addConsoleLogEntry(`Promise Rejection: ${rejectReason}`, 'error');
+        });
+        document.body.dataset.browserErrorListenersAttached = 'true';
+    }
 
     // Light mode contrast enhancement for settings/open controls right before presentation
     let lightModeOverride = document.getElementById('qi-lightmode-contrast-override');
@@ -163,6 +179,117 @@ export function setupGlobalListeners() {
         document.addEventListener('contextmenu', handleGlobalContextMenu);
         document.body.dataset.contextMenuDebugListenerAttached = 'true';
     }
+
+    if (!document.body.dataset.undoRedoListenersAttached) {
+        document.addEventListener('keydown', handleUndoRedoShortcuts);
+        setupCanvasControlButtons();
+        document.body.dataset.undoRedoListenersAttached = 'true';
+    }
+}
+
+function performUndo() {
+    if (!State.canUndo()) return;
+    const targetState = State.peekUndoState();
+    if (!targetState) return;
+
+    const currentContent = State.getFileContent(targetState.path);
+    const restoredState = State.popUndoState(currentContent);
+    if (restoredState !== null) {
+        State.setIsUndoRedoExecuting(true);
+        document.dispatchEvent(new CustomEvent('applyHistoryState', { detail: { path: restoredState.path, content: restoredState.content } }));
+        if (typeof showToast === 'function') showToast("Undo applied", "info", 1000);
+        State.setIsUndoRedoExecuting(false);
+    }
+}
+
+function performRedo() {
+    if (!State.canRedo()) return;
+    const targetState = State.peekRedoState();
+    if (!targetState) return;
+
+    const currentContent = State.getFileContent(targetState.path);
+    const restoredState = State.popRedoState(currentContent);
+    if (restoredState !== null) {
+        State.setIsUndoRedoExecuting(true);
+        document.dispatchEvent(new CustomEvent('applyHistoryState', { detail: { path: restoredState.path, content: restoredState.content } }));
+        if (typeof showToast === 'function') showToast("Redo applied", "info", 1000);
+        State.setIsUndoRedoExecuting(false);
+    }
+}
+
+function handleUndoRedoShortcuts(e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        performUndo();
+    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        performRedo();
+    }
+}
+
+function setupCanvasControlButtons() {
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    const addBtn = document.getElementById('add-element-canvas-btn');
+    const topControls = document.getElementById('canvas-controls-top');
+    const midControls = document.getElementById('canvas-controls-mid');
+
+    const checkHasProject = () => {
+        if (typeof State.getCurrentSkinRoot === 'function') return !!State.getCurrentSkinRoot();
+        return State.getFileMap && State.getFileMap().size > 0;
+    };
+
+    const updateButtonStates = () => {
+        if (undoBtn) undoBtn.classList.toggle('disabled', !State.canUndo());
+        if (redoBtn) redoBtn.classList.toggle('disabled', !State.canRedo());
+        
+        const hasProject = checkHasProject();
+        if (topControls) topControls.classList.toggle('controls-hidden', !hasProject);
+        if (midControls) midControls.classList.toggle('controls-hidden', !hasProject);
+    };
+    
+    document.addEventListener('historyChanged', updateButtonStates);
+    
+    let lastMouseX = window.innerWidth;
+    document.body.classList.add('controls-retracted');
+
+    document.addEventListener('mousemove', (e) => {
+        lastMouseX = e.clientX;
+        if (document.body.dataset.showcaseActive === 'true') return;
+        
+        if (!checkHasProject()) return;
+
+        if (lastMouseX < 160) {
+            document.body.classList.remove('controls-retracted');
+        } else {
+            document.body.classList.add('controls-retracted');
+        }
+    });
+
+    document.addEventListener('appProjectLoaded', () => {
+        updateButtonStates();
+        document.body.dataset.showcaseActive = 'true';
+        document.body.classList.remove('controls-retracted');
+        
+        setTimeout(() => {
+            document.body.dataset.showcaseActive = 'false';
+            if (lastMouseX >= 160) {
+                document.body.classList.add('controls-retracted');
+            }
+        }, 2500); 
+    });
+    
+    setInterval(updateButtonStates, 1000);
+    updateButtonStates();
+
+    if (undoBtn) undoBtn.addEventListener('click', performUndo);
+    if (redoBtn) redoBtn.addEventListener('click', performRedo);
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            console.log("[globalListeners] Add Element clicked");
+            if (typeof showToast === 'function') showToast("Add Element (Stub)", "info", 1000);
+        });
+    }
 }
 
 // --- Event Handlers ---
@@ -189,17 +316,55 @@ function handleLogoHover(event) {
 }
 
 
-/** Global click listener to detect clicks outside the topmost visible modal and trigger flash. */
+/** Global click listener to detect clicks outside the topmost visible modal and handle closure or flash. */
 function handleGlobalClickForModalFlash(event) {
     const visibleModals = document.querySelectorAll('.modal-overlay.visible');
     if (visibleModals.length === 0) return;
 
     const topModalOverlay = visibleModals[visibleModals.length - 1];
 
-    // Check if the click target is exactly the overlay backdrop
+    // Check if the click target is exactly the overlay backdrop dark background wrapper
     if (event.target === topModalOverlay) {
-        // Call imported function directly
-        flashModalBorder(topModalOverlay); // <<< UPDATED CALL
+        const modalId = topModalOverlay.id;
+        
+        // 1. Unsaved Changes Guard: Let the standard toggle utility evaluate confirmations safely
+        if (typeof toggleModalVisibility === 'function') {
+            let success = false;
+            
+            if (modalId === 'console-modal') {
+                if (typeof State !== 'undefined' && State.setIsConsoleVisible) State.setIsConsoleVisible(false);
+                success = toggleModalVisibility(topModalOverlay, false);
+                // Reset console icon
+                const icon = document.getElementById('console-button')?.querySelector('i');
+                if (icon) icon.className = 'iconoir-terminal-tag';
+            } 
+            else if (modalId === 'reference-modal') {
+                success = toggleModalVisibility(topModalOverlay, false);
+                // Reset reference book icon
+                const icon = document.getElementById('reference-button')?.querySelector('i');
+                if (icon) icon.className = 'iconoir-book';
+            } 
+            else if (modalId && modalId.includes('config')) {
+                success = toggleModalVisibility(topModalOverlay, false);
+                // Remove active styling flag from the config button container
+                const btn = document.getElementById('config-button');
+                if (btn) {
+                    btn.classList.remove('active');
+                }
+            } 
+            else {
+                // Fallback catch-all for any other modal overlays (XML Editor, Preview Windows, etc.)
+                success = toggleModalVisibility(topModalOverlay, false);
+            }
+            
+            // If the close transition was cancelled by a user prompt, flash the border layout as fallback feedback
+            if (!success) {
+                flashModalBorder(topModalOverlay);
+            }
+        } else {
+            // Fallback manual closure if import architecture is busy
+            flashModalBorder(topModalOverlay);
+        }
     }
 }
 
@@ -696,8 +861,32 @@ function renderInspectorContent(container, el) {
                 if (options.length === 0) options = ['(No params loaded)'];
             }
             else if (lowerAttr.includes('image') || lowerAttr.includes('background') || lowerAttr.includes('hoverimage')) {
-                options = (typeof State.getAvailableImages === 'function' ? State.getAvailableImages() : null);
-                if (!options || options.length === 0) options = ['(No images loaded)'];
+                const svgPaths = new Set();
+                const currentRoot = State.getCurrentSkinRoot() ? State.getCurrentSkinRoot().toLowerCase() : '';
+                const defaultRoot = State.getDefaultSkinRoot() ? State.getDefaultSkinRoot().toLowerCase() : '';
+
+                const processPath = (p) => {
+                    const lowP = p.toLowerCase();
+                    if (lowP.endsWith('.svg') || lowP.endsWith('.png')) {
+                        if (currentRoot && lowP.startsWith(currentRoot + '/')) {
+                            svgPaths.add(p.substring(currentRoot.length + 1));
+                        } else if (defaultRoot && lowP.startsWith(defaultRoot + '/')) {
+                            svgPaths.add(p.substring(defaultRoot.length + 1));
+                        } else {
+                            svgPaths.add(p);
+                        }
+                    }
+                };
+
+                if (typeof State.getFileMap === 'function' && State.getFileMap()) {
+                    State.getFileMap().forEach((_, filePath) => processPath(filePath));
+                }
+                if (typeof State.getImageBlobUrls === 'function' && State.getImageBlobUrls()) {
+                    State.getImageBlobUrls().forEach((_, filePath) => processPath(filePath));
+                }
+
+                options = Array.from(svgPaths).sort();
+                if (options.length === 0) options = ['(No images loaded)'];
             }
             else if (lowerAttr.includes('position')) {
                 options = ['absolute', 'relative', 'centered'];
@@ -706,13 +895,16 @@ function renderInspectorContent(container, el) {
                 options = ['left', 'center', 'right', 'top', 'bottom'];
             }
             else if (lowerAttr.includes('font')) {
-                options = (typeof State.getAvailableFonts === 'function' ? State.getAvailableFonts() : null);
-                if (!options || options.length === 0) {
-                    // Scrape document for parsed Fonts
-                    options = Array.from(document.querySelectorAll('[data-xml-tag-name="Font"], [data-xml-tag-name="font"]'))
-                        .map(n => n.dataset.xmlAttr_name || n.dataset.xmlAttr_id).filter(Boolean);
+                options = [];
+                if (typeof State.getFontMap === 'function' && State.getFontMap()) {
+                    options = Array.from(State.getFontMap().keys());
                 }
-                options = [...new Set(options)].filter(Boolean);
+                if (options.length === 0) {
+                    // Fallback to active document element scraping if state map is empty
+                    options = Array.from(document.querySelectorAll('[data-xml-tag-name="Font"], [data-xml-tag-name="font"]'))
+                        .map(n => n.dataset.xmlAttr_alias || n.dataset.xmlAttr_name || n.dataset.xmlAttr_id).filter(Boolean);
+                }
+                options = [...new Set(options)].filter(Boolean).sort();
                 if (options.length === 0) options = ['(No fonts loaded)'];
             }
             else if (lowerAttr.includes('style')) {
@@ -1021,6 +1213,12 @@ function renderInspectorContent(container, el) {
 
     ['qi-input-x', 'qi-input-y', 'qi-input-w', 'qi-input-h'].forEach(id => {
         document.getElementById(id).addEventListener('input', () => {
+            // Push active content to stack right before modifying attributes
+            const currentPath = el.dataset.sourcePath;
+            if (currentPath) {
+                const content = State.getFileContent(currentPath);
+                if (content) State.pushHistoryState(currentPath, content);
+            }
             syncDimensions();
             if (window.syncElementChangesToXmlSource) {
                 window.syncElementChangesToXmlSource(el);
@@ -1030,6 +1228,11 @@ function renderInspectorContent(container, el) {
 
     container.querySelectorAll('.qi-attr-val-input').forEach(input => {
         input.addEventListener('input', (e) => {
+            const currentPath = el.dataset.sourcePath;
+            if (currentPath) {
+                const content = State.getFileContent(currentPath);
+                if (content) State.pushHistoryState(currentPath, content);
+            }
             const datasetKey = e.target.dataset.attrKey;
             el.dataset[datasetKey] = e.target.value;
             

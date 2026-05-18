@@ -40,10 +40,12 @@ function setupConsoleInterception() {
     const originalWarn = console.warn;
     console.warn = (...args) => {
         const message = args.map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg))).join(' ');
-        State.addConsoleLogEntry(message, 'warn');
-        // Live Panel Refresh: Update the panel if visible
-        if (typeof window.updateConsoleView === 'function' && document.getElementById('console-modal')?.classList.contains('visible')) {
-            window.updateConsoleView();
+        if (!message.includes('Asset Fallback:')) {
+            State.addConsoleLogEntry(message, 'warn');
+            // Live Panel Refresh: Update the panel if visible
+            if (typeof window.updateConsoleView === 'function' && document.getElementById('console-modal')?.classList.contains('visible')) {
+                window.updateConsoleView();
+            }
         }
         originalWarn.apply(console, args);
     };
@@ -150,12 +152,23 @@ debugStyle.textContent = `
         border-color: #ef4444 !important;
         box-shadow: 0 0 12px #ef4444 !important;
     }
-    body:has(#config-modal.visible) #config-button i,
-    body:has(#reference-modal.visible) #reference-button i,
-    body:has(#console-modal.visible) #console-button i,
-    body.edit-mode-active #debug-toggle-button i {
-        filter: invert(1) !important;
+    body.edit-mode-active #debug-toggle-button {
+        color: #ef4444 !important;
+        background: rgba(239, 68, 68, 0.15) !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.6) !important;
     }
+    #console-button.error {
+        color: #a855f7 !important;
+        background: rgba(147, 51, 234, 0.15) !important;
+        border-color: #a855f7 !important;
+        box-shadow: 0 0 12px rgba(147, 51, 234, 0.6) !important;
+    }
+    #config-button.active i::before,
+    #config-button.active i {
+        -webkit-text-stroke: 1px currentColor;
+    }
+
 `;
 document.head.appendChild(debugStyle);
 

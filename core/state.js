@@ -43,6 +43,10 @@ let simulateSplashOverlay = false;
 let guiSettingsXmlParsedForNames = false;
 let currentZoomLevel = 1;
 
+let undoStack = [];
+let redoStack = [];
+let isUndoRedoExecuting = false;
+
 let visibilityStates = {};
 let activeExpandableViewContainers = new Map();
 let scrollViewStates = new Map();
@@ -201,7 +205,33 @@ export function addImageBlobUrl(key, url) { if(key) imageBlobUrls.set(normalizeP
 export function addFontBlobUrl(key, url) { if(key) fontBlobUrls.set(normalizePath(key), url); }
 export function addUsedFile(type, path) { if (!path) return; const lp = normalizePath(path); switch (type) { case 'xml': usedXmlFiles.add(lp); break; case 'svg': case 'image': usedSvgFiles.add(lp); break; case 'font': usedFontFiles.add(lp); break; default: console.warn(`Unknown used file type: ${type}`); } }
 
-function internalAddLog(message, type='info') { consoleLogContent.push({ timestamp: new Date(), message: String(message), type }); if (consoleLogContent.length > 200) { consoleLogContent.shift(); } if (type === 'error') { if (!hasConsoleErrors) { setHasConsoleErrors(true); } } if(getIsConsoleVisible() && window.updateConsoleView) { window.updateConsoleView(); } return consoleLogContent[consoleLogContent.length - 1]; }
+function internalAddLog(message, type='info') {
+    const msgStr = String(message);
+    if (consoleLogContent.length > 0) {
+        const lastLog = consoleLogContent[consoleLogContent.length - 1];
+        if (lastLog.message === msgStr && lastLog.type === type) {
+            lastLog.timestamp = new Date();
+            lastLog.count = (lastLog.count || 1) + 1;
+            if (getIsConsoleVisible() && window.updateConsoleView) {
+                window.updateConsoleView();
+            }
+            return lastLog;
+        }
+    }
+    consoleLogContent.push({ timestamp: new Date(), message: msgStr, type, count: 1 });
+    if (consoleLogContent.length > 200) {
+        consoleLogContent.shift();
+    }
+    if (type === 'error') {
+        if (!hasConsoleErrors) {
+            setHasConsoleErrors(true);
+        }
+    }
+    if (getIsConsoleVisible() && window.updateConsoleView) {
+        window.updateConsoleView();
+    }
+    return consoleLogContent[consoleLogContent.length - 1];
+}
 export function addConsoleLogEntry(message, type = 'info') { return internalAddLog(message, type); }
 export function clearConsoleLog() { consoleLogContent = []; setHasConsoleErrors(false); if(getIsConsoleVisible() && window.updateConsoleView) { window.updateConsoleView(); } }
 function updateConsoleButtonStateInternal() { const btn = document.getElementById('console-button'); if (btn) btn.classList.toggle('error', hasConsoleErrors); }
@@ -412,6 +442,54 @@ export function getActiveEditorInstanceId() { return activeEditorInstanceId; }
 export function getCurrentZoomLevel() { return currentZoomLevel; }
 export function setCurrentZoomLevel(level) { currentZoomLevel = Math.max(0.1, Math.min(level, 10)); }
 
+// --- Undo / Redo History ---
+export function pushHistoryState(path, xmlContent) {
+    if (isUndoRedoExecuting || !path || xmlContent === undefined) return;
+    const last = undoStack[undoStack.length - 1];
+    if (!last || last.path !== path || last.content !== xmlContent) {
+        undoStack.push({ path, content: xmlContent });
+        if (undoStack.length > 50) undoStack.shift();
+        redoStack = [];
+        document.dispatchEvent(new Event('historyChanged'));
+    }
+}
+
+export function canUndo() { return undoStack.length > 0; }
+export function canRedo() { return redoStack.length > 0; }
+
+export function peekUndoState() { return undoStack.length > 0 ? undoStack[undoStack.length - 1] : null; }
+export function peekRedoState() { return redoStack.length > 0 ? redoStack[redoStack.length - 1] : null; }
+
+export function popUndoState(currentFallbackContent) {
+    if (undoStack.length === 0) return null;
+    const state = undoStack.pop();
+    if (currentFallbackContent !== undefined) {
+         redoStack.push({ path: state.path, content: currentFallbackContent });
+    }
+    document.dispatchEvent(new Event('historyChanged'));
+    return state;
+}
+
+export function popRedoState(currentFallbackContent) {
+    if (redoStack.length === 0) return null;
+    const state = redoStack.pop();
+    if (currentFallbackContent !== undefined) {
+         undoStack.push({ path: state.path, content: currentFallbackContent });
+    }
+    document.dispatchEvent(new Event('historyChanged'));
+    return state;
+}
+
+export function setIsUndoRedoExecuting(isExecuting) {
+    isUndoRedoExecuting = !!isExecuting;
+}
+
+export function clearHistory() {
+    undoStack = [];
+    redoStack = [];
+    document.dispatchEvent(new Event('historyChanged'));
+}
+
 // --- Utility ---
 function revokeBlobUrls(map) { map.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }); map.clear(); }
 export function clearUsedFiles() { usedXmlFiles.clear(); usedSvgFiles.clear(); usedFontFiles.clear(); }
@@ -434,6 +512,7 @@ export function clearAllState() {
     isXmlEditorDirty = false;
 
     visibilityStates = {}; clearExpandableViewContainers(); clearScrollViewStates(); clearAllElementStates();
+    clearHistory();
 
     editorInstances.clear(); activeEditorInstanceId = null; nextEditorInstanceNumericId = 1;
 

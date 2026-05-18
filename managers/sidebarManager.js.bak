@@ -305,6 +305,22 @@ function createTreeElement(node) {
         if (folderLi && !fileLi) { folderLi.classList.toggle('open'); }
     });
 
+    treeElement.addEventListener('dblclick', (event) => {
+        let current = event.target;
+        let fileLi = null;
+        while (current && current !== treeElement) {
+            if (current.tagName === 'LI' && current.classList.contains('file')) {
+                fileLi = current;
+                break;
+            }
+            current = current.parentElement;
+        }
+        if (fileLi && fileLi.dataset.filePath) {
+            const previewArea = getPreviewArea();
+            if (previewArea) previewArea.click();
+        }
+    });
+
     const editButton = getEditButton();
     if (editButton && !editButton.dataset.listenerAttached) {
          editButton.addEventListener('click', () => {

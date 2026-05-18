@@ -35,6 +35,35 @@ let transformStartWidth = 0, transformStartHeight = 0;
 // --- Initialization ---
 export function setupMainContentInteractions() {
     console.log("[mainContent] Setting up Main Content listeners...");
+    
+    // Globally expose the reconciliation hook so detached modules (like SelectionManager nudging) can fire it safely
+    window.syncElementChangesToXmlSource = syncElementChangesToXmlSource;
+
+    if (!document.body.dataset.historyEngineAttached) {
+        document.addEventListener('applyHistoryState', (e) => {
+            const { path, content } = e.detail;
+            if (!content || !path) return;
+
+            State.addFile(path, content);
+            
+            const instance = State.getEditorInstanceByPath(path);
+            if (instance) {
+                 State.updateEditorInstance(instance.uniqueId, { currentContent: content });
+                 const activeTextarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                 if (activeTextarea) {
+                     activeTextarea.value = content;
+                     activeTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                 }
+            }
+
+            // Immediately force layout engine redraw off the fresh memory state
+            if (typeof window.renderMainGui === 'function') {
+                window.renderMainGui();
+            }
+        });
+        document.body.dataset.historyEngineAttached = 'true';
+    }
+
     const mainContentArea = getMainContentArea();
     const guiZoomCanvas = getGuiZoomCanvas();
 
@@ -238,6 +267,9 @@ export function syncElementChangesToXmlSource(el) {
     let fileContent = fileMap.get(normalizedPath);
     
     if (fileContent && fileContent.includes(oldRawXml)) {
+        if (typeof State.pushHistoryState === 'function') {
+            State.pushHistoryState(fileContent);
+        }
         fileContent = fileContent.replace(oldRawXml, newRawXml);
         fileMap.set(normalizedPath, fileContent);
     }
@@ -264,6 +296,9 @@ export function syncElementChangesToXmlSource(el) {
 }
 
 export function updateSelectionOutline() {
+    if (SelectionManager && typeof SelectionManager.updatePosition === 'function') {
+        SelectionManager.updatePosition();
+    }
     const zoomCanvas = getGuiZoomCanvas();
     if (!zoomCanvas) return;
     let outline = document.getElementById('selection-outline-overlay');
@@ -718,6 +753,26 @@ export const SelectionManager = {
 
 // Example usage to wire it up globally (Clicking outside deselects it)
 document.addEventListener('mousedown', (e) => {
+    // 1. Robust check to see if we are in Debug/Edit mode
+    let isDebug = false;
+    if (typeof State !== 'undefined') {
+        if (typeof State.getDebugEnabled === 'function') isDebug = isDebug || State.getDebugEnabled();
+        if (typeof State.getDebugMode === 'function') isDebug = isDebug || State.getDebugMode();
+        if (State.debugMode !== undefined) isDebug = isDebug || State.debugMode;
+    }
+    if (window.debugMode !== undefined) isDebug = isDebug || window.debugMode;
+    if (document.body.classList.contains('debug-mode') || document.body.classList.contains('debug')) isDebug = true;
+    if (document.body.dataset.debug === 'true' || document.body.dataset.mode === 'debug') isDebug = true;
+
+    // 2. If NOT in debug mode, clear any existing selection and do nothing
+    if (!isDebug) {
+        if (SelectionManager.currentSelection) {
+            SelectionManager.deselect();
+        }
+        return;
+    }
+
+    // 3. We are in Debug Mode: proceed with selection logic
     // Ignore clicks inside the Quick Inspector or on handles/pads
     if (e.target.closest('#element-quick-inspector') || e.target.closest('#qi-selection-box')) {
         return;

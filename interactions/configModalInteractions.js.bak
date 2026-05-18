@@ -16,7 +16,7 @@ import {
     getConfigModal, getCloseConfigBtn, getGridToggle, getGridToggleCheckbox,
     getMainContentArea, getBgColorInput, getBgColorValue,
     getBgModeToggle, getBgModeCheckbox,
-    getGuiZoomCanvas
+    getGuiZoomCanvas, getConfigButton
 } from '../core/domUtils.js';
 
 let configListenersSetup = false;
@@ -153,6 +153,10 @@ export function handleConfigToggle() {
     const visibilityChanged = toggleModalVisibility(modal, shouldShow);
     if(visibilityChanged){
         console.log(`[configModal] Visibility toggle successful. Modal is now ${shouldShow ? 'visible' : 'hidden'}.`);
+        const icon = getConfigButton()?.querySelector('i');
+        if (icon) {
+            icon.className = shouldShow ? 'iconoir-settings-solid' : 'iconoir-settings';
+        }
     } else {
         console.log(`[configModal] Visibility toggle did not result in a change (already in desired state or cancelled). Current visible state: ${modal.classList.contains('visible')}`);
     }
@@ -196,6 +200,17 @@ function initConfigModalValues() {
         const useDefaultBg = State.getUseDefaultBackgroundColor();
         bgModeToggle.setAttribute('aria-checked', String(useDefaultBg));
         bgModeCheckbox.checked = useDefaultBg;
+
+        // Init Theme Toggle
+        const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
+        const isThemeDark = (savedTheme === 'dark');
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeCheckbox = document.getElementById('theme-toggle-checkbox');
+        if (themeToggle && themeCheckbox) {
+            themeToggle.setAttribute('aria-checked', String(isThemeDark));
+            themeCheckbox.checked = isThemeDark;
+            document.body.setAttribute('data-app-theme', savedTheme);
+        }
 
         // Init Simulate Splash/Overlay Toggle
         const simulateSplash = State.getSimulateSplashOverlay();
