@@ -1,5 +1,6 @@
 // File: cs/renderers/sliderRenderer.js
 import * as DomUtils from '../core/domUtils.js';
+import * as State from '../core/state.js';
 
 export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourcePath) {
     const htmlElement = document.createElement('div');
@@ -176,11 +177,277 @@ export function renderCS01Slider(xmlNode, mergedAttributes, currentParams, sourc
 }
 
 export function renderCS03Slider(xmlNode, mergedAttributes, currentParams, sourcePath) {
-    console.warn("[sliderRenderer] CS03Slider requested but not fully implemented.");
+    const htmlElement = document.createElement('div');
+    htmlElement.classList.add('gui-slider-container', 'gui-cs03-slider');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.overflow = 'visible';
+
+    const paramId = mergedAttributes['param'] || (DomUtils.getParamValue ? DomUtils.getParamValue(xmlNode, currentParams ? currentParams.paramOffset : 0) : '');
+    const vmin = parseFloat(mergedAttributes['vmin'] || '0');
+    const vmax = parseFloat(mergedAttributes['vmax'] || '1');
+    const vdefault = parseFloat(mergedAttributes['vdefault'] || vmin);
+    const isStepped = mergedAttributes['stepped'] === '1';
+
+    // Core Track Layout Properties
+    const trackX = parseFloat(mergedAttributes['track_x'] || '0');
+    const trackY = parseFloat(mergedAttributes['track_y'] || '0');
+    const trackW = parseFloat(mergedAttributes['track_w'] || '10');
+    const trackH = parseFloat(mergedAttributes['track_h'] || '100');
+    const trackColor = mergedAttributes['trackColor'] || mergedAttributes['trackcolor'] || '#2e2e2e';
+
+    const track = document.createElement('div');
+    track.style.position = 'absolute';
+    track.style.left = `${trackX}px`;
+    track.style.top = `${trackY}px`;
+    track.style.width = `${trackW}px`;
+    track.style.height = `${trackH}px`;
+    track.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(trackColor) : trackColor;
+    htmlElement.appendChild(track);
+
+    // Optional Modulation Secondary Track Overlay
+    if (mergedAttributes['modTrack_x']) {
+        const mtX = parseFloat(mergedAttributes['modTrack_x'] || '0');
+        const mtY = parseFloat(mergedAttributes['modTrack_y'] || '0');
+        const mtW = parseFloat(mergedAttributes['modTrack_w'] || '2');
+        const mtH = parseFloat(mergedAttributes['modTrack_h'] || '100');
+        const mtColor = mergedAttributes['modTrackColor'] || '#22222280';
+
+        const modTrack = document.createElement('div');
+        modTrack.style.position = 'absolute';
+        modTrack.style.left = `${mtX}px`;
+        modTrack.style.top = `${mtY}px`;
+        modTrack.style.width = `${mtW}px`;
+        modTrack.style.height = `${mtH}px`;
+        modTrack.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(mtColor) : mtColor;
+        htmlElement.appendChild(modTrack);
+    }
+
+    // Graphical Knob Handle Initialization
+    const knobX = parseFloat(mergedAttributes['knob_x'] || '0');
+    const knobW = parseFloat(mergedAttributes['knob_w'] || '10');
+    const knobH = parseFloat(mergedAttributes['knob_h'] || '10');
+    const knobAsset = mergedAttributes['knob'];
+
+    const knob = document.createElement('div');
+    knob.style.position = 'absolute';
+    knob.style.left = `${knobX}px`;
+    knob.style.width = `${knobW}px`;
+    knob.style.height = `${knobH}px`;
+    knob.style.cursor = 'grab';
+    knob.style.zIndex = '2';
+
+    if (knobAsset) {
+        const fullPath = State.normalizePath ? State.normalizePath(knobAsset, State.getCurrentSkinRoot()) : knobAsset;
+        const blobUrl = State.getAssetBlobUrl ? State.getAssetBlobUrl(fullPath) : null;
+        if (blobUrl) {
+            knob.style.backgroundImage = `url(${blobUrl})`;
+            knob.style.backgroundSize = '100% 100%';
+            knob.style.backgroundRepeat = 'no-repeat';
+        } else {
+            knob.style.backgroundColor = '#666';
+        }
+    } else {
+        knob.style.backgroundColor = '#888';
+    }
+    htmlElement.appendChild(knob);
+
+    // Create an active fill overlay mapped directly inside the vertical slider background track
+    const fill = document.createElement('div');
+    fill.style.position = 'absolute';
+    fill.style.left = `${trackX}px`;
+    fill.style.width = `${trackW}px`;
+    fill.style.pointerEvents = 'none';
+    
+    const rawFillColor = mergedAttributes['fillColor'] || mergedAttributes['fillcolor'];
+    if (rawFillColor) {
+        fill.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(rawFillColor) : rawFillColor;
+    }
+    htmlElement.appendChild(fill);
+
+    const lX = parseFloat(mergedAttributes['label_x'] || '0');
+    const lY = parseFloat(mergedAttributes['label_y'] || '0');
+    const lW = parseFloat(mergedAttributes['label_w'] || '30');
+    const lH = parseFloat(mergedAttributes['label_h'] || '20');
+
+    // Static Text Label Overlay
+    let label = null;
+    if (mergedAttributes['labelText']) {
+        const lColor = mergedAttributes['label_fontColor'] || '#ffffff';
+        const lFont = mergedAttributes['label_font'];
+
+        label = document.createElement('div');
+        label.style.position = 'absolute';
+        label.style.left = `${lX}px`;
+        label.style.top = `${lY}px`;
+        label.style.width = `${lW}px`;
+        label.style.height = `${lH}px`;
+        label.style.color = DomUtils.parseColor ? DomUtils.parseColor(lColor) : lColor;
+        label.style.textAlign = 'center';
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.justifyContent = 'center';
+        label.style.whiteSpace = 'nowrap';
+        label.textContent = mergedAttributes['labelText'];
+        label.style.pointerEvents = 'none';
+
+        if (lFont && DomUtils.applyFont) {
+            DomUtils.applyFont(label, lFont);
+        }
+        htmlElement.appendChild(label);
+    }
+
+    // Active Live Parameter Value Display Layer
+    let valueDisplay = null;
+    if (mergedAttributes['showValueTextOnHL'] === '1' || mergedAttributes['showValueTextMod'] === '1') {
+        valueDisplay = document.createElement('div');
+        valueDisplay.style.position = 'absolute';
+        valueDisplay.style.left = `${lX}px`;
+        valueDisplay.style.top = `${lY}px`;
+        valueDisplay.style.width = `${lW}px`;
+        valueDisplay.style.height = `${lH}px`;
+        valueDisplay.style.textAlign = 'center';
+        valueDisplay.style.display = 'none'; // hidden by default
+        valueDisplay.style.alignItems = 'center';
+        valueDisplay.style.justifyContent = 'center';
+        valueDisplay.style.whiteSpace = 'nowrap';
+        valueDisplay.style.pointerEvents = 'none';
+        valueDisplay.style.color = DomUtils.parseColor ? DomUtils.parseColor(mergedAttributes['value_fontColor'] || '#ffffff') : '#ffffff';
+        
+        const vFont = mergedAttributes['value_font'];
+        if (vFont && DomUtils.applyFont) {
+            DomUtils.applyFont(valueDisplay, vFont);
+        }
+        htmlElement.appendChild(valueDisplay);
+    }
+
+    htmlElement.dataset.param = paramId || '';
+    htmlElement.dataset.currentValue = vdefault;
+
+    let isHovered = false;
+
+    if (mergedAttributes['showValueTextOnHL'] === '1') {
+        htmlElement.addEventListener('mouseenter', () => {
+            isHovered = true;
+            syncVisuals();
+        });
+        htmlElement.addEventListener('mouseleave', () => {
+            isHovered = false;
+            syncVisuals();
+        });
+    }
+
+    const syncVisuals = () => {
+        let val = parseFloat(htmlElement.dataset.currentValue);
+        if (isNaN(val)) val = vdefault;
+
+        const range = vmax - vmin;
+        const pct = range > 0 ? (val - vmin) / range : 0;
+        const constrainedPct = Math.max(0, Math.min(1, pct));
+
+        const availableHeight = trackH - knobH;
+        const finalTop = trackY + availableHeight * (1 - constrainedPct);
+        knob.style.top = `${finalTop}px`;
+
+        // Synchronize active fill height matching the precise bottom-up knob frame trajectory
+        const fillTop = trackY + availableHeight * (1 - constrainedPct) + (knobH / 2);
+        const fillHeight = (trackY + trackH) - fillTop;
+        fill.style.top = `${fillTop}px`;
+        fill.style.height = `${Math.max(0, fillHeight)}px`;
+
+        const formattedVal = isStepped ? Math.round(val).toString() : val.toFixed(1);
+
+        if (valueDisplay) {
+            valueDisplay.textContent = formattedVal;
+        }
+
+        if (label && valueDisplay && mergedAttributes['showValueTextOnHL'] === '1') {
+            if (isHovered) {
+                label.style.display = 'none';
+                valueDisplay.style.display = 'flex';
+            } else {
+                label.style.display = 'flex';
+                valueDisplay.style.display = 'none';
+            }
+        }
+    };
+
+    htmlElement.updateVisualState = syncVisuals;
+    syncVisuals();
+
+    const observer = new MutationObserver(syncVisuals);
+    observer.observe(knob, { attributes: true, attributeFilter: ['style'] });
+    observer.observe(htmlElement, { attributes: true, attributeFilter: ['data-current-value'] });
+
+    const handleDrag = (clientY) => {
+        const rect = htmlElement.getBoundingClientRect();
+        const relativeY = clientY - rect.top;
+        const availableHeight = trackH - knobH;
+        if (availableHeight <= 0) return;
+
+        let pct = 1 - ((relativeY - trackY) / availableHeight);
+        pct = Math.max(0, Math.min(1, pct));
+
+        let newVal = vmin + pct * (vmax - vmin);
+        if (isStepped) {
+            newVal = Math.round(newVal);
+        }
+
+        htmlElement.dataset.currentValue = newVal;
+        if (paramId && typeof State?.setElementState === 'function') {
+            State.setElementState(paramId, newVal);
+        }
+        if (typeof window?.updateControllerVisibilities === 'function') {
+            window.updateControllerVisibilities();
+        }
+        syncVisuals();
+    };
+
+    let isDragging = false;
+
+    const onMouseDown = (e) => {
+        isDragging = true;
+        handleDrag(e.clientY);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onMouseMove = (e) => {
+        if (!isDragging) return;
+        handleDrag(e.clientY);
+    };
+
+    const onMouseUp = () => {
+        isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    knob.addEventListener('mousedown', onMouseDown);
+    if (mergedAttributes['clickOnTrack'] === '1') {
+        track.addEventListener('mousedown', onMouseDown);
+    }
+
+    // Touch Support for Mobile / Canvas Integrations
+    knob.addEventListener('touchstart', (e) => {
+        isDragging = true;
+        handleDrag(e.touches[0].clientY);
+        const onTouchMove = (evt) => {
+            if (!isDragging) return;
+            handleDrag(evt.touches[0].clientY);
+        };
+        const onTouchEnd = () => {
+            isDragging = false;
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+        };
+        document.addEventListener('touchmove', onTouchMove, { passive: true });
+        document.addEventListener('touchend', onTouchEnd);
+    }, { passive: true });
+
     return {
-        htmlElement: null,
-        mainElementForAttributes: null,
-        requiresRecursiveRender: true,
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
         postProcessFunction: null
     };
 }

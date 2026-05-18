@@ -82,8 +82,7 @@
 .gui-image-button, 
 .gui-control-text-button, 
 .gui-expand-view-trigger,
-.gui-onoff-button,
-.gui-radio-option-button {
+.gui-onoff-button {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;

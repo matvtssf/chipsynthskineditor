@@ -19,7 +19,23 @@ export function renderCS01TextButton(xmlNode, mergedAttributes, currentParams, s
         htmlElement: htmlElement,
         mainElementForAttributes: htmlElement,
         requiresRecursiveRender: false,
-        postProcessFunction: null
+        postProcessFunction: (element, attrs) => {
+            const onColor = attrs['onColor'] || attrs['oncolor'] || '#60a5fa';
+            const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055ff';
+            const isActive = element.classList.contains('active');
+            
+            element.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
+
+            const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0');
+            if (rRatio > 0) {
+                const h = parseFloat(attrs['h'] || '16');
+                element.style.borderRadius = `${rRatio * h}px`;
+            }
+            
+            if (attrs['font'] && DomUtils.applyFont) {
+                DomUtils.applyFont(element, attrs['font']);
+            }
+        }
     };
 }
 
@@ -66,7 +82,23 @@ export function renderCS01OnOffButton(xmlNode, mergedAttributes, currentParams, 
         htmlElement: htmlElement,
         mainElementForAttributes: htmlElement,
         requiresRecursiveRender: false,
-        postProcessFunction: null
+        postProcessFunction: (element, attrs) => {
+            const onColor = attrs['onColor'] || attrs['oncolor'] || '#60a5fa';
+            const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055ff';
+            const isActive = element.classList.contains('active');
+            
+            element.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
+
+            const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0');
+            if (rRatio > 0) {
+                const h = parseFloat(attrs['h'] || '16');
+                element.style.borderRadius = `${rRatio * h}px`;
+            }
+            
+            if (attrs['font'] && DomUtils.applyFont) {
+                DomUtils.applyFont(element, attrs['font']);
+            }
+        }
     };
 }
 
@@ -141,6 +173,98 @@ export function renderImageButton(tagName, xmlNode, mergedAttributes, currentPar
         htmlElement: htmlElement,
         mainElementForAttributes: htmlElement,
         requiresRecursiveRender: false,
-        postProcessFunction: null
+        postProcessFunction: (element, attrs) => {
+            const onColor = attrs['onColor'] || attrs['oncolor'] || '#60a5fa';
+            const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055ff';
+            const isActive = element.classList.contains('active');
+            
+            element.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
+
+            const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0');
+            if (rRatio > 0) {
+                const h = parseFloat(attrs['h'] || '16');
+                element.style.borderRadius = `${rRatio * h}px`;
+            }
+            
+            if (attrs['font'] && DomUtils.applyFont) {
+                DomUtils.applyFont(element, attrs['font']);
+            }
+        }
+    };
+}
+
+export function renderCS01Button(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const htmlElement = document.createElement('button');
+    htmlElement.classList.add('gui-button', 'gui-cs01-button');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.cursor = 'pointer';
+    htmlElement.style.border = 'none';
+    htmlElement.style.padding = '0';
+    htmlElement.style.boxSizing = 'border-box';
+
+    if (mergedAttributes['text']) {
+        htmlElement.textContent = mergedAttributes['text'];
+    }
+
+    const paramId = mergedAttributes['param'] || (DomUtils.getParamValue ? DomUtils.getParamValue(xmlNode, currentParams ? currentParams.paramOffset : 0) : '');
+    const onValue = mergedAttributes['on_value'] || '1';
+    const offValue = mergedAttributes['off_value'] || '0';
+
+    let isPressed = false;
+
+    const pressAction = () => {
+        if (isPressed) return;
+        isPressed = true;
+        htmlElement.classList.add('active');
+        const colorPushed = mergedAttributes['color_pushed'] || '#5462b7FF';
+        htmlElement.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(colorPushed) : colorPushed;
+        
+        if (paramId && typeof State.setElementState === 'function') {
+            State.setElementState(paramId, onValue);
+        }
+        if (typeof window.updateControllerVisibilities === 'function') {
+            window.updateControllerVisibilities();
+        }
+    };
+
+    const releaseAction = () => {
+        if (!isPressed) return;
+        isPressed = false;
+        htmlElement.classList.remove('active');
+        const offColor = mergedAttributes['offColor'] || mergedAttributes['offcolor'] || '#4d5055ff';
+        htmlElement.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+        
+        if (paramId && typeof State.setElementState === 'function') {
+            State.setElementState(paramId, offValue);
+        }
+        if (typeof window.updateControllerVisibilities === 'function') {
+            window.updateControllerVisibilities();
+        }
+    };
+
+    htmlElement.addEventListener('mousedown', pressAction);
+    htmlElement.addEventListener('mouseup', releaseAction);
+    htmlElement.addEventListener('mouseleave', releaseAction);
+    htmlElement.addEventListener('touchstart', (e) => { e.preventDefault(); pressAction(); }, { passive: false });
+    htmlElement.addEventListener('touchend', (e) => { e.preventDefault(); releaseAction(); }, { passive: false });
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: (element, attrs) => {
+            const offColor = attrs['offColor'] || attrs['offcolor'] || '#4d5055ff';
+            element.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(offColor) : offColor;
+
+            const rRatio = parseFloat(attrs['roundedRatio'] || attrs['roundedratio'] || '0');
+            if (rRatio > 0) {
+                const h = parseFloat(attrs['h'] || '16');
+                element.style.borderRadius = `${rRatio * h}px`;
+            }
+            
+            if (attrs['font'] && DomUtils.applyFont) {
+                DomUtils.applyFont(element, attrs['font']);
+            }
+        }
     };
 }

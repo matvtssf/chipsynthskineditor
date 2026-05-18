@@ -11,6 +11,36 @@
     -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
+
+body[data-app-theme="dark"] #sidebar {
+    background-color: rgba(30, 30, 30, 0.85) !important;
+    border-color: rgba(68, 68, 68, 0.5) !important;
+    color: #ffffff !important;
+}
+
+body[data-app-theme="dark"] #sidebar label,
+body[data-app-theme="dark"] #sidebar h2,
+body[data-app-theme="dark"] #sidebar .text-gray-700 {
+    color: #e5e7eb !important;
+}
+
+body[data-app-theme="dark"] #file-browser-container,
+body[data-app-theme="dark"] #preview-area-container,
+body[data-app-theme="dark"] #preview-area {
+    background-color: #252526 !important;
+    color: #ffffff !important;
+    border-color: #3e3e42 !important;
+}
+
+body[data-app-theme="dark"] #skin-selector {
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+    border-color: #444444 !important;
+}
+
+body[data-app-theme="dark"] #file-tree li span:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
 body[data-app-theme="dark"] #sidebar {
     background-color: rgba(26, 26, 26, 0.85);
     border-color: rgba(44, 44, 44, 0.5);
@@ -126,4 +156,102 @@ body[data-app-theme="dark"] #skin-selector {
 .sidebar-bottom-button.open-button:hover { background-color: #2563eb; } 
 .sidebar-bottom-button.open-button i { font-size: 1.1em; } 
 
-.sidebar-icon-button { padding: 0; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #9ca3af; background-color: #f3f4f6; color: #55
+.sidebar-icon-button { padding: 0; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #9ca3af; background-color: #f3f4f6; color: #555; }
+
+/* --- Smooth Transitions for Fade-In Components --- */
+#sidebar-toggle-btn,
+#product-logo-container,
+#skin-selector-container,
+#file-browser-container,
+#preview-area-container,
+#sidebar-controls > div.mb-2,
+#reference-button,
+#debug-toggle-button,
+#console-button {
+    transition: opacity 0.4s ease-in-out, visibility 0.4s ease-in-out;
+}
+
+/* --- Pre-load Box Style Architecture (body:not(.app-loaded)) --- */
+body:not(.app-loaded) #sidebar {
+    top: auto !important;
+    left: auto !important;
+    right: 1rem !important;
+    bottom: 1rem !important;
+    width: 144px !important;
+    height: 48px !important;
+    position: fixed !important;
+}
+
+body:not(.app-loaded) #sidebar-header {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: transparent !important;
+    border-bottom: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+body:not(.app-loaded) #config-button {
+    position: absolute !important;
+    right: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 20 !important;
+}
+
+body:not(.app-loaded) #sidebar .sidebar-content-wrapper {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+body:not(.app-loaded) #sidebar-controls {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-top: none !important;
+}
+
+body:not(.app-loaded) .load-button-area {
+    position: absolute !important;
+    left: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 86px !important;
+    height: 32px !important;
+    display: block !important;
+    z-index: 20 !important;
+}
+
+body:not(.app-loaded) #load-folder-button {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+body:not(.app-loaded) #sidebar-toggle-btn,
+body:not(.app-loaded) #product-logo-container,
+body:not(.app-loaded) #skin-selector-container,
+body:not(.app-loaded) #file-browser-container,
+body:not(.app-loaded) #preview-area-container,
+body:not(.app-loaded) #sidebar-controls > div.mb-2,
+body:not(.app-loaded) #reference-button,
+body:not(.app-loaded) #debug-toggle-button,
+body:not(.app-loaded) #console-button {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}

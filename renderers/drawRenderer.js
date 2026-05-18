@@ -297,6 +297,8 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
         case 'StaticImage': return renderStaticImage(xmlNode, mergedAttributes);
         case 'Line': return renderLine(xmlNode, mergedAttributes);
         case 'Shape': return renderShape(xmlNode, mergedAttributes);
+        case 'Picture8Data': return renderPicture8Data(xmlNode, mergedAttributes);
+        case 'ImageHolder': return renderImageHolder(xmlNode, mergedAttributes);
         default:
             console.warn(`[drawRenderer] Attempted to render unhandled tag: ${tagName}`);
             const placeholder = DomUtils.createErrorPlaceholder(tagName);
@@ -306,4 +308,62 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             if (mergedAttributes['h']) placeholder.style.height = mergedAttributes['h'] + 'px';
             return { htmlElement: placeholder, mainElementForAttributes: placeholder, requiresRecursiveRender: false, postProcessFunction: null };
     }
+}
+
+function renderPicture8Data(xmlNode, mergedAttributes) {
+    const htmlElement = document.createElement('img');
+    htmlElement.src = 'style/spc.svg';
+    htmlElement.classList.add('gui-picture8data', 'gui-svg-image');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.display = 'block';
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
+}
+
+function renderImageHolder(xmlNode, mergedAttributes) {
+    const container = document.createElement('div');
+    container.classList.add('gui-image-holder');
+    container.style.position = 'absolute';
+    container.style.boxSizing = 'border-box';
+    container.style.overflow = 'hidden';
+
+    const placeholder = document.createElement('div');
+    placeholder.classList.add('gui-image-holder-placeholder');
+    placeholder.style.width = '100%';
+    placeholder.style.height = '100%';
+    placeholder.style.display = 'flex';
+    placeholder.style.flexDirection = 'column';
+    placeholder.style.alignItems = 'center';
+    placeholder.style.justifyContent = 'center';
+    placeholder.style.border = '1px dashed rgba(255, 255, 255, 0.15)';
+    placeholder.style.backgroundColor = 'rgba(255, 255, 255, 0.02)';
+    placeholder.style.borderRadius = '4px';
+    placeholder.style.pointerEvents = 'none';
+
+    const textLabel = document.createElement('span');
+    textLabel.textContent = '📂 [Image Holder]';
+    textLabel.style.fontSize = '10px';
+    textLabel.style.color = 'rgba(255, 255, 255, 0.3)';
+    textLabel.style.fontFamily = 'monospace';
+    textLabel.style.userSelect = 'none';
+    
+    placeholder.appendChild(textLabel);
+    container.appendChild(placeholder);
+
+    const paramId = mergedAttributes['param'];
+    const target = mergedAttributes['target'];
+    if (paramId) container.dataset.param = paramId;
+    if (target) container.dataset.target = target;
+
+    return {
+        htmlElement: container,
+        mainElementForAttributes: container,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
 }

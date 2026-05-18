@@ -42,6 +42,63 @@ let currentEditingColorContext = null;
 let activeIconTargetSpan = null;
 let activeIconElement = null;
 
+let ctrlKeyDown = false;
+
+function handleEditorKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const activeId = State.getActiveEditorInstanceId();
+        if (activeId) {
+            const modal = document.getElementById(`xml-editor-modal-${activeId}`);
+            if (modal) {
+                const findBar = modal.querySelector('.xml-editor-find-bar');
+                const findInput = modal.querySelector('.xml-editor-find-input');
+                if (findBar && findInput) {
+                    findBar.style.display = 'block';
+                    findInput.focus();
+                    findInput.select();
+                }
+            }
+        }
+        return;
+    }
+    if (e.key === 'Control' && !ctrlKeyDown) {
+        ctrlKeyDown = true;
+        document.body.classList.add('ctrl-active');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        const activeId = State.getActiveEditorInstanceId();
+        if (activeId) {
+            const modal = document.getElementById(`xml-editor-modal-${activeId}`);
+            if (modal) {
+                const findBar = modal.querySelector('.xml-editor-find-bar');
+                const findInput = modal.querySelector('.xml-editor-find-input');
+                if (findBar && findInput) {
+                    e.preventDefault();
+                    findBar.style.display = 'block';
+                    findInput.focus();
+                    findInput.select();
+                }
+            }
+        }
+    }
+}
+
+function handleEditorKeyUp(e) {
+    if (e.key === 'Control' && ctrlKeyDown) {
+        ctrlKeyDown = false;
+        document.body.classList.remove('ctrl-active');
+    }
+}
+
+function handleEditorWindowBlur() {
+    // Failsafe: prevent CTRL from getting stuck if they alt-tab while holding it
+    if (ctrlKeyDown) {
+        ctrlKeyDown = false;
+        document.body.classList.remove('ctrl-active');
+    }
+}
+
 export function setupXmlEditorListeners() {
     safelyAttachListener(getInsertElementXmlBtn(), 'click', handleOpenXmlInsertModal);
     safelyAttachListener(getCloseXmlInsertBtn(), 'click', handleCloseXmlInsertModal);
@@ -51,6 +108,11 @@ export function setupXmlEditorListeners() {
         insertList.addEventListener('click', handleInsertElementXml);
     }
     document.addEventListener('jumpToStyle', handleJumpToStyle);
+
+    // Add keyboard listeners for the CTRL toggle mechanic
+    document.addEventListener('keydown', handleEditorKeyDown);
+    document.addEventListener('keyup', handleEditorKeyUp);
+    window.addEventListener('blur', handleEditorWindowBlur);
 }
 
 export function setupInstanceHoverListeners(textareaElement, highlightOverlayElement, instanceId) {

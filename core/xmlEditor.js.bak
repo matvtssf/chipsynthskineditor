@@ -313,45 +313,67 @@ function checkAndRerender(instanceId) {
         return;
     }
 
-    const currentSkinRootDirectory = State.getCurrentSkinRoot();
     const editedFilePath = instance.filePath;
-
-    // ADDED: Debug logging
-    console.log(`[checkAndRerender DEBUG] Instance File Path: "${editedFilePath}", Current Skin Root Dir: "${currentSkinRootDirectory}"`);
-
-    let expectedMainSkinFile = "";
-    if (currentSkinRootDirectory && typeof currentSkinRootDirectory === 'string' && currentSkinRootDirectory.length > 0) {
-        const separator = currentSkinRootDirectory.endsWith('/') ? '' : '/';
-        expectedMainSkinFile = State.normalizePath(currentSkinRootDirectory + separator + 'gui.xml');
-    } else {
-        // This case means currentSkinRootDirectory is not set or invalid.
-        // The comparison will likely fail, which is correct if we don't know the main skin.
-        console.warn(`[checkAndRerender DEBUG] Current Skin Root Directory is empty or invalid. Cannot reliably determine main skin XML.`);
-        expectedMainSkinFile = editedFilePath; // Default to self, will likely not trigger general skin reload unless it's specifically set as root
+    const elements = instanceDomElements.get(instanceId);
+    
+    // Commit the current edit buffer to the central state so the layout engine can read it if it's a sub-file
+    if (elements && elements.textarea) {
+        State.addFile(editedFilePath, elements.textarea.value);
     }
 
-    console.log(`[checkAndRerender DEBUG] Comparing "${editedFilePath}" with expected main skin file "${expectedMainSkinFile}"`);
+    let expectedMainSkinFile = null;
+    
+    // Contextual Strategy 1: Check if the edited file itself IS the main skin (merged/root)
+    const lowerEdited = editedFilePath.toLowerCase();
+    if (lowerEdited.endsWith('gui.xml') || lowerEdited.includes('merged_xml.xml') || lowerEdited.endsWith('skin.xml')) {
+        expectedMainSkinFile = editedFilePath;
+    }
 
-    if (editedFilePath === expectedMainSkinFile) {
-        if (DEBUG_OPEN_EDITOR) console.log(`[checkAndRerender] Edited file ${editedFilePath} is the current main skin XML. Triggering reload.`);
-        const elements = instanceDomElements.get(instanceId);
-        if (elements && elements.textarea) {
-            const updatedXmlContent = elements.textarea.value;
-            loadSkin(editedFilePath, updatedXmlContent) // Use editedFilePath, which is the full path
-                .then(() => {
-                    showToast(`Skin ${editedFilePath} reloaded with changes.`, 'info');
-                })
-                .catch(err => {
-                    logError(`[checkAndRerender] Error reloading skin ${editedFilePath}:`, err);
-                    showToast(`Error reloading skin ${editedFilePath}. See console.`, 'error');
-                });
-        } else {
-            logError(`[checkAndRerender] Could not get updated content from textarea for instance ${instanceId} to reload skin.`);
-            showToast('Internal error: Could not get text to reload skin.', 'error');
+    // Contextual Strategy 2: Traverse upwards to find a gui.xml matching the edited file's folder path
+    if (!expectedMainSkinFile) {
+        const pathParts = editedFilePath.split('/');
+        while (pathParts.length > 0 && !expectedMainSkinFile) {
+            pathParts.pop(); 
+            const testDir = pathParts.join('/');
+            const testPath = testDir ? `${testDir}/gui.xml` : 'gui.xml';
+            if (State.getFileContent(testPath) !== undefined) {
+                expectedMainSkinFile = testPath;
+            }
         }
+    }
+
+    // Contextual Strategy 3: Heuristic Content check if it acts as a root
+    if (!expectedMainSkinFile) {
+        const content = elements?.textarea ? elements.textarea.value : State.getFileContent(editedFilePath);
+        if (content && (content.includes('<GUI') || content.includes('<Skin'))) {
+            expectedMainSkinFile = editedFilePath;
+        }
+    }
+
+    // Final Fallback: Re-render the file itself directly
+    if (!expectedMainSkinFile) {
+        expectedMainSkinFile = editedFilePath;
+    }
+
+    console.log(`[checkAndRerender DEBUG] Routing global reload target strictly to -> "${expectedMainSkinFile}"`);
+
+    let rootSkinContent = State.getFileContent(expectedMainSkinFile);
+    if (expectedMainSkinFile === editedFilePath && elements && elements.textarea) {
+        rootSkinContent = elements.textarea.value;
+    }
+
+    if (rootSkinContent !== undefined && rootSkinContent !== null) {
+        loadSkin(expectedMainSkinFile, rootSkinContent)
+            .then(() => {
+                showToast(`Skin hot-reloaded with changes from ${editedFilePath.split('/').pop()}.`, 'info');
+            })
+            .catch(err => {
+                logError(`[checkAndRerender] Error reloading skin ${expectedMainSkinFile}:`, err);
+                showToast(`Error reloading skin. See console.`, 'error');
+            });
     } else {
-        console.log(`[checkAndRerender DEBUG] Paths do NOT match the expected main skin file. No reload triggered for instance ${instanceId}.`);
-        if (DEBUG_OPEN_EDITOR) console.log(`[checkAndRerender] Edited file ${editedFilePath} is NOT the current main skin XML (${expectedMainSkinFile}). No immediate reload.`);
+        logError(`[checkAndRerender] Could not fetch root content for ${expectedMainSkinFile} to reload skin.`);
+        showToast('Internal error: Could not resolve root skin data.', 'error');
     }
 }
 
@@ -543,10 +565,48 @@ export function openXmlEditor(filePath) {
     if(elements.editingFilenameSpan) elements.editingFilenameSpan.textContent = normalizedFilePath;
     if(elements.textarea) elements.textarea.value = editorInstanceFromState.currentContent;
 
+    // Load saved window size and position from localStorage
+    try {
+        const savedLayout = localStorage.getItem(`xml_editor_layout:${normalizedFilePath}`);
+        if (savedLayout && elements.contentContainer) {
+            const layout = JSON.parse(savedLayout);
+            if (layout.width) elements.contentContainer.style.width = layout.width;
+            if (layout.height) elements.contentContainer.style.height = layout.height;
+            if (layout.left) elements.contentContainer.style.left = layout.left;
+            if (layout.top) elements.contentContainer.style.top = layout.top;
+            if (layout.transform) elements.contentContainer.style.transform = layout.transform;
+        }
+    } catch (e) {
+        console.warn(`[xmlEditor] Failed to load saved layout for ${normalizedFilePath}:`, e);
+    }
+
     updateUIDisplay(instanceId);
 
-    if (elements.contentContainer && elements.header) makeModalDraggable(elements.contentContainer, elements.header);
-    if (elements.contentContainer && elements.resizeHandle) makeModalResizable(elements.contentContainer, elements.resizeHandle);
+    // Save tracking function for layout modifications
+    const saveLayoutConfig = () => {
+        if (!elements.contentContainer) return;
+        try {
+            const layoutData = {
+                width: elements.contentContainer.style.width,
+                height: elements.contentContainer.style.height,
+                left: elements.contentContainer.style.left,
+                top: elements.contentContainer.style.top,
+                transform: elements.contentContainer.style.transform
+            };
+            localStorage.setItem(`xml_editor_layout:${normalizedFilePath}`, JSON.stringify(layoutData));
+        } catch (e) {
+            console.error(`[xmlEditor] Failed to save layout context to localStorage:`, e);
+        }
+    };
+
+    if (elements.contentContainer && elements.header) {
+        makeModalDraggable(elements.contentContainer, elements.header);
+        elements.header.addEventListener('mouseup', saveLayoutConfig);
+    }
+    if (elements.contentContainer && elements.resizeHandle) {
+        makeModalResizable(elements.contentContainer, elements.resizeHandle);
+        elements.contentContainer.addEventListener('mouseup', saveLayoutConfig);
+    }
 
     if (elements.textarea && elements.highlightOverlay && document.body.contains(elements.highlightOverlay)) {
         if (DEBUG_OPEN_EDITOR) console.log(`[openXmlEditor] Both Textarea and HighlightOverlay valid for instance ${instanceId}. ABOUT TO CALL setupInstanceHoverListeners. Overlay ID: ${elements.highlightOverlay.id}`);
@@ -554,6 +614,103 @@ export function openXmlEditor(filePath) {
     } else {
         logError(`[openXmlEditor] Textarea or HighlightOverlay missing, or overlay not in DOM for instanceId: ${instanceId}. Cannot setup hover listeners.`);
         if (DEBUG_OPEN_EDITOR) console.error(`[openXmlEditor] SKIPPING setupInstanceHoverListeners. Textarea found: ${!!elements.textarea}, Overlay found: ${!!elements.highlightOverlay}, Overlay in DOM: ${elements.highlightOverlay && document.body.contains(elements.highlightOverlay)}`);
+    }
+
+    if (elements.contentContainer && elements.textarea) {
+        const findBar = document.createElement('div');
+        findBar.className = 'xml-editor-find-bar';
+        findBar.style.cssText = 'position: absolute; top: 35px; right: 10px; z-index: 1000; background: #fff; border: 1px solid #ccc; padding: 4px; display: none;';
+        
+        const findInput = document.createElement('input');
+        findInput.type = 'text';
+        findInput.placeholder = 'Find...';
+        findInput.className = 'xml-editor-find-input';
+        findInput.style.cssText = 'border: 1px solid #aaa; padding: 2px 4px; font-size: 12px; outline: none; width: 150px; display: inline-block; vertical-align: middle;';
+        
+        const findStatus = document.createElement('span');
+        findStatus.style.cssText = 'font-size: 11px; color: #666; margin: 0 4px; min-width: 30px; text-align: center; display: inline-block; vertical-align: middle;';
+        
+        const closeFindBtn = document.createElement('button');
+        closeFindBtn.innerHTML = '&times;';
+        closeFindBtn.style.cssText = 'background: none; border: none; cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1; display: inline-block; vertical-align: middle;';
+        
+        findBar.appendChild(findInput);
+        findBar.appendChild(findStatus);
+        findBar.appendChild(closeFindBtn);
+        elements.contentContainer.appendChild(findBar);
+
+        let findMatches = [];
+        let currentMatchIndex = -1;
+
+        const executeSearch = (direction = 1, wrap = true) => {
+            const query = findInput.value;
+            if (!query) {
+                findMatches = [];
+                currentMatchIndex = -1;
+                findStatus.textContent = '';
+                findInput.style.backgroundColor = '';
+                return;
+            }
+            const text = elements.textarea.value;
+            findMatches = [];
+            let idx = text.toLowerCase().indexOf(query.toLowerCase());
+            while (idx !== -1) {
+                findMatches.push(idx);
+                idx = text.toLowerCase().indexOf(query.toLowerCase(), idx + 1);
+            }
+
+            if (findMatches.length === 0) {
+                currentMatchIndex = -1;
+                findStatus.textContent = '0/0';
+                findInput.style.backgroundColor = '#fee2e2';
+                return;
+            }
+            findInput.style.backgroundColor = '';
+
+            if (currentMatchIndex === -1) {
+                currentMatchIndex = 0;
+            } else {
+                currentMatchIndex += direction;
+                if (currentMatchIndex >= findMatches.length) {
+                    if (wrap) currentMatchIndex = 0;
+                    else currentMatchIndex = findMatches.length - 1;
+                } else if (currentMatchIndex < 0) {
+                    if (wrap) currentMatchIndex = findMatches.length - 1;
+                    else currentMatchIndex = 0;
+                }
+            }
+
+            findStatus.textContent = `${currentMatchIndex + 1}/${findMatches.length}`;
+            
+            elements.textarea.focus();
+            elements.textarea.setSelectionRange(findMatches[currentMatchIndex], findMatches[currentMatchIndex] + query.length);
+            
+            const numLines = text.substring(0, findMatches[currentMatchIndex]).split('\n').length;
+            const lineHeight = parseFloat(window.getComputedStyle(elements.textarea).lineHeight) || 16;
+            elements.textarea.scrollTop = Math.max(0, (numLines - 4) * lineHeight);
+            elements.textarea.dispatchEvent(new Event('scroll'));
+        };
+
+        findInput.addEventListener('input', () => {
+            currentMatchIndex = -1;
+            executeSearch(0);
+        });
+
+        findInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                executeSearch(e.shiftKey ? -1 : 1);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                findBar.style.display = 'none';
+                elements.textarea.focus();
+            }
+        });
+
+        closeFindBtn.addEventListener('click', () => {
+            findBar.style.display = 'none';
+            elements.textarea.focus();
+        });
     }
 
     attachInstanceListeners(instanceId);
@@ -575,9 +732,12 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
     const knownElementNames = getKnownElementNames();
     const knownAttrNames = getKnownAttributeNames();
     const colorRegionsForEscapedText = [];
-    const rawTextRanges = [];
-    const attributeQuoteInfoMap = new Map();
     const iconPlaceholderHtml = `<span class="icon-action-trigger"></span>`;
+
+    const attrQuoteGroups = {};
+    const attrRangeGroups = {};
+    const paramRangeGroups = {};
+    const elementRangeGroups = {};
 
     try {
         const tagRegex = /<(\/)?([\w.:-]+)([^>]*)?>/g;
@@ -586,7 +746,9 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
             const tagName = tagMatch[2];
             const tagNameStart = tagMatch.index + (tagMatch[1] ? 2 : 1);
             const tagNameEnd = tagNameStart + tagName.length;
-            rawTextRanges.push({ type: 'element', name: tagName, start: tagNameStart, end: tagNameEnd });
+            
+            if (!elementRangeGroups[tagName]) elementRangeGroups[tagName] = [];
+            elementRangeGroups[tagName].push({ type: 'element', name: tagName, start: tagNameStart, end: tagNameEnd });
 
             if (!tagMatch[1] && tagMatch[3]) {
                 const attributesString = tagMatch[3];
@@ -598,13 +760,17 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                     const attrName = attrMatchInRaw[1];
                     const attrNameStartInRaw = attributesStringStartInRaw + attrMatchInRaw.index;
                     const attrNameEndInRaw = attrNameStartInRaw + attrName.length;
-                    rawTextRanges.push({ type: 'attribute', name: attrName, start: attrNameStartInRaw, end: attrNameEndInRaw });
+                    
+                    if (!attrRangeGroups[attrName]) attrRangeGroups[attrName] = [];
+                    attrRangeGroups[attrName].push({ type: 'attribute', name: attrName, start: attrNameStartInRaw, end: attrNameEndInRaw });
 
                     if (attrName.toLowerCase() === 'param') {
                         const valueRaw = attrMatchInRaw[3];
                         const valueStartInRaw = attributesStringStartInRaw + attrMatchInRaw.index + attrName.length + 2;
                         const valueEndInRaw = valueStartInRaw + valueRaw.length;
-                        rawTextRanges.push({type: 'param', name: valueRaw, start: valueStartInRaw, end: valueEndInRaw });
+                        
+                        if (!paramRangeGroups[valueRaw]) paramRangeGroups[valueRaw] = [];
+                        paramRangeGroups[valueRaw].push({ type: 'param', name: valueRaw, start: valueStartInRaw, end: valueEndInRaw });
                     }
                 }
             }
@@ -617,7 +783,9 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
             const quoteStartIndexInRaw = rawAttrMatch.index + attrDefPrefixLength;
             const valueRawContent = rawAttrMatch[3];
             const quoteEndIndexInRaw = quoteStartIndexInRaw + 1 + valueRawContent.length + 1;
-            attributeQuoteInfoMap.set(rawAttrMatch.index, { name: attrNameRaw, startQuoteIndex: quoteStartIndexInRaw, endQuoteIndex: quoteEndIndexInRaw });
+            
+            if (!attrQuoteGroups[attrNameRaw]) attrQuoteGroups[attrNameRaw] = [];
+            attrQuoteGroups[attrNameRaw].push({ name: attrNameRaw, rawAttrActualStartIndex: rawAttrMatch.index, startQuoteIndex: quoteStartIndexInRaw, endQuoteIndex: quoteEndIndexInRaw });
         }
 
     } catch(e) {
@@ -629,6 +797,8 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
     let textForHighlighting = escapeHtml(rawXmlText);
     let tempHighlighted = textForHighlighting;
 
+    const attrReplaceCounters = {};
+
     try {
         const attributeValueRegex = /([\w.:-]+)(\s*=\s*)(&quot;)((?:[^&]|&(?!quot;))*?)(&quot;)/g;
         tempHighlighted = tempHighlighted.replace(attributeValueRegex,
@@ -636,17 +806,16 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                 const attrNameClasses = ['hl-attr-name'];
                 if (knownAttrNames.has(attrNameEscaped)) attrNameClasses.push('hl-known-attr-name');
 
-                let bestGuessRawAttrStartIndex = -1;
-                let minDiff = Infinity;
-                attributeQuoteInfoMap.forEach((rawAttrInfo, rawAttrActualStartIndex) => {
-                    if (rawAttrInfo.name === attrNameEscaped) {
-                        const estimatedOriginalStartForEscapedAttr = attributeMatchOffsetInEscapedText - (textForHighlighting.length - rawXmlText.length);
-                        const currentDifference = Math.abs(rawAttrActualStartIndex - estimatedOriginalStartForEscapedAttr);
-                        if (currentDifference < minDiff) { minDiff = currentDifference; bestGuessRawAttrStartIndex = rawAttrActualStartIndex;}
-                    }
-                });
+                if (!attrReplaceCounters[attrNameEscaped]) attrReplaceCounters[attrNameEscaped] = 0;
+                const matchIndex = attrReplaceCounters[attrNameEscaped]++;
+                
+                const quoteGroup = attrQuoteGroups[attrNameEscaped] || [];
+                const rawAttrInfo = quoteGroup[matchIndex] || quoteGroup[quoteGroup.length - 1];
+                const bestGuessRawAttrStartIndex = rawAttrInfo ? rawAttrInfo.rawAttrActualStartIndex : -1;
 
-                const rawAttrRange = rawTextRanges.find(r => r.type === 'attribute' && r.name === attrNameEscaped && r.start === bestGuessRawAttrStartIndex);
+                const rangeGroup = attrRangeGroups[attrNameEscaped] || [];
+                const rawAttrRange = rangeGroup[matchIndex] || rangeGroup[rangeGroup.length - 1];
+
                 const attrDataAttrs = rawAttrRange ? `data-raw-start="${rawAttrRange.start}" data-raw-end="${rawAttrRange.end}"` : '';
                 const attrNameHtml = `<span class="${attrNameClasses.join(' ')}" data-name="${escapeHtml(attrNameEscaped)}" ${attrDataAttrs}>${attrNameEscaped}${iconPlaceholderHtml}</span>`;
 
@@ -689,15 +858,14 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
                     }
                     if (seg.type === 'color_placeholder') {
                         const placeholderIndex = colorRegionsForEscapedText.length;
-                        const rawQuoteInfo = attributeQuoteInfoMap.get(bestGuessRawAttrStartIndex);
                         colorRegionsForEscapedText.push({
                             attrValueGlobalOffset: attributeMatchOffsetInEscapedText + openingQuoteEscaped.length,
                             startInEscapedValue: seg.start,
                             endInEscapedValue: seg.end,
                             hex: seg.hex,
                             type: seg.colorType,
-                            attrQuoteRawStart: rawQuoteInfo?.startQuoteIndex,
-                            attrQuoteRawEnd: rawQuoteInfo?.endQuoteIndex
+                            attrQuoteRawStart: rawAttrInfo?.startQuoteIndex,
+                            attrQuoteRawEnd: rawAttrInfo?.endQuoteIndex
                         });
                         builtHtmlValue += `__COLOR_PLACEHOLDER_${placeholderIndex}__`;
                     } else if (seg.type === 'filepath_span') {
@@ -713,12 +881,31 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
 
                 if (attrNameEscaped.toLowerCase() === 'param') {
                     const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
-                    const rawParamRange = rawTextRanges.find(r => r.type === 'param' && r.name === unescapedOriginalValue && rawAttrRange && r.start > rawAttrRange.start);
+                    const pGroup = paramRangeGroups[unescapedOriginalValue] || [];
+                    const rawParamRange = pGroup.find(r => rawAttrRange && r.start > rawAttrRange.start) || pGroup[0];
                     const paramDataAttrs = rawParamRange ? `data-raw-start="${rawParamRange.start}" data-raw-end="${rawParamRange.end}"` : '';
                     finalAttributeValueHtml = `<span class="hl-param-value" data-name="${escapeHtml(unescapedOriginalValue)}" ${paramDataAttrs}>${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
                 } else if (attrNameEscaped.toLowerCase() === 'style' || attrNameEscaped.toLowerCase() === 'class') {
                     const unescapedOriginalValue = originalEscapedValue.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
-                    finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                    if (unescapedOriginalValue.includes(';')) {
+                        const styleParts = unescapedOriginalValue.split(';');
+                        let multiStyleHtml = "";
+                        styleParts.forEach((part, pIdx) => {
+                            const trimmed = part.trim();
+                            if (trimmed) {
+                                // Deconstruct into interactive sub-tokens so clicking specific style parts jumps cleanly
+                                multiStyleHtml += `<span class="hl-style-value compound-sub-style" data-name="${escapeHtml(trimmed)}">${escapeHtml(part)}${iconPlaceholderHtml}</span>`;
+                            } else {
+                                multiStyleHtml += escapeHtml(part);
+                            }
+                            if (pIdx < styleParts.length - 1) {
+                                multiStyleHtml += ";";
+                            }
+                        });
+                        finalAttributeValueHtml = multiStyleHtml;
+                    } else {
+                        finalAttributeValueHtml = `<span class="hl-style-value" data-name="${escapeHtml(unescapedOriginalValue)}">${finalAttributeValueHtml}${iconPlaceholderHtml}</span>`;
+                    }
                 }
 
                 return `${attrNameHtml}${separatorEscaped}${openingQuoteEscaped}${finalAttributeValueHtml}${closingQuoteEscaped}`;
@@ -727,16 +914,17 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
     } catch (e) { logError("[xmlEditor highlightXmlSyntax AttributeProcessing]", e); }
 
 
+    const elemReplaceCounters = {};
     try {
         tempHighlighted = tempHighlighted.replace(/(&lt;\/?)([\w.:-]+)/g, (match, prefixAndSlash, tagNameEscaped, offsetInEscaped) => {
             const isKnown = knownElementNames.has(tagNameEscaped);
             const tagClasses = isKnown ? 'hl-tag hl-known-tag' : 'hl-tag';
 
-            const rawElemRange = rawTextRanges.find(r =>
-                r.type === 'element' &&
-                r.name === tagNameEscaped &&
-                Math.abs(offsetInEscaped - (r.start - (rawXmlText.length - textForHighlighting.length))) < 20
-            );
+            if (!elemReplaceCounters[tagNameEscaped]) elemReplaceCounters[tagNameEscaped] = 0;
+            const matchIndex = elemReplaceCounters[tagNameEscaped]++;
+            const eGroup = elementRangeGroups[tagNameEscaped] || [];
+            const rawElemRange = eGroup[matchIndex] || eGroup[eGroup.length - 1];
+
             const elemDataAttrs = rawElemRange ? `data-raw-start="${rawElemRange.start}" data-raw-end="${rawElemRange.end}"` : '';
 
             return `${prefixAndSlash}<span class="${tagClasses}" data-name="${escapeHtml(tagNameEscaped)}" ${elemDataAttrs}>${tagNameEscaped}${iconPlaceholderHtml}</span>`;
@@ -775,8 +963,8 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
 
             if (region.type === 'rgba') {
                 wrapperClass = 'hl-color-box-wrapper';
-                wrapperStyleVariables = `style="--box-bg-color: ${originalHex}; --box-border-color: ${originalHex.substring(0, 7)}; --contrast-color: ${contrastColor}; --text-shadow: ${textShadow};"`;
-                innerContent = `<span>${hashSign}</span><span class="hl-color-rgba-text">${hexDigits}</span>`;
+                wrapperStyleVariables = `style="--box-bg-color: ${originalHex}; --box-border-color: ${originalHex.substring(0, 7)};"`;
+                innerContent = `<span style="color: ${contrastColor}; text-shadow: ${textShadow};">${hashSign}</span><span class="hl-color-rgba-text" style="color: ${contrastColor}; text-shadow: ${textShadow};">${hexDigits}</span>`;
             } else {
                 wrapperClass = 'hl-color-rgb-warning-box';
                 wrapperStyleVariables = `style="--box-border-color-warning: red;"`;
@@ -806,11 +994,24 @@ export function highlightXmlSyntax(rawXmlText, instanceId) {
 }
 
 // --- Event Handlers for Editor Instances ---
+let typingDebounceTimers = new Map();
+
 function handleEditorInput(instanceId) {
     const elements = instanceDomElements.get(instanceId);
     if (!elements?.textarea) return;
+    
+    // Save to state buffer instantly so nothing is lost
     State.updateEditorInstance(instanceId, { currentContent: elements.textarea.value });
-    updateUIDisplay(instanceId);
+    
+    // Debounce the heavy UI highlighting math by 250ms to allow native-speed typing
+    if (typingDebounceTimers.has(instanceId)) {
+        clearTimeout(typingDebounceTimers.get(instanceId));
+    }
+    
+    typingDebounceTimers.set(instanceId, setTimeout(() => {
+        updateUIDisplay(instanceId);
+        typingDebounceTimers.delete(instanceId);
+    }, 250));
 }
 
 function handleEditorScroll(instanceId) {

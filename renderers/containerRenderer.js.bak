@@ -34,7 +34,6 @@ function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCa
     // Extract and apply background colors directly from the XML node (case-insensitive)
     const bgColor = mergedAttributes['backgroundColor'] || 
                     mergedAttributes['backgroundcolor'] || 
-                    mergedAttributes['color_back'] || 
                     mergedAttributes['backColor'] || 
                     mergedAttributes['backcolor'] || 
                     mergedAttributes['fill_color'] || 
@@ -788,8 +787,10 @@ function renderScrollViewPageController(xmlNode, mergedAttributes, currentParams
     htmlElement.dataset.pageNames = JSON.stringify(Object.fromEntries(pageNames)); 
     
     // Explicit non-flex fallback structure as demanded by Rule 7
-    htmlElement.style.display = 'block';
-    htmlElement.style.whiteSpace = 'nowrap';
+    if (htmlElement && htmlElement.style) {
+        htmlElement.style.display = 'block';
+        htmlElement.style.whiteSpace = 'nowrap';
+    }
     
     const createButton = (action, imgP, imgHLP, fallbackText) => {
         const button = document.createElement('button');

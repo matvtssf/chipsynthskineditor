@@ -37,8 +37,8 @@
                             </div>
                     </div>
                 </div>
+                <div id="status" class="status-message">Initializing...</div>
             </div>
-            <div id="status" class="status-message">Initializing...</div>
             <div id="error-log-container" class="mt-auto pt-2 border-t flex-shrink-0" style="display: none;">
                 <div class="flex justify-between items-center mb-1">
                     <strong class="text-sm text-red-800">Internal Errors:</strong>
@@ -74,7 +74,7 @@
                 <div id="preview-area-container" class="bg-white rounded-lg shadow p-2 flex-shrink-0 mb-2">
                     <div class="flex justify-between items-center mb-1 flex-shrink-0">
                         <h2 class="text-base font-semibold m-0">Preview</h2>
-                        <button id="edit-button" class="text-xs px-2 py-1 border rounded hover:bg-gray-100" disabled>Edit</button>
+                        <button id="edit-button" class="sidebar-header-button" title="Edit File" disabled><i class="iconoir-edit-pencil"></i></button>
                     </div>
                     <div id="preview-area" class="border border-gray-200 rounded bg-gray-50 p-1 flex-grow overflow-auto text-xs cursor-pointer" title="Click to enlarge preview">Click a file to preview</div>
                 </div>
@@ -99,18 +99,18 @@
                            <input type="file" id="param-reference-file-input" accept=".json" style="display: none;">
                            </div>
                         <div class="flex-shrink-0">
-                            <button id="reference-button" class="sidebar-icon-button" title="Show Element Reference">
+                            <button id="reference-button" class="sidebar-header-button" title="Show Element Reference">
                                 <i class="iconoir-book"></i>
                             </button>
                         </div>
                         <div class="flex-shrink-0">
-                            <button id="debug-toggle-button" class="sidebar-icon-button" role="switch" aria-checked="false" title="Toggle Debug Info">
+                            <button id="debug-toggle-button" class="sidebar-header-button" role="switch" aria-checked="false" title="Toggle Debug Info">
                                 <i class="iconoir-bug"></i>
                             </button>
                             <input type="checkbox" id="debug-checkbox" class="hidden">
                         </div>
                         <div class="flex-shrink-0">
-                            <button id="console-button" class="sidebar-icon-button" title="Show Console Log">
+                            <button id="console-button" class="sidebar-header-button" title="Show Console Log">
                                 <i class="iconoir-terminal-tag"></i>
                             </button>
                         </div>

@@ -45,9 +45,42 @@ let activeIconElement = null;
 let ctrlKeyDown = false;
 
 function handleEditorKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const activeId = State.getActiveEditorInstanceId();
+        if (activeId) {
+            const modal = document.getElementById(`xml-editor-modal-${activeId}`);
+            if (modal) {
+                const findBar = modal.querySelector('.xml-editor-find-bar');
+                const findInput = modal.querySelector('.xml-editor-find-input');
+                if (findBar && findInput) {
+                    findBar.style.display = 'block';
+                    findInput.focus();
+                    findInput.select();
+                }
+            }
+        }
+        return;
+    }
     if (e.key === 'Control' && !ctrlKeyDown) {
         ctrlKeyDown = true;
         document.body.classList.add('ctrl-active');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        const activeId = State.getActiveEditorInstanceId();
+        if (activeId) {
+            const modal = document.getElementById(`xml-editor-modal-${activeId}`);
+            if (modal) {
+                const findBar = modal.querySelector('.xml-editor-find-bar');
+                const findInput = modal.querySelector('.xml-editor-find-input');
+                if (findBar && findInput) {
+                    e.preventDefault();
+                    findBar.style.display = 'block';
+                    findInput.focus();
+                    findInput.select();
+                }
+            }
+        }
     }
 }
 
@@ -77,7 +110,7 @@ export function setupXmlEditorListeners() {
     document.addEventListener('jumpToStyle', handleJumpToStyle);
 
     // Add keyboard listeners for the CTRL toggle mechanic
-    document.addEventListener('keydown', handleEditorKeyDown);
+    window.addEventListener('keydown', handleEditorKeyDown, { capture: true });
     document.addEventListener('keyup', handleEditorKeyUp);
     window.addEventListener('blur', handleEditorWindowBlur);
 }

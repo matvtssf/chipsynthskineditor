@@ -92,6 +92,9 @@ const tagToRendererMap = {
     'StaticImage': DrawRenderer,
     'Line': DrawRenderer,
     'Shape': DrawRenderer,
+    'Picture8Data': DrawRenderer,
+    'ImageHolder': DrawRenderer,
+    'Ellipse': DrawRenderer,
 
     // ControlRenderer tags
     'CS01Slider': ControlRenderer,
@@ -100,6 +103,8 @@ const tagToRendererMap = {
     'CS01Knob': ControlRenderer, 
     'CS01TextButton': ControlRenderer,
     'CS01OnOffButton': ControlRenderer,
+    'CS01Button': ControlRenderer,
+    'CS01RadioButtons': ControlRenderer,
     'CS01ExpandViewButton': ControlRenderer,
     'CS01ModulationLinksContainer': ControlRenderer,
     'Button': ControlRenderer,
@@ -751,6 +756,10 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             DomUtils.applyCommonAttributes(mainElementForAttributes, xmlNode, mergedAttributes);
             localApplyStyles(mainElementForAttributes, styleName, xmlNode, currentParams); 
 
+            if (tagName === 'Ellipse') {
+                mainElementForAttributes.style.borderRadius = '50%';
+            }
+
             if (mergedAttributes['command']) {
                 mainElementForAttributes.dataset.command = mergedAttributes['command'];
             }
@@ -774,6 +783,15 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             }
             if (mergedAttributes['enabledByOnOff'] || mergedAttributes['enabledbyonoff']) {
                 mainElementForAttributes.dataset.enabledByOnOff = mergedAttributes['enabledByOnOff'] || mergedAttributes['enabledbyonoff'];
+            }
+            if (mergedAttributes['onColor'] || mergedAttributes['oncolor']) {
+                mainElementForAttributes.dataset.onColor = mergedAttributes['onColor'] || mergedAttributes['oncolor'];
+            }
+            if (mergedAttributes['offColor'] || mergedAttributes['offcolor']) {
+                mainElementForAttributes.dataset.offColor = mergedAttributes['offColor'] || mergedAttributes['offcolor'];
+            }
+            if (mergedAttributes['roundedRatio'] || mergedAttributes['roundedratio']) {
+                mainElementForAttributes.dataset.roundedRatio = mergedAttributes['roundedRatio'] || mergedAttributes['roundedratio'];
             }
             
             const disColor = mergedAttributes['disabledColor'] || mergedAttributes['disabledcolor'] || mergedAttributes['disabled_backColor'] || mergedAttributes['disabled_backcolor'] || mergedAttributes['backColor'] || mergedAttributes['backcolor'] || '#3a3a3a';
@@ -818,6 +836,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 });
 
                 document.querySelectorAll('[data-controller]').forEach(el => {
+                    if (!el || !el.style) return;
                     const reqController = el.dataset.controller;
                     const reqValue = el.dataset.ruleD1;
                     if (!reqController) return;
@@ -876,7 +895,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                                     const containerEl = document.querySelector(`[data-xml-attr_identifier="${assoc.container}"]`);
                                     const containeeEl = document.querySelector(`[data-xml-attr_identifier="${assoc.containee}"]`);
                                     
-                                    if (containerEl && containeeEl) {
+                                    if (containerEl && containeeEl && containeeEl.style) {
                                         if (containeeEl.parentElement !== containerEl) {
                                             containerEl.appendChild(containeeEl);
                                             containeeEl.style.position = 'absolute';
@@ -891,7 +910,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                             configSetData.allContainees.forEach(containeeId => {
                                 if (!activeContainees.has(containeeId)) {
                                     const containeeEl = document.querySelector(`[data-xml-attr_identifier="${containeeId}"]`);
-                                    if (containeeEl && containeeEl.parentElement !== hiddenStash) {
+                                    if (containeeEl && containeeEl.style && containeeEl.parentElement !== hiddenStash) {
                                         hiddenStash.appendChild(containeeEl);
                                         containeeEl.style.display = 'none';
                                     }
@@ -978,23 +997,23 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
 
                 // Style CS01OnOffButton elements as indicators matching original plugin shapes
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
-                    const hAttr = parseInt(btn.getAttribute('h') || btn.style.height || btn.offsetHeight || '20', 10);
-                    const wAttr = parseInt(btn.getAttribute('w') || btn.style.width || btn.offsetWidth || '20', 10);
-                    const rRatioAttr = btn.getAttribute('roundedRatio') || btn.getAttribute('roundedrectratio') || btn.getAttribute('fill_roundedratio') || '0.5';
-                    const radius = parseFloat(rRatioAttr) * Math.min(hAttr, wAttr);
-                    btn.style.borderRadius = `${radius}px`;
+                    const hAttr = parseInt(btn.style.height || btn.offsetHeight || '16', 10);
+                    const rRatioAttr = btn.dataset.roundedRatio || '0';
+                    const radius = parseFloat(rRatioAttr) * hAttr;
+                    if (radius > 0) {
+                        btn.style.borderRadius = `${radius}px`;
+                    } else {
+                        btn.style.borderRadius = '0px';
+                    }
                     
                     const paramId = btn.dataset.param;
                     const isActive = btn.classList.contains('active') || 
                         (paramId && typeof State.getElementState === 'function' && (State.getElementState(paramId) === 1 || State.getElementState(paramId) === '1'));
                     
-                    if (isActive) {
-                        btn.style.backgroundColor = '#F7BA0B';
-                        btn.style.border = 'none';
-                    } else {
-                        btn.style.backgroundColor = '#555555';
-                        btn.style.border = 'none';
-                    }
+                    const onColor = btn.dataset.onColor || '#F7BA0B';
+                    const offColor = btn.dataset.offColor || '#555555';
+                    btn.style.backgroundColor = DomUtils.parseColor ? DomUtils.parseColor(isActive ? onColor : offColor) : (isActive ? onColor : offColor);
+                    btn.style.border = 'none';
                 });
             };
 

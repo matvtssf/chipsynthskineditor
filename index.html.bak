@@ -24,7 +24,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://c.webfontfree.com/c.js?f=DesignSystemDW01-500R" type="text/javascript"></script>
     
     <link rel="stylesheet" href="style/style.css">
     <style id="dynamic-styles"></style>
@@ -38,8 +37,8 @@
                             </div>
                     </div>
                 </div>
+                <div id="status" class="status-message">Initializing...</div>
             </div>
-            <div id="status" class="status-message">Initializing...</div>
             <div id="error-log-container" class="mt-auto pt-2 border-t flex-shrink-0" style="display: none;">
                 <div class="flex justify-between items-center mb-1">
                     <strong class="text-sm text-red-800">Internal Errors:</strong>
@@ -75,7 +74,7 @@
                 <div id="preview-area-container" class="bg-white rounded-lg shadow p-2 flex-shrink-0 mb-2">
                     <div class="flex justify-between items-center mb-1 flex-shrink-0">
                         <h2 class="text-base font-semibold m-0">Preview</h2>
-                        <button id="edit-button" class="text-xs px-2 py-1 border rounded hover:bg-gray-100" disabled>Edit</button>
+                        <button id="edit-button" class="sidebar-header-button" title="Edit File" disabled><i class="iconoir-edit-pencil"></i></button>
                     </div>
                     <div id="preview-area" class="border border-gray-200 rounded bg-gray-50 p-1 flex-grow overflow-auto text-xs cursor-pointer" title="Click to enlarge preview">Click a file to preview</div>
                 </div>

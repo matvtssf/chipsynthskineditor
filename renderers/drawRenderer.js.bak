@@ -180,7 +180,7 @@ function renderLine(xmlNode, mergedAttributes) {
     lineElement.setAttribute("stroke-width", String(frameWidth));
     
     const isDiagonal = (wAttr > 0 && hAttr > 0);
-    lineElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || (isDiagonal ? "round" : "square"));
+    lineElement.setAttribute("stroke-linecap", mergedAttributes['stroke-linecap'] || (isDiagonal ? "round" : "butt"));
     
     svgElement.appendChild(lineElement);
     
@@ -297,6 +297,8 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
         case 'StaticImage': return renderStaticImage(xmlNode, mergedAttributes);
         case 'Line': return renderLine(xmlNode, mergedAttributes);
         case 'Shape': return renderShape(xmlNode, mergedAttributes);
+        case 'Picture8Data': return renderPicture8Data(xmlNode, mergedAttributes);
+        case 'ImageHolder': return renderImageHolder(xmlNode, mergedAttributes);
         default:
             console.warn(`[drawRenderer] Attempted to render unhandled tag: ${tagName}`);
             const placeholder = DomUtils.createErrorPlaceholder(tagName);
@@ -306,4 +308,19 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             if (mergedAttributes['h']) placeholder.style.height = mergedAttributes['h'] + 'px';
             return { htmlElement: placeholder, mainElementForAttributes: placeholder, requiresRecursiveRender: false, postProcessFunction: null };
     }
+}
+
+function renderPicture8Data(xmlNode, mergedAttributes) {
+    const htmlElement = document.createElement('img');
+    htmlElement.src = 'style/spc.svg';
+    htmlElement.classList.add('gui-picture8data', 'gui-svg-image');
+    htmlElement.style.position = 'absolute';
+    htmlElement.style.display = 'block';
+
+    return {
+        htmlElement: htmlElement,
+        mainElementForAttributes: htmlElement,
+        requiresRecursiveRender: false,
+        postProcessFunction: null
+    };
 }

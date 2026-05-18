@@ -3,7 +3,7 @@ import * as State from '../core/state.js';
 import * as DomUtils from '../core/domUtils.js';
 import { renderCS01Slider, renderCS03Slider } from './sliderRenderer.js?v=2';
 import { renderCS03Knob, renderCS01Knob } from './knobRenderer.js?v=2';
-import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton } from './buttonRenderer.js?v=2';
+import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton, renderCS01Button } from './buttonRenderer.js?v=2';
 import { renderCS01ExpandViewButton } from './expandViewButtonRenderer.js?v=2';
 import { createModulationLinksContainer } from './modulationLinksRenderer.js';
 
@@ -15,10 +15,14 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             return renderCS03Slider(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS03Knob':
             return renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'CS01Knob':
+            return renderCS01Knob(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01TextButton':
             return renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01OnOffButton':
             return renderCS01OnOffButton(xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'CS01RadioButtons':
+            return renderCS01RadioButtons(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01CheckButtons':
             return renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01ExpandViewButton': {
@@ -330,6 +334,104 @@ function renderCS01CheckButtons(xmlNode, mergedAttributes, currentParams, source
         requiresRecursiveRender: false,
         postProcessFunction: (element) => {
             element.querySelectorAll('.gui-check-option-button').forEach(b => {
+                if (typeof b.updateVisualState === 'function') b.updateVisualState();
+            });
+        }
+    };
+}
+
+function renderCS01RadioButtons(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const container = document.createElement('div');
+    container.classList.add('gui-radio-buttons-container');
+    container.style.position = 'absolute';
+
+    const paramId = mergedAttributes['param'] || (currentParams ? currentParams.paramOffset : 0);
+    const vDefault = mergedAttributes['vdefault'] || '0';
+
+    const colorText = mergedAttributes['color_text'] || mergedAttributes['colorText'] || mergedAttributes['color'] || '#ffffff';
+    const colorBack = mergedAttributes['color_back'] || mergedAttributes['colorBack'] || mergedAttributes['backColor'] || mergedAttributes['backcolor'] || '#555555';
+
+    for (const child of xmlNode.children) {
+        if (child.tagName === 'OptionItem') {
+            const btn = document.createElement('button');
+            btn.classList.add('gui-radio-option-button');
+            btn.style.position = 'absolute';
+            btn.style.boxSizing = 'border-box';
+            btn.style.cursor = 'pointer';
+            btn.style.backgroundColor = 'transparent';
+
+            const cx = child.getAttribute('x');
+            const cy = child.getAttribute('y');
+            const cw = child.getAttribute('w');
+            const ch = child.getAttribute('h');
+            if (cx) btn.style.left = `${cx}px`;
+            if (cy) btn.style.top = `${cy}px`;
+            if (cw) btn.style.width = `${cw}px`;
+            if (ch) btn.style.height = `${ch}px`;
+
+            const optVal = child.getAttribute('value');
+            const imgOn = child.getAttribute('image_on');
+            const imgOff = child.getAttribute('image_off');
+            const labelOn = child.getAttribute('label_on') || child.getAttribute('label') || '';
+            const labelOff = child.getAttribute('label_off') || child.getAttribute('label') || '';
+            const fontAttr = child.getAttribute('font');
+
+            if (fontAttr && DomUtils.applyFont) {
+                DomUtils.applyFont(btn, fontAttr);
+            }
+
+            const updateVisuals = () => {
+                const currentStored = typeof State?.getElementState === 'function' ? State.getElementState(paramId) : null;
+                const activeVal = currentStored !== null ? String(currentStored) : String(vDefault);
+                const isSelected = String(optVal) === activeVal;
+
+                btn.textContent = isSelected ? labelOn : labelOff;
+
+                const targetImg = isSelected ? (imgOn || imgOff) : imgOff;
+                if (targetImg) {
+                    const blob = typeof State?.getAssetBlobUrl === 'function' ? State.getAssetBlobUrl(State.normalizePath(targetImg, State.getCurrentSkinRoot())) : null;
+                    if (blob) {
+                        btn.style.backgroundImage = `url(${blob})`;
+                        btn.style.backgroundSize = '100% 100%';
+                    }
+                } else {
+                    btn.style.backgroundImage = 'none';
+                }
+
+                if (isSelected) {
+                    btn.classList.add('active');
+                    btn.style.color = DomUtils.parseColor ? DomUtils.parseColor(colorText) : colorText;
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.color = DomUtils.parseColor ? DomUtils.parseColor(colorBack) : colorBack;
+                }
+            };
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (typeof State?.setElementState === 'function' && paramId) {
+                    State.setElementState(paramId, optVal);
+                }
+                container.querySelectorAll('.gui-radio-option-button').forEach(b => {
+                    if (typeof b.updateVisualState === 'function') b.updateVisualState();
+                });
+                if (typeof window?.updateControllerVisibilities === 'function') {
+                    window.updateControllerVisibilities();
+                }
+            });
+
+            btn.updateVisualState = updateVisuals;
+            updateVisuals();
+            container.appendChild(btn);
+        }
+    }
+
+    return {
+        htmlElement: container,
+        mainElementForAttributes: container,
+        requiresRecursiveRender: false,
+        postProcessFunction: (element) => {
+            element.querySelectorAll('.gui-radio-option-button').forEach(b => {
                 if (typeof b.updateVisualState === 'function') b.updateVisualState();
             });
         }
