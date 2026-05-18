@@ -2,7 +2,7 @@
 import * as State from '../core/state.js';
 import * as DomUtils from '../core/domUtils.js';
 import { renderCS01Slider, renderCS03Slider } from './sliderRenderer.js?v=2';
-import { renderCS03Knob } from './knobRenderer.js?v=2';
+import { renderCS03Knob, renderCS01Knob } from './knobRenderer.js?v=2';
 import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton } from './buttonRenderer.js?v=2';
 import { renderCS01ExpandViewButton } from './expandViewButtonRenderer.js?v=2';
 import { createModulationLinksContainer } from './modulationLinksRenderer.js';
@@ -15,6 +15,8 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             return renderCS03Slider(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS03Knob':
             return renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourcePath);
+        case 'CS01Knob':
+            return renderCS01Knob(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01TextButton':
             return renderCS01TextButton(xmlNode, mergedAttributes, currentParams, sourcePath);
         case 'CS01OnOffButton':

@@ -105,58 +105,6 @@ async function initializeApp() {
 function initializeThemeManagement() {
     const savedTheme = localStorage.getItem('chipsynth-editor-theme') || 'dark';
     document.body.setAttribute('data-app-theme', savedTheme);
-
-    const injectThemeControl = () => {
-        const configModal = document.getElementById('config-modal') || document.querySelector('.config-section') || document.querySelector('.sidebar');
-        if (!configModal || document.getElementById('theme-selector-row')) return;
-
-        const row = document.createElement('div');
-        row.id = 'theme-selector-row';
-        row.style.margin = '10px 0';
-        row.style.padding = '5px';
-        row.style.display = 'block';
-
-        const label = document.createElement('label');
-        label.textContent = 'Interface Theme: ';
-        label.style.marginRight = '10px';
-        label.style.display = 'inline-block';
-
-        const select = document.createElement('select');
-        select.id = 'app-theme-select';
-        select.style.padding = '3px';
-
-        const darkOpt = document.createElement('option');
-        darkOpt.value = 'dark';
-        darkOpt.textContent = 'Dark Mode';
-        darkOpt.selected = (savedTheme === 'dark');
-
-        const lightOpt = document.createElement('option');
-        lightOpt.value = 'light';
-        lightOpt.textContent = 'Light Mode';
-        lightOpt.selected = (savedTheme === 'light');
-
-        select.appendChild(darkOpt);
-        select.appendChild(lightOpt);
-        row.appendChild(label);
-        row.appendChild(select);
-
-        const targetContainer = configModal.querySelector('.modal-body') || configModal.querySelector('.config-body') || configModal;
-        if (targetContainer && targetContainer !== configModal) {
-            targetContainer.appendChild(row);
-        } else {
-            configModal.insertBefore(row, configModal.firstChild);
-        }
-
-        select.addEventListener('change', (e) => {
-            const newTheme = e.target.value;
-            document.body.setAttribute('data-app-theme', newTheme);
-            localStorage.setItem('chipsynth-editor-theme', newTheme);
-        });
-    };
-
-    injectThemeControl();
-    const observer = new MutationObserver(() => injectThemeControl());
-    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // --- Global error handlers ---
@@ -171,3 +119,49 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // --- Start the application ---
 document.addEventListener('DOMContentLoaded', initializeApp);
+
+// --- XML Editor Cursor Tracking Context Highlights ---
+const debugStyle = document.createElement('style');
+debugStyle.textContent = `
+    .debug-line-highlight {
+        outline: 2px dotted #ff3333 !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 6px rgba(255, 51, 51, 0.6) !important;
+        z-index: 999999 !important;
+    }
+`;
+document.head.appendChild(debugStyle);
+
+const handleEditorLineSync = () => {
+    const activeEl = document.activeElement;
+    if (!activeEl || activeEl.tagName !== 'TEXTAREA') return;
+
+    const text = activeEl.value;
+    const selStart = activeEl.selectionStart;
+    const linesBefore = text.substring(0, selStart).split('\n');
+    const currentLineNum = linesBefore.length - 1;
+    const currentLineText = text.split('\n')[currentLineNum] || '';
+
+    document.querySelectorAll('.debug-line-highlight').forEach(el => {
+        el.classList.remove('debug-line-highlight');
+    });
+
+    const paramMatch = currentLineText.match(/param=["']([^"']+)["']/);
+    const xMatch = currentLineText.match(/x=["']([^"']+)["']/);
+    const yMatch = currentLineText.match(/y=["']([^"']+)["']/);
+
+    let selector = '';
+    if (paramMatch) {
+        selector = `[data-param="${paramMatch[1]}"], [data-xml-attr_param="${paramMatch[1]}"]`;
+    } else if (xMatch && yMatch) {
+        selector = `[data-xml-attr_x="${xMatch[1]}"][data-xml-attr_y="${yMatch[1]}"]`;
+    }
+
+    if (selector) {
+        const target = document.querySelector(selector);
+        if (target) target.classList.add('debug-line-highlight');
+    }
+};
+
+document.addEventListener('keyup', handleEditorLineSync);
+document.addEventListener('click', handleEditorLineSync);

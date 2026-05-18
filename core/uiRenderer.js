@@ -19,14 +19,14 @@ import * as ContainerRenderer from '../renderers/containerRenderer.js';
 import * as DropDownRenderer from '../renderers/dropDownRenderer.js';
 
 // Unpack and layer semicolon-delimited compound styles from left to right safely without mutating read-only module namespace objects
-function localApplyStyles(htmlElement, styleName, xmlNode, mergedAttributes) {
+function localApplyStyles(htmlElement, styleName, xmlNode, currentParams) {
     if (styleName && typeof styleName === 'string' && styleName.includes(';')) {
         const parts = styleName.split(';').map(s => s.trim()).filter(Boolean);
         for (const part of parts) {
-            DomUtils.applyStyles(htmlElement, part, xmlNode, mergedAttributes);
+            DomUtils.applyStyles(htmlElement, part, xmlNode, currentParams);
         }
     } else {
-        DomUtils.applyStyles(htmlElement, styleName, xmlNode, mergedAttributes);
+        DomUtils.applyStyles(htmlElement, styleName, xmlNode, currentParams);
     }
 }
 
@@ -327,15 +327,6 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 if (maxH > 0 && !macroRootH) macroRootH = String(maxH);
             }
 
-            if (macroRootW) macroHostDiv.style.width = macroRootW.endsWith('px') ? macroRootW : macroRootW + 'px';
-            if (macroRootH) macroHostDiv.style.height = macroRootH.endsWith('px') ? macroRootH : macroRootH + 'px';
-            
-            const macroMergedAttrs = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
-            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, macroMergedAttrs); 
-            localApplyStyles(macroHostDiv, styleName, xmlNode, macroMergedAttrs); 
-
-            parentHtmlElement.appendChild(macroHostDiv);
-
             let newParamOffset = currentParams.paramOffset || 0;
             if (macroParamOffsetStr) {
                 const offset = parseInt(macroParamOffsetStr, 10);
@@ -349,6 +340,57 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 paramOffset: newParamOffset,
                 macroDefs: { ...(currentParams.macroDefs || {}), ...macroDefsLocal }
             };
+
+            if (macroRootW) macroHostDiv.style.width = macroRootW.endsWith('px') ? macroRootW : macroRootW + 'px';
+            if (macroRootH) macroHostDiv.style.height = macroRootH.endsWith('px') ? macroRootH : macroRootH + 'px';
+            
+            // --- Apply attributes from the macro's root node (e.g., <GUI>) first so they act as base defaults ---
+            const rootStyleName = macroRootNode.getAttribute('style');
+            const rootMergedAttrs = resolveStyleMacros(DomUtils.getMergedAttributes(macroRootNode, rootStyleName, State.getStyles()));
+            
+            // Strip x/y from the internal root so it doesn't shift the macro instance
+            delete rootMergedAttrs['x'];
+            delete rootMergedAttrs['y'];
+            
+            DomUtils.applyCommonAttributes(macroHostDiv, macroRootNode, rootMergedAttrs);
+            localApplyStyles(macroHostDiv, rootStyleName, macroRootNode, newCurrentParams);
+
+            // --- Then apply attributes from the calling <GUIMacro> tag to allow overriding ---
+            const macroMergedAttrs = resolveStyleMacros(DomUtils.getMergedAttributes(xmlNode, styleName, State.getStyles()));
+            DomUtils.applyCommonAttributes(macroHostDiv, xmlNode, macroMergedAttrs); 
+            localApplyStyles(macroHostDiv, styleName, xmlNode, newCurrentParams); 
+
+            // Forcibly apply the calculated background from the macro root or override tag right after local styles run
+            const finalBg = xmlNode.getAttribute('backgroundColor') || xmlNode.getAttribute('backgroundcolor') || xmlNode.getAttribute('color_back') || xmlNode.getAttribute('backColor') || xmlNode.getAttribute('backcolor') ||
+                            macroRootNode.getAttribute('backgroundColor') || macroRootNode.getAttribute('backgroundcolor') || macroRootNode.getAttribute('color_back') || macroRootNode.getAttribute('backColor') || macroRootNode.getAttribute('backcolor') ||
+                            (styleName && State.getStyles()?.[styleName] && (State.getStyles()[styleName].backgroundColor || State.getStyles()[styleName].backgroundcolor || State.getStyles()[styleName].color_back || State.getStyles()[styleName].backColor || State.getStyles()[styleName].backcolor)) ||
+                            (rootStyleName && State.getStyles()?.[rootStyleName] && (State.getStyles()[rootStyleName].backgroundColor || State.getStyles()[rootStyleName].backgroundcolor || State.getStyles()[rootStyleName].color_back || State.getStyles()[rootStyleName].backColor || State.getStyles()[rootStyleName].backcolor));
+            if (finalBg && finalBg !== 'none' && finalBg !== 'transparent') {
+                macroHostDiv.style.backgroundColor = typeof DomUtils.parseColor === 'function' ? DomUtils.parseColor(finalBg) : finalBg;
+            } else {
+                macroHostDiv.style.backgroundColor = 'transparent';
+            }
+
+            const finalImg = macroMergedAttrs['image'] || rootMergedAttrs['image'] || macroRootNode.getAttribute('image');
+            if (finalImg) {
+                const currentSkinRoot = State.getCurrentSkinRoot() || '';
+                const imgFullPath = State.normalizePath(finalImg, currentSkinRoot);
+                const blobUrl = State.getAssetBlobUrl(imgFullPath);
+                if (blobUrl) {
+                    macroHostDiv.style.backgroundImage = `url('${blobUrl}')`;
+                    macroHostDiv.style.backgroundRepeat = 'no-repeat';
+                    macroHostDiv.style.backgroundPosition = 'top left';
+                }
+            }
+
+            // Re-apply explicit GUIMacro offsets to guarantee they win over any rogue x/y attributes
+            if (xoffset || yoffset) {
+                macroHostDiv.style.position = 'absolute'; 
+                if (xoffset) macroHostDiv.style.left = xoffset.endsWith('px') ? xoffset : xoffset + 'px';
+                if (yoffset) macroHostDiv.style.top = yoffset.endsWith('px') ? yoffset : yoffset + 'px';
+            }
+
+            parentHtmlElement.appendChild(macroHostDiv);
 
             for (const elNode of macroRootNode.children) {
                 if (elNode.nodeType === Node.ELEMENT_NODE) {
@@ -463,7 +505,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             boxElement.style.webkitUserSelect = 'none';
             
             DomUtils.applyCommonAttributes(boxElement, xmlNode, mergedAttributes);
-            localApplyStyles(boxElement, styleName, xmlNode, mergedAttributes);
+            localApplyStyles(boxElement, styleName, xmlNode, currentParams);
 
             let isEditing = false;
 
@@ -707,7 +749,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             }
             
             DomUtils.applyCommonAttributes(mainElementForAttributes, xmlNode, mergedAttributes);
-            localApplyStyles(mainElementForAttributes, styleName, xmlNode, mergedAttributes); 
+            localApplyStyles(mainElementForAttributes, styleName, xmlNode, currentParams); 
 
             if (mergedAttributes['command']) {
                 mainElementForAttributes.dataset.command = mergedAttributes['command'];
@@ -866,6 +908,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                 document.querySelectorAll('.gui-view-container, .gui-view-container1').forEach(container => {
                     const onOffBtn = container.querySelector('[data-role="onOff"]');
                     if (!onOffBtn) return;
+                    if (onOffBtn.closest('.gui-view-container, .gui-view-container1') !== container) return;
                     const paramId = onOffBtn.dataset.param;
                     if (!paramId) return;
 
@@ -917,7 +960,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     const container = el.closest('.gui-view-container, .gui-view-container1');
                     if (!container) return;
                     const onOffBtn = container.querySelector('[data-role="onOff"]');
-                    if (!onOffBtn) return;
+                    if (!onOffBtn || onOffBtn.closest('.gui-view-container, .gui-view-container1') !== container) return;
                     const paramId = onOffBtn.dataset.param;
                     if (!paramId) return;
 

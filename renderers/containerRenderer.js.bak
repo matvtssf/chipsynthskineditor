@@ -22,12 +22,41 @@ function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCa
         htmlElement.style.display = 'none'; // Default to hidden until VisibilityController updates it
     }
 
-    // Handle background image or fill color specifically for containers
-    const bgColor = mergedAttributes['backgroundColor'] || mergedAttributes['backgroundcolor'] || mergedAttributes['backColor'] || mergedAttributes['backcolor'] || mergedAttributes['fill_color'] || mergedAttributes['fillcolor'];
+    // Force container dimensions so backgrounds actually have a surface area to render on (fixes invisible root GUIs)
+    const w = mergedAttributes['w'] || xmlNode.getAttribute('w');
+    const h = mergedAttributes['h'] || xmlNode.getAttribute('h');
+    if (w) htmlElement.style.width = w.endsWith('px') || w.endsWith('%') ? w : `${w}px`;
+    else if (tagName === 'GUI') htmlElement.style.width = '100%';
+    
+    if (h) htmlElement.style.height = h.endsWith('px') || h.endsWith('%') ? h : `${h}px`;
+    else if (tagName === 'GUI') htmlElement.style.height = '100%';
+
+    // Extract and apply background colors directly from the XML node (case-insensitive)
+    const bgColor = mergedAttributes['backgroundColor'] || 
+                    mergedAttributes['backgroundcolor'] || 
+                    mergedAttributes['color_back'] || 
+                    mergedAttributes['backColor'] || 
+                    mergedAttributes['backcolor'] || 
+                    mergedAttributes['fill_color'] || 
+                    xmlNode.getAttribute('backgroundColor') || 
+                    xmlNode.getAttribute('backgroundcolor') || 
+                    xmlNode.getAttribute('color_back') || 
+                    xmlNode.getAttribute('backColor') || 
+                    xmlNode.getAttribute('backcolor');
     if (bgColor) {
         htmlElement.style.backgroundColor = DomUtils.parseColor(bgColor);
     }
 
+    // Extract and apply structural borders natively
+    const borderColor = mergedAttributes['color_border'] || xmlNode.getAttribute('color_border');
+    if (borderColor) {
+        htmlElement.style.borderColor = DomUtils.parseColor(borderColor);
+        htmlElement.style.borderStyle = 'solid';
+        htmlElement.style.borderWidth = '1px';
+        htmlElement.style.boxSizing = 'border-box';
+    }
+
+    // Handle background image or fill color specifically for containers
     const imgRelPath = mergedAttributes['image'];
     if (imgRelPath) {
         const currentSkinRoot = State.getCurrentSkinRoot() || '';
@@ -69,7 +98,11 @@ function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCa
                     }
 
                     // Inherit visual attributes from the external file root layer so the skin graphics display beautifully
-                    const extBgColor = rootNode.getAttribute('backgroundColor') || rootNode.getAttribute('backgroundcolor') || rootNode.getAttribute('backColor') || rootNode.getAttribute('backcolor');
+                    const extBgColor = rootNode.getAttribute('backgroundColor') || 
+                                       rootNode.getAttribute('backgroundcolor') || 
+                                       rootNode.getAttribute('color_back') || 
+                                       rootNode.getAttribute('backColor') || 
+                                       rootNode.getAttribute('backcolor');
                     if (extBgColor) {
                         htmlElement.style.backgroundColor = DomUtils.parseColor(extBgColor);
                     }

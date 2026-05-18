@@ -49,6 +49,11 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
     } else {
         console.warn("[guiBuilder] visibilityController.clearRegisteredContainers not available during reset.");
     }
+    
+    // Clear dynamic routing managers for clean reload
+    window.csViewConfigManagers = [];
+    window.csViewConfigSets = {};
+
     mainViewport.classList.remove('loaded');
     mainViewport.scrollTop = 0;
     mainViewport.scrollLeft = 0;
@@ -71,7 +76,12 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
         const guiHeight = guiHeightAttr ? parseInt(guiHeightAttr, 10) : 630;
 
         const globalDefaults = {};
-        const defaultBg = guiNode.getAttribute('color_back') || guiNode.getAttribute('backgroundColor') || '#565d82FF';
+        const defaultBg = guiNode.getAttribute('color_back') || 
+                          guiNode.getAttribute('backgroundColor') || 
+                          guiNode.getAttribute('backgroundcolor') || 
+                          guiNode.getAttribute('backColor') || 
+                          guiNode.getAttribute('backcolor') || 
+                          '#565d82FF';
         globalDefaults['color_back'] = defaultBg;
         const defaultTextColor = guiNode.getAttribute('color_text') || guiNode.getAttribute('textColor') || '#FFFFFFFF';
         globalDefaults['color_text'] = defaultTextColor;

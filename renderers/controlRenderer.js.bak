@@ -2,7 +2,7 @@
 import * as State from '../core/state.js';
 import * as DomUtils from '../core/domUtils.js';
 import { renderCS01Slider, renderCS03Slider } from './sliderRenderer.js?v=2';
-import { renderCS03Knob } from './knobRenderer.js?v=2';
+import { renderCS03Knob, renderCS01Knob } from './knobRenderer.js?v=2';
 import { renderCS01TextButton, renderCS01OnOffButton, renderImageButton } from './buttonRenderer.js?v=2';
 import { renderCS01ExpandViewButton } from './expandViewButtonRenderer.js?v=2';
 import { createModulationLinksContainer } from './modulationLinksRenderer.js';
@@ -45,23 +45,29 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
             popoverPanel.style.display = 'none';
             popoverPanel.style.zIndex = '5000';
 
-            // Calculate precise coordinates relative directly to the left edge of the main GUI screen
-            const childView = xmlNode.querySelector('CS01ViewContainer, CS01ViewContainer1, GUI, GUIContainer, GUIMacro');
-            let posX = '0';
-            let posY = '40';
-            if (childView) {
-                posX = childView.getAttribute('x') || childView.getAttribute('xoffset') || '0';
-                posY = childView.getAttribute('y') || childView.getAttribute('yoffset') || '40';
-            }
-            popoverPanel.style.left = posX.endsWith('px') ? posX : `${posX}px`;
-            popoverPanel.style.top = posY.endsWith('px') ? posY : `${posY}px`;
+            // Convert popover to a full-bleed overlay anchored at 0,0 of the main GUI
+            // We DO NOT set left/top offsets here, because the native UI engine will read xoffset="0" yoffset="40"
+            // and apply them directly to the inner layout container, avoiding a double or triple offset shift.
+            popoverPanel.style.left = '0px';
+            popoverPanel.style.top = '0px';
+            popoverPanel.style.width = '100%';
+            popoverPanel.style.height = '100%';
+            popoverPanel.style.pointerEvents = 'none'; // Let clicks pass through to the main GUI elements below
 
-            // Traverse upwards to pinpoint the absolute top-level drawn faceplate GUI workspace root node
-            let rootGuiNode = parentHtmlElement;
-            while (rootGuiNode && rootGuiNode.parentElement && rootGuiNode.dataset.xmlTagName !== 'GUI' && !rootGuiNode.classList.contains('synth-faceplate-root')) {
-                rootGuiNode = rootGuiNode.parentElement;
+            // Traverse to the absolute highest plugin faceplate container to ensure layout offsets anchor to the screen's 0,0
+            let synthRoot = parentHtmlElement.closest ? parentHtmlElement.closest('[data-xml-tag-name="GUI"]') : null;
+            if (!synthRoot) {
+                let curr = parentHtmlElement;
+                let highestContainer = null;
+                while (curr) {
+                    if (curr.classList && (curr.classList.contains('gui-view-container') || curr.classList.contains('gui-view-container1'))) {
+                        highestContainer = curr;
+                    }
+                    curr = curr.parentElement;
+                }
+                synthRoot = highestContainer;
             }
-            const targetAppendSurface = rootGuiNode || parentHtmlElement;
+            const targetAppendSurface = synthRoot || parentHtmlElement;
 
             // Append popover directly to the top-level GUI surface to resolve alignment strictly from the left window edge
             if (targetAppendSurface && typeof targetAppendSurface.appendChild === 'function') {

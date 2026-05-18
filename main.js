@@ -119,3 +119,56 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // --- Start the application ---
 document.addEventListener('DOMContentLoaded', initializeApp);
+
+// --- XML Editor Cursor Tracking Context Highlights ---
+const debugStyle = document.createElement('style');
+debugStyle.textContent = `
+    .debug-line-highlight {
+        outline: 2px dotted #ff3333 !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 6px rgba(255, 51, 51, 0.6) !important;
+        z-index: 999999 !important;
+    }
+`;
+document.head.appendChild(debugStyle);
+
+const handleEditorLineSync = () => {
+    const activeEl = document.activeElement;
+    if (!activeEl || !activeEl.id || !activeEl.id.startsWith('xml-editor-textarea')) return;
+
+    const text = activeEl.value;
+    const selStart = activeEl.selectionStart;
+    const linesBefore = text.substring(0, selStart).split('\n');
+    const currentLineNum = linesBefore.length - 1;
+    const currentLineText = text.split('\n')[currentLineNum] || '';
+
+    document.querySelectorAll('.debug-line-highlight').forEach(el => {
+        el.classList.remove('debug-line-highlight');
+    });
+
+    const paramMatch = currentLineText.match(/\bparam=["']([^"']+)["']/i);
+    const xMatch = currentLineText.match(/\bx=["']([^"']+)["']/i);
+    const yMatch = currentLineText.match(/\by=["']([^"']+)["']/i);
+
+    let selector = '';
+    if (paramMatch) {
+        const pVal = String(paramMatch[1]).trim();
+        selector = `[data-param="${pVal}"], [data-param-id="${pVal}"], [data-xml-attr_param="${pVal}"]`;
+    } else if (xMatch && yMatch) {
+        const xVal = String(xMatch[1]).trim();
+        const yVal = String(yMatch[1]).trim();
+        selector = `[data-xml-attr_x="${xVal}"][data-xml-attr_y="${yVal}"], [style*="left: ${xVal}px"][style*="top: ${yVal}px"]`;
+    }
+
+    if (selector) {
+        const targets = document.querySelectorAll(selector);
+        targets.forEach(target => {
+            if (target.classList.contains('gui-element') || target.classList.contains('gui-view-container') || target.classList.contains('gui-view-container1') || target.classList.contains('gui-macro-instance-content')) {
+                target.classList.add('debug-line-highlight');
+            }
+        });
+    }
+};
+
+document.addEventListener('keyup', handleEditorLineSync);
+document.addEventListener('click', handleEditorLineSync);

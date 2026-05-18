@@ -1,4 +1,4 @@
-// File: cs/domUtils.js
+// File: cs/core/domUtils.js
 /**
  * domUtils.js
  * DOM element references (via getter functions) and utility functions.
@@ -254,14 +254,15 @@ export function normalizePath(p) { return stateNormalizePath(p); }
 export function formatChipsynthName(text) { if (!text) return ''; return text.replace(/chipsynth/gi, 'chip<b>synth</b>'); }
 
 export function parseColor(colorString) {
-    if (!colorString || typeof colorString !== 'string') { return 'rgba(0,0,0,0)'; }
+    if (!colorString || typeof colorString !== 'string') { return 'transparent'; }
     const s = colorString.trim().toLowerCase();
-    if (s === 'transparent') return 'rgba(0,0,0,0)'; if (s === 'none') return 'none';
+    if (s === 'transparent') return 'transparent'; if (s === 'none') return 'transparent';
     if (s.startsWith('#')) {
         let hex = s.substring(1); if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2]; if (hex.length === 6) hex += 'ff';
         if (hex.length === 8) {
             const r = parseInt(hex.substring(0, 2), 16); const g = parseInt(hex.substring(2, 4), 16); const b = parseInt(hex.substring(4, 6), 16); const aInt = parseInt(hex.substring(6, 8), 16);
             if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(aInt)) { console.warn(`[domUtils parseColor] Invalid hex characters in: "${colorString}", returning 'none'.`); return 'none'; }
+            if (aInt === 0) return 'transparent';
             const a = parseFloat((aInt / 255).toFixed(3)); return `rgba(${r},${g},${b},${a})`;
         }
     }
@@ -393,7 +394,7 @@ export function applyCommonAttributes(element, xmlNode, styleName = null) {
     }
 }
 
-export function applyStyles(element, styleName, xmlNode) {
+export function applyStyles(element, styleName, xmlNode, currentParams = null) {
     if (!element) { console.warn('[domUtils applyStyles] HTML Element is null/undefined. Skipping.'); return; }
     if (!xmlNode ) { console.warn('[domUtils applyStyles] xmlNode is null/undefined. Skipping for element:', element.tagName); return; }
 
@@ -447,27 +448,40 @@ export function applyStyles(element, styleName, xmlNode) {
         const xmlNames = Array.isArray(xmlAttrNames) ? xmlAttrNames : [xmlAttrNames];
         const styleNames = Array.isArray(styleAttrNames) ? styleAttrNames : [styleAttrNames];
 
+        const resolveMacros = (val) => {
+            if (typeof val !== 'string') return val;
+            let result = val;
+            if (currentParams && currentParams.macroDefs) {
+                for (const defKey in currentParams.macroDefs) {
+                    if (result.includes(defKey)) {
+                        result = result.replaceAll(defKey, currentParams.macroDefs[defKey]);
+                    }
+                }
+            }
+            return result;
+        };
+
         if (xmlNode && xmlNode.attributes) {
             for (const name of xmlNames) {
                 const lowerName = name.toLowerCase();
                 for (const attr of xmlNode.attributes) {
-                    if (attr.name.toLowerCase() === lowerName) return attr.value;
+                    if (attr.name.toLowerCase() === lowerName) return resolveMacros(attr.value);
                 }
             }
         }
         for (const name of styleNames) {
             const lowerName = name.toLowerCase();
             for (const key in styleData) {
-                if (key.toLowerCase() === lowerName && styleData[key] !== undefined) return styleData[key];
+                if (key.toLowerCase() === lowerName && styleData[key] !== undefined) return resolveMacros(styleData[key]);
             }
         }
         if (globalDefaultKey) {
             const lowerKey = globalDefaultKey.toLowerCase();
             for (const key in globalDefaults) {
-                if (key.toLowerCase() === lowerKey && globalDefaults[key] !== undefined) return globalDefaults[key];
+                if (key.toLowerCase() === lowerKey && globalDefaults[key] !== undefined) return resolveMacros(globalDefaults[key]);
             }
         }
-        return fallback;
+        return resolveMacros(fallback);
     };
 
     if (!isLineOrShape) {
@@ -535,7 +549,7 @@ export function applyStyles(element, styleName, xmlNode) {
 
     const bgHandledByImageStates = isButton && (getFinalValue(['image', 'image_on', 'image_off'], ['image', 'image_on', 'image_off'], null) !== null || styleData.image || styleData.image_on || styleData.image_off);
     const isTransparentAttr = getFinalValue('transparent', 'transparent', null, '0') === '1';
-    let explicitBgColor = getFinalValue(['fill_color', 'color_back', 'backgroundColor'], ['fill_color', 'color_back', 'backgroundColor'], null);
+    let explicitBgColor = getFinalValue(['backgroundColor', 'backgroundcolor', 'backColor', 'backcolor', 'fill_color', 'color_back'], ['backgroundColor', 'backgroundcolor', 'backColor', 'backcolor', 'fill_color', 'color_back'], null);
     if (isButton && !explicitBgColor && !bgHandledByImageStates) {
         if (element.classList.contains('active')) {
             explicitBgColor = getFinalValue('onColor', 'onColor', null) || getFinalValue('offColor', 'offColor', null);
@@ -548,14 +562,22 @@ export function applyStyles(element, styleName, xmlNode) {
         if (isStaticText || isContainer) {
             if (isTransparentAttr) { element.style.backgroundColor = 'transparent'; }
             else if (explicitBgColor) { element.style.backgroundColor = parseColor(explicitBgColor); }
-            else { element.style.backgroundColor = 'transparent'; }
+            else { 
+                if (!element.style.backgroundColor) {
+                    element.style.backgroundColor = 'transparent';
+                }
+            }
         } else if (!bgHandledByImageStates && !isOptionMenu) {
             let finalBgColor = '';
             if (isTransparentAttr) { finalBgColor = 'transparent'; }
             else if (explicitBgColor) { finalBgColor = parseColor(explicitBgColor); }
             else { const globalBg = (isHtmlRect || isButton) ? globalDefaults['color_back'] : null; finalBgColor = globalBg ? parseColor(globalBg) : ''; }
             if (finalBgColor && finalBgColor !== 'none') { element.style.backgroundColor = finalBgColor; }
-            else { element.style.backgroundColor = ''; }
+            else { 
+                if (!element.style.backgroundColor) {
+                    element.style.backgroundColor = ''; 
+                }
+            }
         } else if (isOptionMenu) {
             if (explicitBgColor && explicitBgColor !== 'none' && !isTransparentAttr) {
                 element.style.backgroundColor = parseColor(explicitBgColor);

@@ -105,7 +105,15 @@ export function renderImageButton(tagName, xmlNode, mergedAttributes, currentPar
         const imgKey = state ? 'image_on' : 'image_off';
         const imgPath = mergedAttributes[imgKey] || mergedAttributes['image'];
         if (imgPath) {
-            const blob = State.getAssetBlobUrl(State.normalizePath(imgPath, State.getCurrentSkinRoot()));
+            let imgFullPath = imgPath;
+            if (sourcePath && sourcePath.includes('/')) {
+                const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
+                imgFullPath = dir + imgPath;
+            }
+            let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath, State.getCurrentSkinRoot()));
+            if (!blob) {
+                blob = State.getAssetBlobUrl(State.normalizePath(imgPath, State.getCurrentSkinRoot()));
+            }
             if (blob) {
                 htmlElement.style.backgroundImage = `url(${blob})`;
                 htmlElement.style.backgroundSize = '100% 100%';
@@ -114,6 +122,20 @@ export function renderImageButton(tagName, xmlNode, mergedAttributes, currentPar
     };
 
     updateImage(isActive);
+
+    htmlElement.addEventListener('click', (e) => {
+        if (!paramId) return;
+        const currentStored = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
+        const currentState = currentStored !== null ? currentStored : vDefaultOnOff;
+        const nextState = (String(currentState) === onValue || String(currentState) === '1' || currentState === 1) ? offValue : onValue;
+        
+        if (typeof State.setElementState === 'function') {
+            State.setElementState(paramId, nextState);
+        }
+        if (typeof window.updateControllerVisibilities === 'function') {
+            window.updateControllerVisibilities();
+        }
+    });
 
     return {
         htmlElement: htmlElement,

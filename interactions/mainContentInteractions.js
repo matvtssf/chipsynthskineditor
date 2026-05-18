@@ -141,18 +141,23 @@ function handleDebugMouseMove(event) {
         }
         return;
     }
-    debugOverlay.style.display = 'block';
+ debugOverlay.style.display = 'block';
     const zoomCanvasRect = zoomCanvas.getBoundingClientRect();
     const currentScale = State.getCurrentZoomLevel(); // FIXED: Use getCurrentZoomLevel
-    const mouseXRelativeToCanvasScaled = event.clientX - zoomCanvasRect.left;
-    const mouseYRelativeToCanvasScaled = event.clientY - zoomCanvasRect.top;
-    const mouseXUnscaled = mouseXRelativeToCanvasScaled / currentScale;
-    const mouseYUnscaled = mouseYRelativeToCanvasScaled / currentScale;
+    const skinContainer = zoomCanvas.querySelector('#skin-container-actual');
 
-    let elementInfo = `Canvas X: ${mouseXUnscaled.toFixed(0)}, Y: ${mouseYUnscaled.toFixed(0)}\n`;
+    let skinX = (event.clientX - zoomCanvasRect.left) / currentScale;
+    let skinY = (event.clientY - zoomCanvasRect.top) / currentScale;
+
+    if (skinContainer) {
+        const skinRect = skinContainer.getBoundingClientRect();
+        skinX = (event.clientX - skinRect.left) / currentScale;
+        skinY = (event.clientY - skinRect.top) / currentScale;
+    }
+
+    let elementInfo = `Skin X: ${skinX.toFixed(0)}, Y: ${skinY.toFixed(0)}\n`;
     let targetElement = event.target;
     let validTargetFound = false;
-    const skinContainer = zoomCanvas.querySelector('#skin-container-actual');
 
     while (targetElement && targetElement !== document.body) {
         if (targetElement.dataset && targetElement.dataset.xmlTagName) {

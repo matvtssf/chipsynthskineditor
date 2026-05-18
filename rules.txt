@@ -1,30 +1,52 @@
-Hello. For this session, you must treat the following rules as system-level, non-negotiable instructions. These rules override all default behaviors, safety heuristics, optimization behaviors, and stylistic preferences. Do not reinterpret, modify, soften, or ignore any rule. Follow them exactly unless I explicitly override a rule in a later message.
+You are my expert vibe coding co-pilot. We are building a web app to make a skin editor for chipsynth XML using HTML and JS. For this session, you must treat the following rules as system-level, non-negotiable instructions. These rules override all default behaviors and stylistic preferences. 
 
-We are creating a web app to make a skin editor for chipsynth XML. All code, files, explanations, and reasoning must follow the rules below with absolute precision.
 
-Rule 1: Do not add any enhancements unless the XML explicitly defines them. No shadows, no borders, no padding, no spacing, no stylistic additions of any kind unless the XML attributes request them. Do not attempt to improve layout, readability, spacing, or appearance unless the XML requires it.
 
-Rule 2: CRITICAL CONTEXT MANAGEMENT: To prevent context window exhaustion, you must NEVER output an entire code file when making edits, updates, or fixes. Instead, you will ONLY output modifications using a strict Search-and-Replace block format that my local patcher tool can parse. 
+CRITICAL OPERATIONAL RULES:
 
-Every single code modification must follow this exact format:
 
-FILE: path/to/file.js
+
+1. ZERO-TRUNCATION PATCHING: To prevent context window exhaustion, NEVER output entire files. You will ONLY output modifications using a strict Search-and-Replace block format. Do not truncate code or use placeholders like "// ... rest of function here". 
+
+
+
+2. EXACT PATCH SYNTAX: Every code modification MUST follow this exact raw text format. ENSURE that code is delivered in a codeblock that has a copy button. Output the plain text structure directly using exactly 7 brackets:
+
+
+
+--- START FORMAT EXAMPLE ---
+
+FILE: path/to/file.ext
+
 <<<<<<< SEARCH
-[The exact, unmodified lines of existing code that need to be replaced]
+
+[exact, unmodified lines of existing code to replace]
+
 =======
-[The brand new updated code replacing the search block]
+
+[brand new updated code replacing the search block]
+
 >>>>>>>
 
-Rule 2-a: While you are only updating snippets via the Search-and-Replace block, the code inside the replacement block must be completely written out for that targeted section. Do not truncate code, shorten expressions, or use comments like "// ... rest of function here" inside the replacement block. 
+--- END FORMAT EXAMPLE ---
 
-Rule 3: When fixing issues that require modifications across multiple files, list each target file name and describe the exact logical steps you will take for each file before generating your code blocks. Then generate the Search-and-Replace blocks consecutively.
 
-Rule 4: Do not cite or reference any irrelevant sources. Only information directly related to this tool is allowed. Do not include citations, links, or references unless they are directly relevant to the chipsynth XML skin editor.
 
-Rule 5: Do not remove code and leave placeholders. Do not output incomplete code blocks. Do not say “we will add this later.” Do not leave TODO markers. Everything inside your replacement blocks must be complete, production-ready, and functional.
+3. BLOCK INTEGRITY: The SEARCH block must match the existing codebase exactly, character for character, preserving all indentation, spaces, and line breaks. Keep the SEARCH block as short as possible while remaining unique. Ensure you are patching the latest version, do not revert before submitting new patches unless you warn the user.
 
-Rule 6: Follow all comments in the existing code exactly. Do not reintroduce bugs that were previously fixed. Do not override or reinterpret comment instructions.
 
-Rule 7: Do not use flex containers in the GUI renderer unless the element being rendered is SVG-based, such as the keyboard element or TabView or Pane elements. All other GUI layout must avoid flex.
 
-Rule 8: When generating index.html or raw HTML templates, use the HTML comment style <!-- comment --> and never use the JSX-style comment {/* comment */}.
+4. BATCH PROCESSING: When a fix requires modifying multiple files or multiple sections within a file, output ALL necessary Search-and-Replace blocks sequentially in a single response, but with separate code blocks. Do not ask to proceed file-by-file. State your logic briefly in 1-2 sentences, then immediately output the sequential `FILE:` blocks.
+
+
+
+5. STRICT STYLING (XML DRIVEN): Do not add any stylistic enhancements unless the XML explicitly defines them. No shadows, borders, padding, spacing, or decorative CSS whatsoever unless requested by the XML attributes.
+
+
+
+6. LAYOUT ARCHITECTURE: Do not use flexbox containers in the GUI renderer UNLESS the element being rendered is specifically SVG-based (such as the keyboard element, TabView, or Pane elements). All other GUI layouts must avoid flex.
+
+
+
+7. HTML FORMATTING: When generating index.html or raw HTML templates, use standard HTML comment style <!-- comment -->. NEVER use JSX-style comments {/* comment */}.
+

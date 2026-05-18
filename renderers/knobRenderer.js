@@ -415,7 +415,6 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
             labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
             if (triggerUpdate) updateVisuals(currentValue);
 
-            // Force state update and dynamic routing re-calc
             if (typeof State.setElementState === 'function') {
                 State.setElementState(paramId, currentValue);
             }
@@ -441,7 +440,6 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
         labelElement.title = `${labelText||'K'}(${paramId}): ${DomUtils.formatDisplayValue(currentValue, valueTextFormat, vmin, vmax)}`;
         updateVisuals(currentValue);
 
-        // Force state update and dynamic routing re-calc
         if (typeof State.setElementState === 'function') {
             State.setElementState(paramId, currentValue);
         }
@@ -519,4 +517,122 @@ export function renderCS03Knob(xmlNode, mergedAttributes, currentParams, sourceP
     updateVisuals(currentValue);
 
     return { htmlElement: container, mainElementForAttributes: container, requiresRecursiveRender: false, postProcessFunction: null };
+}
+
+export function renderCS01Knob(xmlNode, mergedAttributes, currentParams, sourcePath) {
+    const attributesCopy = { ...mergedAttributes };
+    
+    if (attributesCopy['trackColor'] && !attributesCopy['valueTrackColor']) {
+        attributesCopy['valueTrackColor'] = attributesCopy['trackColor'];
+    }
+    if (attributesCopy['fillColor'] && !attributesCopy['valueFillColor']) {
+        attributesCopy['valueFillColor'] = attributesCopy['fillColor'];
+    }
+    if (attributesCopy['fontColor']) {
+        if (!attributesCopy['label_fontColor']) attributesCopy['label_fontColor'] = attributesCopy['fontColor'];
+        if (!attributesCopy['value_fontColor']) attributesCopy['value_fontColor'] = attributesCopy['fontColor'];
+    }
+    if (attributesCopy['trackWidth'] && !attributesCopy['valueTrackWidth']) {
+        attributesCopy['valueTrackWidth'] = attributesCopy['trackWidth'];
+    }
+    
+    if (attributesCopy['format']) {
+        attributesCopy['valueText_format'] = attributesCopy['format'];
+    } else if (!attributesCopy['valueText_format']) {
+        attributesCopy['valueText_format'] = '%.f';
+    }
+    
+    const knobWAttr = parseFloat(attributesCopy['w'] || 32);
+    const knobHAttr = parseFloat(attributesCopy['h'] || 32);
+    const knobTrackW = parseFloat(attributesCopy['valueTrackWidth'] || 3);
+    const safeDiameter = Math.min(knobWAttr, knobHAttr) - (knobTrackW * 4);
+    
+    attributesCopy['knob_w'] = safeDiameter;
+    attributesCopy['knob_h'] = safeDiameter;
+    attributesCopy['knob_x'] = (knobWAttr - safeDiameter) / 2;
+    attributesCopy['knob_y'] = (knobHAttr - safeDiameter) / 2;
+    
+    attributesCopy['knobFillColor'] = 'transparent';
+    attributesCopy['labelText'] = '';
+    
+    const result = renderCS03Knob(xmlNode, attributesCopy, currentParams, sourcePath);
+    if (!result || !result.htmlElement) return result;
+    
+    const container = result.htmlElement;
+    
+    const oldLabel = container.querySelector('.knob-label');
+    if (oldLabel) {
+        Object.assign(oldLabel.style, {
+            left: '0px',
+            top: '0px',
+            width: `${knobWAttr}px`,
+            height: `${knobHAttr}px`,
+            justifyContent: 'center',
+            alignItems: 'center',
+            lineHeight: `${knobHAttr}px`
+        });
+    }
+    
+    const svgIndicator = container.querySelector('.knob-indicator-group-svg');
+    if (svgIndicator) svgIndicator.style.display = 'none';
+    const htmlIndicator = container.querySelector('.knob-indicator-wrapper-html');
+    if (htmlIndicator) htmlIndicator.style.display = 'none';
+    const fallbackIndicator = container.querySelector('.knob-indicator-group-svg-fallback');
+    if (fallbackIndicator) fallbackIndicator.style.display = 'none';
+    
+    const centerValEl = document.createElement('div');
+    centerValEl.className = 'knob-center-value';
+    
+    const vmin = parseFloat(attributesCopy['vmin'] || 0);
+    const vmax = parseFloat(attributesCopy['vmax'] || 1);
+    const valueTextFormat = attributesCopy['valueText_format'];
+    const fontAlias = attributesCopy['font'] || attributesCopy['label_font'] || attributesCopy['value_font'];
+    const fontColor = DomUtils.parseColor(attributesCopy['fontColor'] || '#FFFFFFFF');
+    
+    Object.assign(centerValEl.style, {
+        position: 'absolute',
+        left: '0px',
+        top: '0px',
+        width: `${knobWAttr}px`,
+        height: `${knobHAttr}px`,
+        lineHeight: `${knobHAttr}px`,
+        textAlign: 'center',
+        pointerEvents: 'none',
+        color: fontColor,
+        zIndex: '3',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    });
+    
+    if (fontAlias) {
+        DomUtils.applyFont(centerValEl, fontAlias);
+    }
+    
+    const fontSizeAttr = attributesCopy['font_size'] || attributesCopy['fontsize'];
+    if (fontSizeAttr) {
+        if (fontSizeAttr === 'VerySmall') centerValEl.style.fontSize = '10px';
+        else if (fontSizeAttr === 'Small') centerValEl.style.fontSize = '12px';
+    }
+    
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `.knob-container:has(input.knob-value-input) .knob-center-value { display: none !important; }`;
+    container.appendChild(styleTag);
+    
+    const updateCenterDisplay = (val) => {
+        centerValEl.textContent = DomUtils.formatDisplayValue(parseFloat(val), valueTextFormat, vmin, vmax);
+    };
+    
+    const initVal = container.dataset.currentValue || attributesCopy['vdefault'] || vmin;
+    updateCenterDisplay(initVal);
+    
+    container.appendChild(centerValEl);
+    
+    container.addEventListener('knobValueChanged', (e) => {
+        if (e.detail && e.detail.value !== undefined) {
+            updateCenterDisplay(e.detail.value);
+        }
+    });
+    
+    return result;
 }

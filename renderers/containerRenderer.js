@@ -32,7 +32,16 @@ function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCa
     else if (tagName === 'GUI') htmlElement.style.height = '100%';
 
     // Extract and apply background colors directly from the XML node (case-insensitive)
-    const bgColor = mergedAttributes['backgroundColor'] || mergedAttributes['backgroundcolor'] || xmlNode.getAttribute('backgroundColor') || xmlNode.getAttribute('backgroundcolor') || mergedAttributes['backColor'] || mergedAttributes['fill_color'];
+    const bgColor = mergedAttributes['backgroundColor'] || 
+                    mergedAttributes['backgroundcolor'] || 
+                    mergedAttributes['backColor'] || 
+                    mergedAttributes['backcolor'] || 
+                    mergedAttributes['fill_color'] || 
+                    xmlNode.getAttribute('backgroundColor') || 
+                    xmlNode.getAttribute('backgroundcolor') || 
+                    xmlNode.getAttribute('color_back') || 
+                    xmlNode.getAttribute('backColor') || 
+                    xmlNode.getAttribute('backcolor');
     if (bgColor) {
         htmlElement.style.backgroundColor = DomUtils.parseColor(bgColor);
     }
@@ -88,7 +97,11 @@ function renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCa
                     }
 
                     // Inherit visual attributes from the external file root layer so the skin graphics display beautifully
-                    const extBgColor = rootNode.getAttribute('backgroundColor') || rootNode.getAttribute('backgroundcolor') || rootNode.getAttribute('backColor') || rootNode.getAttribute('backcolor');
+                    const extBgColor = rootNode.getAttribute('backgroundColor') || 
+                                       rootNode.getAttribute('backgroundcolor') || 
+                                       rootNode.getAttribute('color_back') || 
+                                       rootNode.getAttribute('backColor') || 
+                                       rootNode.getAttribute('backcolor');
                     if (extBgColor) {
                         htmlElement.style.backgroundColor = DomUtils.parseColor(extBgColor);
                     }

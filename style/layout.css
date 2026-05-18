@@ -69,9 +69,7 @@ body.logo-hover #text-logo { opacity: 0.1; }
     width: 3000px; 
     height: 3000px; 
     position: relative; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     background-color: transparent; 
     will-change: transform, background-position; 
     overflow: visible; 
@@ -83,9 +81,7 @@ body.logo-hover #text-logo { opacity: 0.1; }
     width: 3000px;
     height: 3000px; 
     position: relative; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     flex-shrink: 0; 
 }
 
@@ -104,7 +100,9 @@ body.logo-hover #text-logo { opacity: 0.1; }
 }
 
 #skin-container-actual {
-    position: relative; 
+    position: absolute; 
+    top: 0; left: 0; right: 0; bottom: 0;
+    margin: auto;
     overflow: hidden;   
     box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
 }

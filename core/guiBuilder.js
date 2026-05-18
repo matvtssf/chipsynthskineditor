@@ -76,7 +76,12 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
         const guiHeight = guiHeightAttr ? parseInt(guiHeightAttr, 10) : 630;
 
         const globalDefaults = {};
-        const defaultBg = guiNode.getAttribute('color_back') || guiNode.getAttribute('backgroundColor') || '#565d82FF';
+        const defaultBg = guiNode.getAttribute('color_back') || 
+                          guiNode.getAttribute('backgroundColor') || 
+                          guiNode.getAttribute('backgroundcolor') || 
+                          guiNode.getAttribute('backColor') || 
+                          guiNode.getAttribute('backcolor') || 
+                          '#565d82FF';
         globalDefaults['color_back'] = defaultBg;
         const defaultTextColor = guiNode.getAttribute('color_text') || guiNode.getAttribute('textColor') || '#FFFFFFFF';
         globalDefaults['color_text'] = defaultTextColor;
@@ -124,6 +129,18 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
          }
 
         parseFontDefinitions(guiNode, dynamicStyles);
+
+        const finalGuiAttrs = DomUtils.getMergedAttributes(guiNode, guiNode.getAttribute('style'), State.getStyles());
+        const resolvedBg = finalGuiAttrs['backgroundColor'] || 
+                           finalGuiAttrs['backgroundcolor'] || 
+                           finalGuiAttrs['backColor'] || 
+                           finalGuiAttrs['backcolor'] || 
+                           finalGuiAttrs['color_back'];
+        if (resolvedBg) {
+            State.setSkinDefaultBackgroundColor(resolvedBg);
+            skinHolder.style.backgroundColor = DomUtils.parseColor(resolvedBg);
+            DomUtils.applyCurrentBackgroundColor();
+        }
 
         console.log("[guiBuilder] Rendering child elements into skinHolder...");
         const childNodes = guiNode.childNodes;
