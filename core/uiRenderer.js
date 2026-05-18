@@ -995,6 +995,98 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
                     }
                 });
 
+                // Update standard Image Buttons (Button, OnOffButton, CommandButton, HoldButton)
+                document.querySelectorAll('[data-xml-tag-name="Button"], [data-xml-tag-name="OnOffButton"], [data-xml-tag-name="CommandButton"], [data-xml-tag-name="HoldButton"]').forEach(btn => {
+                    const paramId = btn.dataset.param;
+                    if (!paramId) return;
+
+                    const onValue = btn.dataset.xmlAttr_on_value || '1.0';
+                    const offValue = btn.dataset.xmlAttr_off_value || '0.0';
+                    const vDefault = btn.dataset.xmlAttr_vdefault || offValue;
+
+                    const currentStored = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
+                    const currentState = currentStored !== null ? String(currentStored) : String(vDefault);
+                    
+                    const isActive = (currentState === String(onValue) || currentState === '1' || currentState === '1.0');
+                    
+                    if (isActive) {
+                        btn.classList.add('active');
+                        btn.setAttribute('aria-checked', 'true');
+                    } else {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-checked', 'false');
+                    }
+
+                    const imgKey = isActive ? 'xmlAttr_image_on' : 'xmlAttr_image_off';
+                    const imgPath = btn.dataset[imgKey] || btn.dataset['xmlAttr_image'];
+                    if (imgPath) {
+                        const sourcePath = btn.dataset.sourcePath;
+                        let imgFullPath = imgPath;
+                        if (sourcePath && sourcePath.includes('/')) {
+                            const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
+                            imgFullPath = dir + imgPath;
+                        }
+                        let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath));
+                        if (!blob) {
+                            blob = State.getAssetBlobUrl(State.normalizePath(imgPath));
+                        }
+                        if (blob) {
+                            const newUrl = `url("${blob}")`;
+                            if (btn.style.backgroundImage !== newUrl) {
+                                btn.style.backgroundImage = newUrl;
+                                btn.style.backgroundSize = '100% 100%';
+                                btn.style.backgroundRepeat = 'no-repeat';
+                            }
+                        }
+                    }
+                });
+
+                // Update standard Image Buttons (Button, OnOffButton, CommandButton, HoldButton)
+                document.querySelectorAll('[data-xml-tag-name="Button"], [data-xml-tag-name="OnOffButton"], [data-xml-tag-name="CommandButton"], [data-xml-tag-name="HoldButton"]').forEach(btn => {
+                    const paramId = btn.dataset.param;
+                    if (!paramId) return;
+
+                    const onValue = btn.dataset.xmlAttr_on_value || '1.0';
+                    const offValue = btn.dataset.xmlAttr_off_value || '0.0';
+                    const vDefault = btn.dataset.xmlAttr_vdefault || offValue;
+
+                    const currentStored = typeof State.getElementState === 'function' ? State.getElementState(paramId) : null;
+                    const currentState = currentStored !== null ? String(currentStored) : String(vDefault);
+                    
+                    const isActive = (currentState === String(onValue) || currentState === '1' || currentState === '1.0');
+                    
+                    if (isActive) {
+                        btn.classList.add('active');
+                        btn.setAttribute('aria-checked', 'true');
+                    } else {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-checked', 'false');
+                    }
+
+                    const imgKey = isActive ? 'xmlAttr_image_on' : 'xmlAttr_image_off';
+                    const imgPath = btn.dataset[imgKey] || btn.dataset['xmlAttr_image'];
+                    if (imgPath) {
+                        const sourcePath = btn.dataset.sourcePath;
+                        let imgFullPath = imgPath;
+                        if (sourcePath && sourcePath.includes('/')) {
+                            const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/') + 1);
+                            imgFullPath = dir + imgPath;
+                        }
+                        let blob = State.getAssetBlobUrl(State.normalizePath(imgFullPath));
+                        if (!blob) {
+                            blob = State.getAssetBlobUrl(State.normalizePath(imgPath));
+                        }
+                        if (blob) {
+                            const newUrl = `url("${blob}")`;
+                            if (btn.style.backgroundImage !== newUrl) {
+                                btn.style.backgroundImage = newUrl;
+                                btn.style.backgroundSize = '100% 100%';
+                                btn.style.backgroundRepeat = 'no-repeat';
+                            }
+                        }
+                    }
+                });
+
                 // Style CS01OnOffButton elements as indicators matching original plugin shapes
                 document.querySelectorAll('[data-xml-tag-name="CS01OnOffButton"]').forEach(btn => {
                     const hAttr = parseInt(btn.style.height || btn.offsetHeight || '16', 10);

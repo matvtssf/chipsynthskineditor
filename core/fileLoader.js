@@ -163,7 +163,11 @@ export function readFileAndStore(file, path) {
 
              // --- UPDATED: Added .png, .html, .fermatax, .fermatap ---
              if (/\.(svg|png|jpg|jpeg|gif)$/i.test(lowerFileName)) {
-                 const blobUrl = URL.createObjectURL(file);
+                 let blobFile = file;
+                 if (lowerFileName.endsWith('.svg')) {
+                     blobFile = new Blob([file], { type: 'image/svg+xml' });
+                 }
+                 const blobUrl = URL.createObjectURL(blobFile);
                  State.addImageBlobUrl(storeKey, blobUrl);
                  
                  // If it's an SVG file, also read it as text so it can be edited inside the XML Editor

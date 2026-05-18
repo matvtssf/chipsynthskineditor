@@ -99,18 +99,18 @@
                            <input type="file" id="param-reference-file-input" accept=".json" style="display: none;">
                            </div>
                         <div class="flex-shrink-0">
-                            <button id="reference-button" class="sidebar-icon-button" title="Show Element Reference">
+                            <button id="reference-button" class="sidebar-header-button" title="Show Element Reference">
                                 <i class="iconoir-book"></i>
                             </button>
                         </div>
                         <div class="flex-shrink-0">
-                            <button id="debug-toggle-button" class="sidebar-icon-button" role="switch" aria-checked="false" title="Toggle Debug Info">
+                            <button id="debug-toggle-button" class="sidebar-header-button" role="switch" aria-checked="false" title="Toggle Edit Mode">
                                 <i class="iconoir-bug"></i>
                             </button>
                             <input type="checkbox" id="debug-checkbox" class="hidden">
                         </div>
                         <div class="flex-shrink-0">
-                            <button id="console-button" class="sidebar-icon-button" title="Show Console Log">
+                            <button id="console-button" class="sidebar-header-button" title="Show Console Log">
                                 <i class="iconoir-terminal-tag"></i>
                             </button>
                         </div>

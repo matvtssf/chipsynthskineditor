@@ -129,12 +129,33 @@ debugStyle.textContent = `
         box-shadow: 0 0 6px rgba(255, 51, 51, 0.6) !important;
         z-index: 999999 !important;
     }
+    body.edit-mode-active #canvas-viewport {
+        box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.6), 0 0 30px rgba(239, 68, 68, 0.4) !important;
+        border: 2px solid rgba(239, 68, 68, 0.8) !important;
+        transition: box-shadow 0.25s ease-in-out, border-color 0.25s ease-in-out;
+    }
+    body.edit-mode-active .grid-visible,
+    body.edit-mode-active .grid-active,
+    body.edit-mode-active #gui-zoom-canvas.grid-active,
+    body.edit-mode-active #main-content-area.grid-visible {
+        background-image: 
+            linear-gradient(to right, rgba(239, 68, 68, 0.75) 1.5px, transparent 1.5px), 
+            linear-gradient(to bottom, rgba(239, 68, 68, 0.75) 1.5px, transparent 1.5px) !important;
+        box-shadow: inset 0 0 60px rgba(239, 68, 68, 0.3) !important;
+    }
+    body.edit-mode-active .grid-line,
+    body.edit-mode-active [class*="grid-line"] {
+        background-color: #ef4444 !important;
+        color: #ef4444 !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 12px #ef4444 !important;
+    }
 `;
 document.head.appendChild(debugStyle);
 
 const handleEditorLineSync = () => {
     const activeEl = document.activeElement;
-    if (!activeEl || activeEl.tagName !== 'TEXTAREA') return;
+    if (!activeEl || !activeEl.id || !activeEl.id.startsWith('xml-editor-textarea')) return;
 
     const text = activeEl.value;
     const selStart = activeEl.selectionStart;
@@ -146,20 +167,27 @@ const handleEditorLineSync = () => {
         el.classList.remove('debug-line-highlight');
     });
 
-    const paramMatch = currentLineText.match(/param=["']([^"']+)["']/);
-    const xMatch = currentLineText.match(/x=["']([^"']+)["']/);
-    const yMatch = currentLineText.match(/y=["']([^"']+)["']/);
+    const paramMatch = currentLineText.match(/\bparam=["']([^"']+)["']/i);
+    const xMatch = currentLineText.match(/\bx=["']([^"']+)["']/i);
+    const yMatch = currentLineText.match(/\by=["']([^"']+)["']/i);
 
     let selector = '';
     if (paramMatch) {
-        selector = `[data-param="${paramMatch[1]}"], [data-xml-attr_param="${paramMatch[1]}"]`;
+        const pVal = String(paramMatch[1]).trim();
+        selector = `[data-param="${pVal}"], [data-param-id="${pVal}"], [data-xml-attr_param="${pVal}"]`;
     } else if (xMatch && yMatch) {
-        selector = `[data-xml-attr_x="${xMatch[1]}"][data-xml-attr_y="${yMatch[1]}"]`;
+        const xVal = String(xMatch[1]).trim();
+        const yVal = String(yMatch[1]).trim();
+        selector = `[data-xml-attr_x="${xVal}"][data-xml-attr_y="${yVal}"], [style*="left: ${xVal}px"][style*="top: ${yVal}px"]`;
     }
 
     if (selector) {
-        const target = document.querySelector(selector);
-        if (target) target.classList.add('debug-line-highlight');
+        const targets = document.querySelectorAll(selector);
+        targets.forEach(target => {
+            if (target.classList.contains('gui-element') || target.classList.contains('gui-view-container') || target.classList.contains('gui-view-container1') || target.classList.contains('gui-macro-instance-content')) {
+                target.classList.add('debug-line-highlight');
+            }
+        });
     }
 };
 

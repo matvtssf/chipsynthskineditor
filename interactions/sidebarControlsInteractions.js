@@ -268,18 +268,19 @@ function handleDebugToggle() {
         debugCheckbox.checked = newCheckedState; // Keep hidden checkbox in sync
         debugToggleButton.setAttribute('aria-checked', String(newCheckedState));
         debugToggleButton.classList.toggle('active', newCheckedState);
+        debugToggleButton.title = newCheckedState ? "Disable Edit Mode" : "Toggle Edit Mode";
         const debugIcon = debugToggleButton.querySelector('i');
         if (debugIcon) {
-            debugIcon.classList.toggle('iconoir-bug', !newCheckedState);
-            debugIcon.classList.toggle('iconoir-bug-solid', newCheckedState);
+            debugIcon.className = newCheckedState ? 'iconoir-edit-pencil active' : 'iconoir-edit-pencil';
         }
         State.setDebugEnabled(newCheckedState); // Update global state
+        document.body.classList.toggle('edit-mode-active', newCheckedState);
 
         debugOverlayElement.style.display = newCheckedState ? 'block' : 'none';
         if (!newCheckedState && debugOverlayElement) { // Clear overlay when disabling
             debugOverlayElement.textContent = '';
         }
-        showToast(`Debug Info: ${newCheckedState ? 'ON' : 'OFF'}`, 'info', 1500);
+        showToast(`Edit Mode: ${newCheckedState ? 'ON' : 'OFF'}`, 'info', 1500);
     } else {
         logError("Debug checkbox, toggle button, or debug overlay element not found.", null, true);
     }

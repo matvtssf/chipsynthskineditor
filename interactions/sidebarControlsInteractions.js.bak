@@ -268,18 +268,20 @@ function handleDebugToggle() {
         debugCheckbox.checked = newCheckedState; // Keep hidden checkbox in sync
         debugToggleButton.setAttribute('aria-checked', String(newCheckedState));
         debugToggleButton.classList.toggle('active', newCheckedState);
+        debugToggleButton.title = newCheckedState ? "Disable Edit Mode" : "Toggle Edit Mode";
         const debugIcon = debugToggleButton.querySelector('i');
         if (debugIcon) {
             debugIcon.classList.toggle('iconoir-bug', !newCheckedState);
             debugIcon.classList.toggle('iconoir-bug-solid', newCheckedState);
         }
         State.setDebugEnabled(newCheckedState); // Update global state
+        document.body.classList.toggle('edit-mode-active', newCheckedState);
 
         debugOverlayElement.style.display = newCheckedState ? 'block' : 'none';
         if (!newCheckedState && debugOverlayElement) { // Clear overlay when disabling
             debugOverlayElement.textContent = '';
         }
-        showToast(`Debug Info: ${newCheckedState ? 'ON' : 'OFF'}`, 'info', 1500);
+        showToast(`Edit Mode: ${newCheckedState ? 'ON' : 'OFF'}`, 'info', 1500);
     } else {
         logError("Debug checkbox, toggle button, or debug overlay element not found.", null, true);
     }
@@ -432,6 +434,8 @@ function handleSidebarPreviewAreaClick() {
 function closePreviewItemModal() {
     if (previewItemModal) {
         toggleModalVisibility(previewItemModal, false); // Hide the modal
+        const previewEditBtn = document.getElementById('preview-edit-button');
+        if (previewEditBtn) previewEditBtn.style.display = 'none';
         if (previewItemModalContent) {
             previewItemModalContent.innerHTML = '';
             previewItemModalContent.onwheel = null; // Clean up wheel event on close

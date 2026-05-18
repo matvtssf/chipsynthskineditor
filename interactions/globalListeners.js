@@ -924,21 +924,8 @@ function renderInspectorContent(container, el) {
             else if (lowerPath.includes('chipsynth md')) stylesPath = stylesPath.replace(/chipsynth md/i, 'chipsynth MD');
             else if (lowerPath.includes('chipsynth c64')) stylesPath = stylesPath.replace(/chipsynth c64/i, 'chipsynth C64');
             
-            container.querySelector('#qi-close-btn').click();
             if (typeof openXmlEditor === 'function') {
                 openXmlEditor(stylesPath);
-                // Keep the Quick Inspector open when jumping to styles.xml
-                // The XML editor opens as a separate modal, so the inspector should remain visible.
-                const inspector = document.getElementById('element-quick-inspector');
-                if (inspector) {
-                    inspector.style.display = 'flex'; // Ensure it stays visible
-                    // Also ensure the canvas blur/scroll lock is not removed by the inspector's own close logic
-                    const cViewport = document.getElementById('canvas-viewport');
-                    if (cViewport) {
-                        cViewport.style.filter = 'blur(6px) brightness(0.7)';
-                        cViewport.style.overflow = 'hidden';
-                    }
-                }
             }
         });
     });

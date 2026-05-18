@@ -129,6 +129,33 @@ debugStyle.textContent = `
         box-shadow: 0 0 6px rgba(255, 51, 51, 0.6) !important;
         z-index: 999999 !important;
     }
+    body.edit-mode-active #canvas-viewport {
+        box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.6), 0 0 30px rgba(239, 68, 68, 0.4) !important;
+        border: 2px solid rgba(239, 68, 68, 0.8) !important;
+        transition: box-shadow 0.25s ease-in-out, border-color 0.25s ease-in-out;
+    }
+    body.edit-mode-active .grid-visible,
+    body.edit-mode-active .grid-active,
+    body.edit-mode-active #gui-zoom-canvas.grid-active,
+    body.edit-mode-active #main-content-area.grid-visible {
+        background-image: 
+            linear-gradient(to right, rgba(239, 68, 68, 0.75) 1.5px, transparent 1.5px), 
+            linear-gradient(to bottom, rgba(239, 68, 68, 0.75) 1.5px, transparent 1.5px) !important;
+        box-shadow: inset 0 0 60px rgba(239, 68, 68, 0.3) !important;
+    }
+    body.edit-mode-active .grid-line,
+    body.edit-mode-active [class*="grid-line"] {
+        background-color: #ef4444 !important;
+        color: #ef4444 !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 12px #ef4444 !important;
+    }
+    body:has(#config-modal.visible) #config-button i,
+    body:has(#reference-modal.visible) #reference-button i,
+    body:has(#console-modal.visible) #console-button i,
+    body.edit-mode-active #debug-toggle-button i {
+        filter: invert(1) !important;
+    }
 `;
 document.head.appendChild(debugStyle);
 
