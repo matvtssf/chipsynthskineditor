@@ -26,6 +26,12 @@ let panStartX = 0, panStartY = 0;
 let panStartScrollX = 0, panStartScrollY = 0;
 let lastHoveredElement = null;
 
+let isTransforming = false;
+let transformType = null;
+let transformStartX = 0, transformStartY = 0;
+let transformStartLeft = 0, transformStartTop = 0;
+let transformStartWidth = 0, transformStartHeight = 0;
+
 // --- Initialization ---
 export function setupMainContentInteractions() {
     console.log("[mainContent] Setting up Main Content listeners...");
@@ -35,6 +41,7 @@ export function setupMainContentInteractions() {
     if (guiZoomCanvas) {
         if (!guiZoomCanvas.dataset.panListenerAttached) {
             guiZoomCanvas.addEventListener('mousedown', handlePanStart);
+            guiZoomCanvas.addEventListener('mousedown', handleTransformStart);
             guiZoomCanvas.dataset.panListenerAttached = 'true';
             console.log("[mainContent] Panning listeners attached (mousedown on canvas elements, scrolls mainContentArea).");
         }
@@ -50,10 +57,10 @@ export function setupMainContentInteractions() {
              guiZoomCanvas.dataset.debugListenersAttached = 'true';
              console.log("[mainContent] Debug listeners attached to guiZoomCanvas.");
         }
-        if (!guiZoomCanvas.dataset.wheelListenerAttached) {
-            guiZoomCanvas.addEventListener('wheel', handleWheelZoom, { passive: false });
-            guiZoomCanvas.dataset.wheelListenerAttached = 'true';
-            console.log("[mainContent] Wheel zoom listener attached to guiZoomCanvas.");
+        if (!document.body.dataset.globalWheelZoomAttached) {
+            document.addEventListener('wheel', handleWheelZoom, { passive: false });
+            document.body.dataset.globalWheelZoomAttached = 'true';
+            console.log("[mainContent] Global wheel zoom listener attached to document to prevent native scaling.");
         }
     } else {
         logError("[mainContent] guiZoomCanvas not found for listeners init!", null, true);
@@ -124,6 +131,175 @@ export function handlePanEnd(e) {
     document.removeEventListener('mouseup', handlePanEnd);
     console.log("[mainContent] Pan end.");
 }
+
+function handleTransformStart(e) {
+    if (!State.getDebugEnabled() || e.button !== 0) return;
+    const handle = e.target.closest('.selection-resize-handle');
+    const guiElement = e.target.closest('.gui-element');
+    let targetEl = null;
+    if (handle) {
+        isTransforming = true;
+        transformType = 'resize';
+        targetEl = State.getSelectedElement();
+    } else if (guiElement && guiElement === State.getSelectedElement()) {
+        isTransforming = true;
+        transformType = 'move';
+        targetEl = guiElement;
+    }
+    if (!isTransforming || !targetEl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    transformStartX = e.clientX;
+    transformStartY = e.clientY;
+    transformStartLeft = parseFloat(targetEl.style.left) || 0;
+    transformStartTop = parseFloat(targetEl.style.top) || 0;
+    transformStartWidth = parseFloat(targetEl.style.width) || targetEl.clientWidth || 0;
+    transformStartHeight = parseFloat(targetEl.style.height) || targetEl.clientHeight || 0;
+    document.addEventListener('mousemove', handleTransformMove);
+    document.addEventListener('mouseup', handleTransformEnd, { once: true });
+}
+
+function handleTransformMove(e) {
+    if (!isTransforming) return;
+    const targetEl = State.getSelectedElement();
+    if (!targetEl) { handleTransformEnd(); return; }
+    const zoom = State.getCurrentZoomLevel() || 1;
+    const dx = (e.clientX - transformStartX) / zoom;
+    const dy = (e.clientY - transformStartY) / zoom;
+    if (transformType === 'move') {
+        const newLeft = Math.round(transformStartLeft + dx);
+        const newTop = Math.round(transformStartTop + dy);
+        targetEl.style.left = `${newLeft}px`;
+        targetEl.style.top = `${newTop}px`;
+        targetEl.dataset.xmlAttr_x = newLeft;
+        targetEl.dataset.xmlAttr_y = newTop;
+    } else if (transformType === 'resize') {
+        const newWidth = Math.max(8, Math.round(transformStartWidth + dx));
+        const newHeight = Math.max(8, Math.round(transformStartHeight + dy));
+        targetEl.style.width = `${newWidth}px`;
+        targetEl.style.height = `${newHeight}px`;
+        targetEl.dataset.xmlAttr_w = newWidth;
+        targetEl.dataset.xmlAttr_h = newHeight;
+        targetEl.dataset.xmlAttr_width = newWidth;
+        targetEl.dataset.xmlAttr_height = newHeight;
+    }
+    updateSelectionOutline();
+    if (window.updateInspectorReadout) {
+        window.updateInspectorReadout(targetEl);
+    }
+}
+
+function handleTransformEnd() {
+    if (!isTransforming) return;
+    isTransforming = false;
+    transformType = null;
+    document.removeEventListener('mousemove', handleTransformMove);
+    State.setXmlEditorDirty(true);
+    
+    const targetEl = State.getSelectedElement();
+    if (targetEl) {
+        syncElementChangesToXmlSource(targetEl);
+    }
+}
+
+export function syncElementChangesToXmlSource(el) {
+    const filePath = el.dataset.sourcePath;
+    if (!filePath) return;
+
+    const tagName = el.dataset.xmlTagName;
+    const oldRawXml = el.dataset.rawXml || "";
+    if (!tagName || !oldRawXml) return;
+
+    let attributesStr = "";
+    const attributesArray = [];
+    for (const key in el.dataset) {
+        if (key.startsWith('xmlAttr_')) {
+            const attrName = key.slice(8);
+            attributesArray.push({ name: attrName, value: el.dataset[key] });
+        }
+    }
+    
+    attributesArray.sort((a, b) => a.name.localeCompare(b.name));
+    attributesArray.forEach(attr => {
+        attributesStr += ` ${attr.name}="${attr.value}"`;
+    });
+
+    let newRawXml = "";
+    if (oldRawXml.trim().endsWith('/>')) {
+        newRawXml = `<${tagName}${attributesStr} />`;
+    } else {
+        const closingBracketIndex = oldRawXml.indexOf('>');
+        const originalRemainder = oldRawXml.slice(closingBracketIndex);
+        newRawXml = `<${tagName}${attributesStr}${originalRemainder.startsWith(' />') ? ' /' : ''}>`;
+    }
+
+    const fileMap = State.getFileMap();
+    const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+    let fileContent = fileMap.get(normalizedPath);
+    
+    if (fileContent && fileContent.includes(oldRawXml)) {
+        fileContent = fileContent.replace(oldRawXml, newRawXml);
+        fileMap.set(normalizedPath, fileContent);
+    }
+
+    const instance = State.getEditorInstanceByPath(normalizedPath);
+    if (instance) {
+        let currentEditorContent = instance.currentContent;
+        if (currentEditorContent && currentEditorContent.includes(oldRawXml)) {
+            currentEditorContent = currentEditorContent.replace(oldRawXml, newRawXml);
+            State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
+            
+            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+            if (textarea) {
+                const scrollPos = textarea.scrollTop;
+                textarea.value = currentEditorContent;
+                textarea.scrollTop = scrollPos;
+                textarea.dispatchEvent(new Event('input'));
+            }
+        }
+    }
+
+    el.dataset.rawXml = newRawXml;
+    console.log(`[Reconciliation Engine] Synced modifications successfully for <${tagName}> in ${filePath}`);
+}
+
+export function updateSelectionOutline() {
+    const zoomCanvas = getGuiZoomCanvas();
+    if (!zoomCanvas) return;
+    let outline = document.getElementById('selection-outline-overlay');
+    const selectedEl = State.getSelectedElement();
+    if (!selectedEl || !State.getDebugEnabled()) {
+        if (outline) outline.style.display = 'none';
+        return;
+    }
+    if (!outline) {
+        outline = document.createElement('div');
+        outline.id = 'selection-outline-overlay';
+        outline.style.position = 'absolute';
+        outline.style.border = '4px solid #22c55e';
+        outline.style.boxSizing = 'border-box';
+        outline.style.pointerEvents = 'none';
+        outline.style.zIndex = '10000';
+        const handle = document.createElement('div');
+        handle.className = 'selection-resize-handle';
+        handle.style.position = 'absolute';
+        handle.style.right = '-6px';
+        handle.style.bottom = '-6px';
+        handle.style.width = '12px';
+        handle.style.height = '12px';
+        handle.style.background = '#22c55e';
+        handle.style.pointerEvents = 'auto';
+        handle.style.cursor = 'nwse-resize';
+        outline.appendChild(handle);
+        zoomCanvas.appendChild(outline);
+    }
+    outline.style.display = 'block';
+    outline.style.left = selectedEl.style.left || '0px';
+    outline.style.top = selectedEl.style.top || '0px';
+    outline.style.width = selectedEl.style.width || `${selectedEl.clientWidth}px`;
+    outline.style.height = selectedEl.style.height || `${selectedEl.clientHeight}px`;
+}
+window.updateSelectionOutline = updateSelectionOutline;
 
 // --- Debug Overlay Logic (Relative to guiZoomCanvas) ---
 function handleDebugMouseMove(event) {
@@ -274,6 +450,18 @@ export function updateGuiZoom(zoomLevel, origin = null) {
  */
 function handleWheelZoom(event) {
     if (!event.ctrlKey) return;
+    
+    // Globally prevent default native browser scaling whenever CTRL is held
+    event.preventDefault();
+
+    const inspector = document.getElementById('element-quick-inspector');
+    if (inspector && inspector.style.display !== 'none') {
+        return;
+    }
+    
+    if (event.target.closest('#sidebar') || event.target.closest('[data-xml-tag-name="Keyboard"]') || event.target.closest('.keyboard-gui')) {
+        return;
+    }
 
     const zoomCanvas = getGuiZoomCanvas();
     if (!zoomCanvas) {
@@ -284,8 +472,6 @@ function handleWheelZoom(event) {
     if (!zoomCanvas.contains(event.target) && event.target !== zoomCanvas) {
         return;
     }
-
-    event.preventDefault();
 
     const currentZoom = State.getCurrentZoomLevel(); // FIXED: Use getCurrentZoomLevel
     const zoomFactor = 0.1;
@@ -322,3 +508,245 @@ function handleWheelZoom(event) {
         if(zoomValueDisplayElement) zoomValueDisplayElement.textContent = `${Math.round(newZoom * 100)}%`;
     }
 }
+export const SelectionManager = {
+    currentSelection: null,
+    overlay: null,
+
+    select(el) {
+        this.deselect(); // Clear previous selection
+        if (!el) return;
+
+        this.currentSelection = el;
+
+        // 1. Create the Green Bounding Box
+        this.overlay = document.createElement('div');
+        this.overlay.id = 'qi-selection-box';
+        this.overlay.style.position = 'absolute';
+        this.overlay.style.top = '0';
+        this.overlay.style.left = '0';
+        this.overlay.style.width = '100%';
+        this.overlay.style.height = '100%';
+        this.overlay.style.border = '2px solid #32cd32'; // Vibrant Green
+        this.overlay.style.boxSizing = 'border-box';
+        this.overlay.style.pointerEvents = 'none'; // Let clicks pass through to the element
+        this.overlay.style.zIndex = '9000';
+
+        // 2. Define the 8 Scaling Handles
+        const handleSize = 8;
+        const offset = -4; // Centers the handle over the border
+        const handles = [
+            { pos: 'nw', top: offset, left: offset, cursor: 'nwse-resize' },
+            { pos: 'n', top: offset, left: `calc(50% - ${handleSize/2}px)`, cursor: 'ns-resize' },
+            { pos: 'ne', top: offset, right: offset, cursor: 'nesw-resize' },
+            { pos: 'e', top: `calc(50% - ${handleSize/2}px)`, right: offset, cursor: 'ew-resize' },
+            { pos: 'se', bottom: offset, right: offset, cursor: 'nwse-resize' },
+            { pos: 's', bottom: offset, left: `calc(50% - ${handleSize/2}px)`, cursor: 'ns-resize' },
+            { pos: 'sw', bottom: offset, left: offset, cursor: 'nesw-resize' },
+            { pos: 'w', top: `calc(50% - ${handleSize/2}px)`, left: offset, cursor: 'ew-resize' }
+        ];
+
+        handles.forEach(h => {
+            const handleEl = document.createElement('div');
+            handleEl.className = `qi-resize-handle qi-handle-${h.pos}`;
+            handleEl.style.position = 'absolute';
+            handleEl.style.width = `${handleSize}px`;
+            handleEl.style.height = `${handleSize}px`;
+            handleEl.style.background = '#32cd32';
+            handleEl.style.opacity = '0.5'; // Half opacity as requested
+            handleEl.style.cursor = h.cursor;
+            handleEl.style.pointerEvents = 'auto'; // Make handles clickable
+            
+            if (h.top !== undefined) handleEl.style.top = typeof h.top === 'number' ? `${h.top}px` : h.top;
+            if (h.bottom !== undefined) handleEl.style.bottom = typeof h.bottom === 'number' ? `${h.bottom}px` : h.bottom;
+            if (h.left !== undefined) handleEl.style.left = typeof h.left === 'number' ? `${h.left}px` : h.left;
+            if (h.right !== undefined) handleEl.style.right = typeof h.right === 'number' ? `${h.right}px` : h.right;
+
+            this.attachResizeLogic(handleEl, h.pos, el);
+            this.overlay.appendChild(handleEl);
+        });
+
+        // 3. Define the Underneath Nudge Pad
+        const nudgePad = document.createElement('div');
+        nudgePad.style.position = 'absolute';
+        nudgePad.style.bottom = '-35px';
+        nudgePad.style.left = '50%';
+        nudgePad.style.transform = 'translateX(-50%)';
+        nudgePad.style.display = 'flex';
+        nudgePad.style.gap = '2px';
+        nudgePad.style.background = 'rgba(26, 32, 44, 0.9)';
+        nudgePad.style.padding = '4px';
+        nudgePad.style.borderRadius = '4px';
+        nudgePad.style.pointerEvents = 'auto';
+        nudgePad.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
+
+        const arrows = [
+            { id: 'left', icon: '◀', dx: -1, dy: 0 },
+            { id: 'up', icon: '▲', dx: 0, dy: -1 },
+            { id: 'down', icon: '▼', dx: 0, dy: 1 },
+            { id: 'right', icon: '▶', dx: 1, dy: 0 }
+        ];
+
+        arrows.forEach(dir => {
+            const btn = document.createElement('button');
+            btn.innerHTML = dir.icon;
+            btn.style.background = '#4a5568';
+            btn.style.border = 'none';
+            btn.style.color = '#fff';
+            btn.style.width = '24px';
+            btn.style.height = '24px';
+            btn.style.borderRadius = '3px';
+            btn.style.cursor = 'pointer';
+            btn.style.fontSize = '12px';
+            
+            btn.onmousedown = (e) => e.stopPropagation(); // Prevent dragging
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                this.nudgeElement(el, dir.dx, dir.dy);
+            };
+            nudgePad.appendChild(btn);
+        });
+
+        this.overlay.appendChild(nudgePad);
+        
+        // Append the whole overlay directly to the element so it moves and scales with it
+        el.appendChild(this.overlay);
+    },
+
+    deselect() {
+        if (this.overlay && this.overlay.parentNode) {
+            this.overlay.parentNode.removeChild(this.overlay);
+        }
+        this.overlay = null;
+        this.currentSelection = null;
+    },
+
+    nudgeElement(el, dx, dy) {
+        let currentX = parseFloat(el.style.left) || 0;
+        let currentY = parseFloat(el.style.top) || 0;
+        
+        const newX = currentX + dx;
+        const newY = currentY + dy;
+        
+        el.style.left = `${newX}px`;
+        el.style.top = `${newY}px`;
+        el.dataset.xmlAttr_x = newX;
+        el.dataset.xmlAttr_y = newY;
+        
+        this.sync(el);
+    },
+
+    attachResizeLogic(handle, pos, el) {
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); // Stop element dragging
+            e.preventDefault();
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startW = parseFloat(el.style.width) || el.clientWidth || 0;
+            const startH = parseFloat(el.style.height) || el.clientHeight || 0;
+            const startLeft = parseFloat(el.style.left) || 0;
+            const startTop = parseFloat(el.style.top) || 0;
+
+            // Fetch the zoom level so the mouse delta matches the element scale
+            const zoom = typeof State !== 'undefined' && State.getSavedZoomLevel ? State.getSavedZoomLevel() : 1;
+
+            const onMouseMove = (moveEvent) => {
+                const deltaX = (moveEvent.clientX - startX) / zoom;
+                const deltaY = (moveEvent.clientY - startY) / zoom;
+                
+                let newW = startW;
+                let newH = startH;
+                let newLeft = startLeft;
+                let newTop = startTop;
+
+                if (pos.includes('e')) newW = startW + deltaX;
+                if (pos.includes('s')) newH = startH + deltaY;
+                
+                if (pos.includes('w')) {
+                    newW = startW - deltaX;
+                    newLeft = startLeft + deltaX;
+                }
+                if (pos.includes('n')) {
+                    newH = startH - deltaY;
+                    newTop = startTop + deltaY;
+                }
+
+                // Prevent collapsing to negative sizes
+                if (newW > 10) {
+                    el.style.width = `${newW}px`;
+                    el.style.left = `${newLeft}px`;
+                    el.dataset.xmlAttr_w = Math.round(newW);
+                    el.dataset.xmlAttr_x = Math.round(newLeft);
+                }
+                if (newH > 10) {
+                    el.style.height = `${newH}px`;
+                    el.style.top = `${newTop}px`;
+                    el.dataset.xmlAttr_h = Math.round(newH);
+                    el.dataset.xmlAttr_y = Math.round(newTop);
+                }
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                this.sync(el);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    },
+
+    sync(el) {
+        if (typeof State !== 'undefined' && State.setXmlEditorDirty) {
+            State.setXmlEditorDirty(true);
+        }
+        if (window.syncElementChangesToXmlSource) {
+            window.syncElementChangesToXmlSource(el);
+        }
+        
+        // Auto-update the Quick Inspector if it's open
+        const inspectorX = document.getElementById('qi-input-x');
+        if (inspectorX) {
+            document.getElementById('qi-input-x').value = el.dataset.xmlAttr_x;
+            document.getElementById('qi-input-y').value = el.dataset.xmlAttr_y;
+            document.getElementById('qi-input-w').value = el.dataset.xmlAttr_w;
+            document.getElementById('qi-input-h').value = el.dataset.xmlAttr_h;
+        }
+    }
+};
+
+// Example usage to wire it up globally (Clicking outside deselects it)
+document.addEventListener('mousedown', (e) => {
+    // 1. Robust check to see if we are in Debug/Edit mode
+    let isDebug = false;
+    if (typeof State !== 'undefined') {
+        if (typeof State.getDebugEnabled === 'function') isDebug = isDebug || State.getDebugEnabled();
+        if (typeof State.getDebugMode === 'function') isDebug = isDebug || State.getDebugMode();
+        if (State.debugMode !== undefined) isDebug = isDebug || State.debugMode;
+    }
+    if (window.debugMode !== undefined) isDebug = isDebug || window.debugMode;
+    if (document.body.classList.contains('debug-mode') || document.body.classList.contains('debug')) isDebug = true;
+    if (document.body.dataset.debug === 'true' || document.body.dataset.mode === 'debug') isDebug = true;
+
+    // 2. If NOT in debug mode, clear any existing selection and do nothing
+    if (!isDebug) {
+        if (SelectionManager.currentSelection) {
+            SelectionManager.deselect();
+        }
+        return;
+    }
+
+    // 3. We are in Debug Mode: proceed with selection logic
+    // Ignore clicks inside the Quick Inspector or on handles/pads
+    if (e.target.closest('#element-quick-inspector') || e.target.closest('#qi-selection-box')) {
+        return;
+    }
+    
+    const guiElement = e.target.closest('.gui-element');
+    if (guiElement) {
+        SelectionManager.select(guiElement);
+    } else {
+        SelectionManager.deselect();
+    }
+});

@@ -1,0 +1,6 @@
+vibe_config.json
+.vibe_chat.json
+.vibe_history/
+*.bak
+*.safe
+*.zip

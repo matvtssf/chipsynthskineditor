@@ -63,12 +63,13 @@ body.logo-hover #text-logo { opacity: 0.1; }
     right: 0;
     z-index: 100;
     padding: 0.5rem 1rem;
-    background-color: rgba(17, 24, 39, 0.8);
+    background-color: transparent;
     color: #ffffff;
     font-size: 0.875rem;
     font-weight: 500;
     pointer-events: none;
     display: none;
+    opacity: 0.25;
 }
 #status.visible {
     display: block;
@@ -82,12 +83,13 @@ body.logo-hover #text-logo { opacity: 0.1; }
     right: 0;
     z-index: 100;
     padding: 0.5rem 1rem;
-    background-color: rgba(17, 24, 39, 0.8);
+    background-color: transparent;
     color: #ffffff;
     font-size: 0.875rem;
     font-weight: 500;
     pointer-events: none;
     display: none;
+    opacity: 0.25;
 }
 #status.visible {
     display: block;
@@ -114,6 +116,7 @@ body.logo-hover #text-logo { opacity: 0.1; }
     will-change: transform, background-position; 
     overflow: visible; 
     pointer-events: auto; 
+    transition: transform 0.15s ease-out, transform-origin 0.15s ease-out;
 }
 
 /* --- Fixed Dimension Content --- */

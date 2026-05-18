@@ -23,6 +23,10 @@ function removeActiveClickOutsideListener() {
 }
 
 function handleOnOffButtonClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) {
+        event.preventDefault();
+        return;
+    }
     const button = event.currentTarget;
     const command = button.dataset.command;
     const param = button.dataset.param;
@@ -123,6 +127,10 @@ function closeExpandableView(tag) {
 }
 
 async function handleExpandViewButtonClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) {
+        event.preventDefault();
+        return;
+    }
     const button = event.currentTarget;
     const tag = button.dataset.closeButtonTag;
     const modalContainerId = button.dataset.modalContainerId; // Get ID from button
@@ -252,6 +260,10 @@ async function handleExpandViewButtonClick(event) {
 }
 
 function handleControlTextButtonClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) {
+        event.preventDefault();
+        return;
+    }
     const button = event.currentTarget;
     const tag = button.dataset.controlTag;
     if (!tag) {

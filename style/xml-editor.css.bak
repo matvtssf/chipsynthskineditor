@@ -7,14 +7,14 @@
     flex-grow: 1; display: flex; 
 }
 
-#xml-editor-line-numbers { 
+#xml-editor-line-numbers, [id^="xml-editor-line-numbers"] { 
     flex-shrink: 0; min-width: 40px; height: 100%; background-color: #f3f4f6; color: #6b7280; 
     padding: 8px 4px 15px 8px; text-align: right; overflow: hidden !important; user-select: none; 
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; 
     font-size: 13px !important; line-height: 21px !important; box-sizing: border-box; 
     border-right: 1px solid #d1d5db; position: relative; white-space: pre; 
 }
-#xml-editor-line-numbers .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; transition: background-color 0.8s ease-out; }
+#xml-editor-line-numbers .lineNumberEntry, [id^="xml-editor-line-numbers"] .lineNumberEntry { display: block !important; width: 100%; text-align: right !important; transition: background-color 0.8s ease-out; }
 
 @keyframes rowFlashActive {
     0% { background-color: rgba(234, 179, 8, 0.25); box-shadow: 0 0 8px rgba(234, 179, 8, 0.4); }
@@ -210,7 +210,8 @@ body[data-app-theme="dark"] #xml-editor-textarea-container {
     border-color: #333333 !important;
 }
 
-body[data-app-theme="dark"] #xml-editor-line-numbers {
+body[data-app-theme="dark"] #xml-editor-line-numbers,
+body[data-app-theme="dark"] [id^="xml-editor-line-numbers"] {
     background-color: #1a1a1a !important;
     color: #858585 !important;
     border-color: #333333 !important;

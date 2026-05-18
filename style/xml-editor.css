@@ -265,3 +265,23 @@ body[data-app-theme="dark"] #xml-editor-buttons {
     background-color: #1a1a1a !important;
     border-color: #333333 !important;
 }
+
+#element-quick-inspector {
+    border-radius: 4px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+    font-family: monospace;
+}
+
+#element-quick-inspector input, #element-quick-inspector select {
+    border-radius: 2px;
+    outline: none;
+}
+
+#element-quick-inspector input:focus, #element-quick-inspector select:focus {
+    border-color: #3182ce !important;
+}
+
+.selection-resize-handle {
+    border: 1px solid #fff;
+    border-radius: 2px;
+}

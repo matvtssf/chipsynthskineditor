@@ -35,6 +35,10 @@ let customBackgroundColor = '#4B5563';
 let skinDefaultBackgroundColor = null;
 let showGridLines = false;
 let debugEnabled = false;
+let selectedElement = null;
+let savedViewportScrollLeft = 0;
+let savedViewportScrollTop = 0;
+let savedZoomLevel = 1;
 let simulateSplashOverlay = false;
 let guiSettingsXmlParsedForNames = false;
 let currentZoomLevel = 1;
@@ -151,7 +155,13 @@ export function setSkinDefaultBackgroundColor(value) { skinDefaultBackgroundColo
 export function getShowGridLines() { return showGridLines; }
 export function setShowGridLines(value) { showGridLines = !!value; }
 export function getDebugEnabled() { return debugEnabled; }
-export function setDebugEnabled(value) { debugEnabled = !!value; }
+export function setDebugEnabled(value) { debugEnabled = !!value; if (!value) { setSelectedElement(null); } }
+export function getSelectedElement() { return selectedElement; }
+export function setSelectedElement(el) { selectedElement = el; if (window.updateSelectionOutline) window.updateSelectionOutline(); }
+export function getSavedViewportScroll() { return { left: savedViewportScrollLeft, top: savedViewportScrollTop }; }
+export function setSavedViewportScroll(left, top) { savedViewportScrollLeft = left; savedViewportScrollTop = top; }
+export function getSavedZoomLevel() { return savedZoomLevel; }
+export function setSavedZoomLevel(level) { savedZoomLevel = level; }
 export function getSimulateSplashOverlay() { return simulateSplashOverlay; }
 export function setSimulateSplashOverlay(value) { simulateSplashOverlay = !!value; }
 export function getGuiSettingsXmlParsedForNames() { return guiSettingsXmlParsedForNames; }

@@ -6,7 +6,7 @@
     position: fixed;
     top: 0.5rem;
     left: 0.5rem;
-    z-index: 1010;
+    z-index: 8000;
     padding: 0.5rem 1rem;
     background-color: transparent;
     border-radius: 0.375rem;
@@ -116,6 +116,7 @@ body.logo-hover #text-logo { opacity: 0.1; }
     will-change: transform, background-position; 
     overflow: visible; 
     pointer-events: auto; 
+    transition: transform 0.15s ease-out, transform-origin 0.15s ease-out;
 }
 
 /* --- Fixed Dimension Content --- */

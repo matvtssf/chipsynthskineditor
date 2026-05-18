@@ -88,6 +88,7 @@ function hideValueText(container) {
  * @param {MouseEvent} event
  */
 function handleMouseDown(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) return;
     if (event.button !== 0 || activeTextInput) return;
 
     const container = event.target.closest('.gui-slider-container');
@@ -201,6 +202,7 @@ function handleMouseDown(event) {
 
 /** Handles double click for text input if enabled. */
 function handleDoubleClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) return;
     if (activeTextInput) return;
     const targetKnob = event.target.closest('.gui-slider-knob');
     if (!targetKnob) return;
@@ -298,6 +300,7 @@ function handleDoubleClick(event) {
 
 /** Handles hover enter event for sliders. */
 function handleMouseEnter(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) return;
     const container = event.target.closest('.gui-slider-container');
     if (container && container.dataset.showText === '1' && !isDraggingKnob && !activeTextInput) {
         showValueText(container);
@@ -306,6 +309,7 @@ function handleMouseEnter(event) {
 
 /** Handles hover leave event for sliders. */
 function handleMouseLeave(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) return;
     const container = event.target.closest('.gui-slider-container');
     if (container && !isDraggingKnob && !activeTextInput) {
         hideValueText(container);

@@ -59,6 +59,35 @@ export function setupParamReferenceModalListeners() {
         paramList.addEventListener('mouseout', handleParamListItemHoverOut);
     }
 
+    // Global listener to handle middle-click jumps and hotlinks directly to individual parameter rows
+    document.removeEventListener('jumpToParam', window._paramRefJumpHandler);
+    window._paramRefJumpHandler = (e) => {
+        const paramId = String(e.detail?.id || '').trim();
+        if (!paramId) return;
+
+        const modal = getParamReferenceModal();
+        if (modal && !modal.classList.contains('visible')) {
+            modal.classList.add('visible');
+            loadParamReferenceUI();
+        }
+
+        const activeParamList = getParamList();
+        if (activeParamList) {
+            const targetLi = Array.from(activeParamList.querySelectorAll('li')).find(li => String(li.dataset.paramId).trim() === paramId);
+            if (targetLi) {
+                if (selectedParamListItem) {
+                    selectedParamListItem.classList.remove('selected', 'bg-indigo-100');
+                }
+                targetLi.classList.add('selected', 'bg-indigo-100');
+                selectedParamListItem = targetLi;
+                currentSelectedParamId = paramId;
+                populateParamDetails(currentSelectedParamCategory, paramId);
+                setTimeout(() => targetLi.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+            }
+        }
+    };
+    document.addEventListener('jumpToParam', window._paramRefJumpHandler);
+
     // --- Make Modal Draggable ---
     if (!isParamRefModalDraggable) {
         const modalContent = getParamReferenceModalContent(); // Use new getter
@@ -129,7 +158,18 @@ function loadParamReferenceUI() {
 
     categories.forEach(cat => { const option = document.createElement('option'); option.value = cat; option.textContent = cat; categorySelect.appendChild(option); });
 
-    const categoryToLoad = currentSelectedParamCategory && categories.includes(currentSelectedParamCategory) ? currentSelectedParamCategory : categories[0];
+    let detectedCategory = null;
+    const skinRoot = (typeof State.getCurrentSkinRoot === 'function' ? State.getCurrentSkinRoot() : '') || '';
+    const productKeywords = ['sfc', 'portafm', 'ops7', 'md', 'c64'];
+    
+    for (const keyword of productKeywords) {
+        if (skinRoot.toLowerCase().includes(keyword)) {
+            detectedCategory = categories.find(cat => cat.toLowerCase().includes(keyword));
+            if (detectedCategory) break;
+        }
+    }
+
+    const categoryToLoad = detectedCategory || (currentSelectedParamCategory && categories.includes(currentSelectedParamCategory) ? currentSelectedParamCategory : categories[0]);
     if (categoryToLoad) { categorySelect.value = categoryToLoad; populateParamList(categoryToLoad); }
     else { placeholder.textContent = "No categories found."; placeholder.style.display = 'block'; }
 

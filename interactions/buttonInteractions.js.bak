@@ -23,6 +23,10 @@ function removeActiveClickOutsideListener() {
 }
 
 function handleOnOffButtonClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) {
+        event.preventDefault();
+        return;
+    }
     const button = event.currentTarget;
     const command = button.dataset.command;
     const param = button.dataset.param;
@@ -35,6 +39,18 @@ function handleOnOffButtonClick(event) {
 
     if (param) {
         State.setElementState(param, newState ? 1 : 0);
+    }
+
+    if (button.dataset.role === 'onOff') {
+        const container = button.closest('.gui-cs01viewcontainer1');
+        if (container) {
+            container.classList.toggle('disabled', !newState);
+            container.dispatchEvent(new CustomEvent('stateChanged'));
+        }
+    }
+
+    if (typeof window.updateControllerVisibilities === 'function') {
+        window.updateControllerVisibilities();
     }
 
     const getAttrFromDataset = (name) => {
@@ -111,6 +127,10 @@ function closeExpandableView(tag) {
 }
 
 async function handleExpandViewButtonClick(event) {
+    if (State.getDebugEnabled && State.getDebugEnabled()) {
+        event.preventDefault();
+        return;
+    }
     const button = event.currentTarget;
     const tag = button.dataset.closeButtonTag;
     const modalContainerId = button.dataset.modalContainerId; // Get ID from button
