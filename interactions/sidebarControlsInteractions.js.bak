@@ -70,6 +70,52 @@ function handleSidebarToggle() {
     }
 }
 
+function disableEditMode() {
+    const debugCheckbox = getDebugCheckbox();
+    const debugToggleButton = getDebugToggleButton();
+    const debugOverlayElement = getDebugOverlay();
+
+    if (debugCheckbox && debugToggleButton && debugOverlayElement) {
+        debugCheckbox.checked = false;
+        debugToggleButton.setAttribute('aria-checked', 'false');
+        debugToggleButton.classList.remove('active');
+        debugToggleButton.title = "Toggle Edit Mode";
+        const debugIcon = debugToggleButton.querySelector('i');
+        if (debugIcon) {
+            debugIcon.className = 'iconoir-edit-pencil';
+        }
+        State.setDebugEnabled(false);
+        document.body.classList.remove('edit-mode-active');
+        debugOverlayElement.style.display = 'none';
+        debugOverlayElement.textContent = '';
+    }
+}
+
+function closeAllModals() {
+    const modalIds = [
+        'xml-editor-modal', 'console-modal', 'config-modal', 'reference-modal',
+        'attribute-editor-modal', 'element-editor-modal', 'xml-insert-element-modal',
+        'param-reference-modal', 'preview-item-modal'
+    ];
+    modalIds.forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) {
+            toggleModalVisibility(modal, false);
+        }
+    });
+    const consoleIcon = getConsoleButton()?.querySelector('i');
+    if (consoleIcon) {
+        consoleIcon.className = 'iconoir-terminal-tag';
+    }
+    State.setIsConsoleVisible(false);
+    if (previewItemModalContent) {
+        previewItemModalContent.innerHTML = '';
+        previewItemModalContent.onwheel = null;
+    }
+    const previewEditBtn = document.getElementById('preview-edit-button');
+    if (previewEditBtn) previewEditBtn.style.display = 'none';
+}
+
 export function initializeSidebarControls() {
     const sidebarToggleBtn = getSidebarToggleBtn();
     const loadFolderButton = getLoadFolderButton();
@@ -90,9 +136,18 @@ export function initializeSidebarControls() {
         sidebarToggleBtn.addEventListener('click', handleSidebarToggle);
     }
     if (loadFolderButton && fileInput) {
-        loadFolderButton.addEventListener('click', () => fileInput.click());
+        loadFolderButton.addEventListener('click', () => {
+            if (State.canUndo()) {
+                if (!confirm("You have unsaved changes in your current project. We highly recommend downloading/saving your project first so you don't lose your work.\n\nDo you want to proceed and open a new project anyway?")) {
+                    return;
+                }
+            }
+            fileInput.click();
+        });
         fileInput.addEventListener('change', (event) => {
             if (event.target.files.length > 0) {
+                disableEditMode();
+                closeAllModals();
                 handleFileSelection(event.target.files);
             }
         });
@@ -159,6 +214,9 @@ export function initializeSidebarControls() {
     document.getElementById('sidebar-import-input')?.addEventListener('change', handleSidebarImport);
     document.getElementById('remove-item-btn')?.addEventListener('click', handleRemoveItem);
     document.getElementById('export-item-btn')?.addEventListener('click', handleExportItem);
+    document.getElementById('save-project-button')?.addEventListener('click', handleExportProjectZip);
+    document.addEventListener('historyChanged', updateSaveButtonVisualState);
+    updateSaveButtonVisualState();
      if (configButton) {
         configButton.addEventListener('click', handleConfigToggle);
     } else {
@@ -299,9 +357,26 @@ function getSelectedTreeItemInfo() {
 
 function handleNewXml() {
     const info = getSelectedTreeItemInfo();
+    
+    let rootPrefix = '';
+    const fileMapKeys = Array.from(State.getFileMap().keys());
+    if (fileMapKeys.length > 0) {
+        const firstPath = fileMapKeys[0];
+        const firstPathParts = firstPath.split('/');
+        if (firstPathParts.length > 1) {
+            const potentialRoot = firstPathParts[0];
+            if (fileMapKeys.every(p => p.startsWith(potentialRoot + '/') || p === potentialRoot)) {
+                rootPrefix = potentialRoot + '/';
+            }
+        }
+    }
+
     let defaultDir = State.getCurrentSkinRoot() || "default/gui";
     if (info.isFolder && info.path) {
         defaultDir = info.path;
+        if (rootPrefix && !defaultDir.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+            defaultDir = rootPrefix + defaultDir;
+        }
     } else if (!info.isFolder && info.path.includes('/')) {
         defaultDir = info.path.substring(0, info.path.lastIndexOf('/'));
     }
@@ -325,9 +400,26 @@ function handleNewXml() {
 
 function handleNewFolder() {
     const info = getSelectedTreeItemInfo();
+    
+    let rootPrefix = '';
+    const fileMapKeys = Array.from(State.getFileMap().keys());
+    if (fileMapKeys.length > 0) {
+        const firstPath = fileMapKeys[0];
+        const firstPathParts = firstPath.split('/');
+        if (firstPathParts.length > 1) {
+            const potentialRoot = firstPathParts[0];
+            if (fileMapKeys.every(p => p.startsWith(potentialRoot + '/') || p === potentialRoot)) {
+                rootPrefix = potentialRoot + '/';
+            }
+        }
+    }
+
     let defaultDir = State.getCurrentSkinRoot() || "default/gui";
     if (info.isFolder && info.path) {
         defaultDir = info.path;
+        if (rootPrefix && !defaultDir.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+            defaultDir = rootPrefix + defaultDir;
+        }
     } else if (!info.isFolder && info.path.includes('/')) {
         defaultDir = info.path.substring(0, info.path.lastIndexOf('/'));
     }
@@ -335,9 +427,17 @@ function handleNewFolder() {
     const folderName = prompt("Enter new folder name:", "NewFolder");
     if (!folderName) return;
 
-    const placeholderPath = defaultDir.endsWith('/') ? `${defaultDir}${folderName}/.init.xml` : `${defaultDir}/${folderName}/.init.xml`;
+    const finalDir = defaultDir.endsWith('/') ? defaultDir : `${defaultDir}/`;
+    const placeholderPath = `${finalDir}${folderName}/.init.xml`;
+    const normalizedPath = placeholderPath.toLowerCase();
+
+    if (State.getFileMap().has(normalizedPath)) {
+        showToast("Folder structure already exists!", "warning");
+        return;
+    }
+
     const initialXml = `<?xml version="1.0" encoding="utf-8"?>\n<FolderInit />`;
-    State.getFileMap().set(placeholderPath.toLowerCase(), initialXml);
+    State.getFileMap().set(normalizedPath, initialXml);
     populateFileBrowser();
     showToast(`Created new folder structure: ${folderName}`, "info");
 }
@@ -412,7 +512,25 @@ function handleRemoveItem() {
 
     const normalizedTarget = info.path.toLowerCase();
     if (info.isFolder) {
-        const prefix = normalizedTarget + '/';
+        let rootPrefix = '';
+        const fileMapKeys = Array.from(State.getFileMap().keys());
+        if (fileMapKeys.length > 0) {
+            const firstPath = fileMapKeys[0];
+            const firstPathParts = firstPath.split('/');
+            if (firstPathParts.length > 1) {
+                const potentialRoot = firstPathParts[0];
+                if (fileMapKeys.every(p => p.startsWith(potentialRoot + '/') || p === potentialRoot)) {
+                    rootPrefix = potentialRoot + '/';
+                }
+            }
+        }
+
+        let folderPath = normalizedTarget;
+        if (rootPrefix && !folderPath.startsWith(rootPrefix.toLowerCase())) {
+            folderPath = rootPrefix.toLowerCase() + folderPath;
+        }
+        const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/';
+
         State.getFileMap().forEach((_, key) => {
             if (key.startsWith(prefix)) State.getFileMap().delete(key);
         });
@@ -432,7 +550,7 @@ function handleRemoveItem() {
     populateFileBrowser();
 }
 
-function handleExportItem() {
+async function handleExportItem() {
     const info = getSelectedTreeItemInfo();
     if (!info.path) {
         showToast("Select a file or folder to export.", "warning");
@@ -440,22 +558,135 @@ function handleExportItem() {
     }
 
     const normalizedTarget = info.path.toLowerCase();
-    if (info.isFolder) {
-        showToast("Zipping folders natively fallback: Downloading discoverable sub-tree elements.", "info");
-        const prefix = normalizedTarget + '/';
-        let count = 0;
-        State.getFileMap().forEach((content, key) => {
-            if (key.startsWith(prefix) && !key.endsWith('.keep')) {
-                triggerDownload(key.substring(key.lastIndexOf('/') + 1), content);
-                count++;
+    
+    let rootPrefix = '';
+    const fileMapKeys = Array.from(State.getFileMap().keys());
+    if (fileMapKeys.length > 0) {
+        const firstPath = fileMapKeys[0];
+        const firstPathParts = firstPath.split('/');
+        if (firstPathParts.length > 1) {
+            const potentialRoot = firstPathParts[0];
+            if (fileMapKeys.every(p => p.startsWith(potentialRoot + '/') || p === potentialRoot)) {
+                rootPrefix = potentialRoot + '/';
             }
-        });
-        if(count === 0) showToast("No text files found inside folder branch.", "warning");
+        }
+    }
+
+    if (info.isFolder) {
+        if (!window.JSZip) {
+            showToast("ZIP library not loaded yet.", "error");
+            return;
+        }
+        showToast("Generating ZIP archive...", "info");
+        const zip = new window.JSZip();
+        
+        let folderPath = normalizedTarget;
+        if (rootPrefix && !folderPath.startsWith(rootPrefix.toLowerCase())) {
+            folderPath = rootPrefix.toLowerCase() + folderPath;
+        }
+        const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/';
+        let count = 0;
+
+        const uniqueKeys = new Set();
+        State.getFileMap().forEach((_, k) => { if (k.startsWith(prefix)) uniqueKeys.add(k); });
+        State.getImageBlobUrls().forEach((_, k) => { if (k.startsWith(prefix)) uniqueKeys.add(k); });
+        State.getFontBlobUrls().forEach((_, k) => { if (k.startsWith(prefix)) uniqueKeys.add(k); });
+
+        for (const key of uniqueKeys) {
+            if (key.endsWith('.keep') || key.endsWith('.init.xml')) continue;
+            
+            const zipPath = key.substring(prefix.lastIndexOf('/', prefix.length - 2) + 1);
+
+            if (State.getImageBlobUrls().has(key)) {
+                try {
+                    const res = await fetch(State.getImageBlobUrls().get(key));
+                    const blob = await res.blob();
+                    zip.file(zipPath, blob);
+                    count++;
+                } catch (e) {
+                    console.error("Failed to fetch image blob for zip:", key, e);
+                }
+            } else if (State.getFontBlobUrls().has(key)) {
+                try {
+                    const res = await fetch(State.getFontBlobUrls().get(key));
+                    const blob = await res.blob();
+                    zip.file(zipPath, blob);
+                    count++;
+                } catch (e) {
+                    console.error("Failed to fetch font blob for zip:", key, e);
+                }
+            } else {
+                const content = State.getFileMap().get(key);
+                if (content !== undefined && content !== null) {
+                    zip.file(zipPath, content);
+                    count++;
+                }
+            }
+        }
+
+        if (count === 0) {
+            showToast("No files found inside folder branch to export.", "warning");
+            return;
+        }
+
+        try {
+            const contentBlob = await zip.generateAsync({ type: "blob" });
+            const folderName = info.path.split('/').pop() || "folder";
+            const element = document.createElement('a');
+            element.href = URL.createObjectURL(contentBlob);
+            element.download = `${folderName}.zip`;
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            showToast(`Successfully downloaded ${folderName}.zip. (Reminder: Save the root of the skin in the "USER" folder to apply it as a user skin.)`, "info", 6000);
+        } catch (err) {
+            console.error("ZIP generation error:", err);
+            showToast("Failed to generate zip file archive.", "error");
+        }
     } else {
-        const content = State.getFileMap().get(normalizedTarget) || "";
+        let fileKey = normalizedTarget;
+        if (rootPrefix && !fileKey.startsWith(rootPrefix.toLowerCase())) {
+            fileKey = rootPrefix.toLowerCase() + fileKey;
+        }
+        
         const filename = info.path.substring(info.path.lastIndexOf('/') + 1);
-        triggerDownload(filename, content);
-        showToast(`Exported asset: ${filename}`, "info");
+        
+        if (State.getImageBlobUrls().has(fileKey)) {
+            try {
+                const res = await fetch(State.getImageBlobUrls().get(fileKey));
+                const blob = await res.blob();
+                const element = document.createElement('a');
+                element.href = URL.createObjectURL(blob);
+                element.download = filename;
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                showToast(`Exported asset: ${filename}`, "info");
+            } catch(e) {
+                showToast("Failed to download image asset.", "error");
+            }
+        } else if (State.getFontBlobUrls().has(fileKey)) {
+            try {
+                const res = await fetch(State.getFontBlobUrls().get(fileKey));
+                const blob = await res.blob();
+                const element = document.createElement('a');
+                element.href = URL.createObjectURL(blob);
+                element.download = filename;
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                showToast(`Exported asset: ${filename}`, "info");
+            } catch(e) {
+                showToast("Failed to download font asset.", "error");
+            }
+        } else {
+            const content = State.getFileMap().get(fileKey) || "";
+            triggerDownload(filename, content);
+            showToast(`Exported asset: ${filename}`, "info");
+        }
     }
 }
 
@@ -656,6 +887,100 @@ function closePreviewItemModal() {
 }
 
 // Removed escapeHtml as it's not used here; if needed elsewhere, it should be in domUtils.
+
+async function handleExportProjectZip() {
+    if (!window.JSZip) {
+        showToast("ZIP library not loaded yet.", "error");
+        return;
+    }
+    if (State.getFileMap().size === 0) {
+        showToast("No project files loaded to save.", "warning");
+        return;
+    }
+    showToast("Generating full project ZIP archive...", "info");
+    const zip = new window.JSZip();
+    let count = 0;
+
+    const uniqueKeys = new Set();
+    State.getFileMap().forEach((_, k) => uniqueKeys.add(k));
+    State.getImageBlobUrls().forEach((_, k) => uniqueKeys.add(k));
+    State.getFontBlobUrls().forEach((_, k) => uniqueKeys.add(k));
+
+    for (const key of uniqueKeys) {
+        if (key.endsWith('.keep') || key.endsWith('.init.xml')) continue;
+
+        if (State.getImageBlobUrls().has(key)) {
+            try {
+                const res = await fetch(State.getImageBlobUrls().get(key));
+                const blob = await res.blob();
+                zip.file(key, blob);
+                count++;
+            } catch (e) {
+                console.error("Failed to fetch image blob for zip:", key, e);
+            }
+        } else if (State.getFontBlobUrls().has(key)) {
+            try {
+                const res = await fetch(State.getFontBlobUrls().get(key));
+                const blob = await res.blob();
+                zip.file(key, blob);
+                count++;
+            } catch (e) {
+                console.error("Failed to fetch font blob for zip:", key, e);
+            }
+        } else {
+            const content = State.getFileMap().get(key);
+            if (content !== undefined && content !== null) {
+                zip.file(key, content);
+                count++;
+            }
+        }
+    }
+
+    try {
+        const contentBlob = await zip.generateAsync({ type: "blob" });
+        const element = document.createElement('a');
+        element.href = URL.createObjectURL(contentBlob);
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        let productStr = "product";
+        let skinStr = "skin";
+        const skinRoot = State.getCurrentSkinRoot();
+        if (skinRoot) {
+            const parts = skinRoot.split('/').filter(Boolean);
+            if (parts.length > 0) productStr = parts[0];
+            if (parts.length > 1) skinStr = parts[parts.length - 1];
+        }
+
+        element.download = `${productStr}_${dateStr}_${skinStr}.zip`;
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+        State.clearHistory();
+        showToast(`Successfully downloaded full project archive. (Reminder: Save the root of the skin in the "USER" folder to apply it as a user skin.)`, "info", 6000);
+    } catch (err) {
+        console.error("ZIP generation error:", err);
+        showToast("Failed to generate zip file archive.", "error");
+    }
+}
+
+function updateSaveButtonVisualState() {
+    const saveBtn = document.getElementById('save-project-button');
+    if (!saveBtn) return;
+    const isDirty = State.canUndo();
+    const icon = saveBtn.querySelector('i');
+    if (isDirty) {
+        saveBtn.classList.add('dirty');
+        if (icon) {
+            icon.className = 'iconoir-download-square-solid';
+        }
+    } else {
+        saveBtn.classList.remove('dirty');
+        if (icon) {
+            icon.className = 'iconoir-download-square';
+        }
+    }
+}
 
 export function updateConsoleButtonErrorState(hasErrors) {
     const consoleButton = getConsoleButton();

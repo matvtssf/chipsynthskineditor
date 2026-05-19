@@ -48,6 +48,21 @@ export async function handleFileSelection(files) {
     if (!hasProductXml) {
         if (statusDiv) updateStatus('Please choose a chip<b>synth</b> root folder to start.', 6000);
         showToast('Please choose a chip<b>synth</b> root folder to start.', 'error', 6000);
+        
+        // Prevent premature sidebar expansion or layout showing when validation fails
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.add('collapsed');
+        }
+        document.body.classList.remove('app-loaded');
+
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = '';
+            setTimeout(() => {
+                fileInput.click();
+            }, 150);
+        }
         return;
     }
 
@@ -163,7 +178,11 @@ export function readFileAndStore(file, path) {
 
              // --- UPDATED: Added .png, .html, .fermatax, .fermatap ---
              if (/\.(svg|png|jpg|jpeg|gif)$/i.test(lowerFileName)) {
-                 const blobUrl = URL.createObjectURL(file);
+                 let blobFile = file;
+                 if (lowerFileName.endsWith('.svg')) {
+                     blobFile = new Blob([file], { type: 'image/svg+xml' });
+                 }
+                 const blobUrl = URL.createObjectURL(blobFile);
                  State.addImageBlobUrl(storeKey, blobUrl);
                  
                  // If it's an SVG file, also read it as text so it can be edited inside the XML Editor

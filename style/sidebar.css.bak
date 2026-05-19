@@ -154,10 +154,13 @@ body[data-app-theme="dark"] #skin-selector {
 #sidebar-controls #zoom-slider::-moz-range-thumb { width: 1rem; height: 1rem; background: #60a5fa; border-radius: 50%; cursor: pointer; border: none; } 
 #sidebar-controls .flex.justify-between { gap: 0.5rem; align-items: stretch; } 
 
-.load-button-area { flex-grow: 1; flex-shrink: 1; flex-basis: auto; min-width: 60px; margin-bottom: 0; display: flex; } 
-.sidebar-bottom-button.open-button { background-color: #3b82f6; color: white; padding: 0 0.75rem; border: none; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3em; flex-grow: 1; height: 2rem; box-sizing: border-box; } 
+.load-button-area { flex-grow: 1; flex-shrink: 1; flex-basis: auto; min-width: 60px; margin-bottom: 0; display: flex; gap: 0.5rem; } 
+.sidebar-bottom-button.open-button { background-color: #3b82f6; color: white; padding: 0 0.5rem; border: none; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3em; flex-grow: 1; height: 2rem; box-sizing: border-box; } 
 .sidebar-bottom-button.open-button:hover { background-color: #2563eb; } 
 .sidebar-bottom-button.open-button i { font-size: 1.1em; } 
+.sidebar-bottom-button.save-button { background-color: #10b981; color: white; padding: 0 0.5rem; border: none; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3em; flex-grow: 1; height: 2rem; box-sizing: border-box; }
+.sidebar-bottom-button.save-button:hover { background-color: #059669; }
+.sidebar-bottom-button.save-button i { font-size: 1.1em; }
 
 .sidebar-icon-button { padding: 0; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #9ca3af; background-color: #f3f4f6; color: #555; }
 
@@ -258,7 +261,13 @@ body:not(.app-loaded) #preview-area-container,
 body:not(.app-loaded) #sidebar-controls > div.mb-2,
 body:not(.app-loaded) #reference-button,
 body:not(.app-loaded) #debug-toggle-button,
-body:not(.app-loaded) #console-button {
+body:not(.app-loaded) #console-button,
+body:not(.app-loaded) #new-xml-btn,
+body:not(.app-loaded) #new-folder-btn,
+body:not(.app-loaded) #import-file-btn,
+body:not(.app-loaded) #remove-item-btn,
+body:not(.app-loaded) #export-item-btn,
+body:not(.app-loaded) #save-project-button {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;

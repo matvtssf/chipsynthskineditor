@@ -48,6 +48,21 @@ export async function handleFileSelection(files) {
     if (!hasProductXml) {
         if (statusDiv) updateStatus('Please choose a chip<b>synth</b> root folder to start.', 6000);
         showToast('Please choose a chip<b>synth</b> root folder to start.', 'error', 6000);
+        
+        // Roll back the premature app-loaded state transition completely
+        document.body.classList.remove('app-loaded');
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.remove('collapsed');
+        }
+
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = '';
+            setTimeout(() => {
+                fileInput.click();
+            }, 150);
+        }
         return;
     }
 

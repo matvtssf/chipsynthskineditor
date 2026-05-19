@@ -16,9 +16,12 @@ import {
     getMainContentArea,
     getDebugOverlay,
     getZoomSlider, // Used for min/max zoom values
-    logError
+    logError,
+    updateStatus,
+    showToast
 } from '../core/domUtils.js';
 import { updateZoomControlsDisplay } from './sidebarControlsInteractions.js';
+import { openXmlEditor } from '../core/xmlEditor.js';
 
 // --- Module State ---
 let isPanning = false;
@@ -98,6 +101,26 @@ export function setupMainContentInteractions() {
         mainContentArea.addEventListener('contextmenu', (e) => {
             if (e.button === 1) e.preventDefault();
         });
+    }
+
+    if (!document.body.dataset.layerKeysAttached) {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === '+' || e.key === '=') {
+                const sel = State.getSelectedElement() || SelectionManager.currentSelection;
+                if (sel) {
+                    e.preventDefault();
+                    moveElementLayer(sel, 'up');
+                }
+            } else if (e.key === '-' || e.key === '_') {
+                const sel = State.getSelectedElement() || SelectionManager.currentSelection;
+                if (sel) {
+                    e.preventDefault();
+                    moveElementLayer(sel, 'down');
+                }
+            }
+        });
+        document.body.dataset.layerKeysAttached = 'true';
     }
 }
 
@@ -213,6 +236,9 @@ function handleTransformMove(e) {
         targetEl.dataset.xmlAttr_height = newHeight;
     }
     updateSelectionOutline();
+    if (SelectionManager.currentSelection === targetEl) {
+        SelectionManager.renderContextToolbar(targetEl);
+    }
     if (window.updateInspectorReadout) {
         window.updateInspectorReadout(targetEl);
     }
@@ -231,20 +257,156 @@ function handleTransformEnd() {
     }
 }
 
+function getAttributesFromTagString(tagString) {
+    const attrs = {};
+    const closingBracketIndex = tagString.indexOf('>');
+    const openingTagContent = closingBracketIndex !== -1 ? tagString.slice(0, closingBracketIndex) : tagString;
+    
+    const regex = /([a-zA-Z0-9_\-:]+)=\s*["']([^"']*)["']/g;
+    let match;
+    while ((match = regex.exec(openingTagContent)) !== null) {
+        const name = match[1];
+        const value = match[2];
+        if (name !== 'xmlns' && !name.startsWith('xmlns:')) {
+            attrs[name] = value;
+        }
+    }
+    return attrs;
+}
+
+function findElementInXmlContent(fileContent, tagName, targetAttrs) {
+    let searchStr = `<${tagName}`;
+    let startIndex = 0;
+    let indices = [];
+    
+    while ((startIndex = fileContent.indexOf(searchStr, startIndex)) !== -1) {
+        const nextChar = fileContent.charAt(startIndex + searchStr.length);
+        if (nextChar === ' ' || nextChar === '\t' || nextChar === '\r' || nextChar === '\n' || nextChar === '>' || nextChar === '/') {
+            indices.push(startIndex);
+        }
+        startIndex += searchStr.length;
+    }
+    
+    console.log(`[XML Finder] Found ${indices.length} potential index occurrences for <${tagName}>`);
+    
+    for (const index of indices) {
+        const closeIndex = fileContent.indexOf('>', index);
+        if (closeIndex === -1) continue;
+        
+        const openingTagText = fileContent.slice(index, closeIndex + 1);
+        const fileTagAttrs = getAttributesFromTagString(openingTagText);
+        
+        let isMatch = true;
+        // Filter strictly based on identifying structural attributes to avoid xmlns serialization mismatches
+        const keysToCompare = ['x', 'y', 'w', 'h', 'width', 'height', 'param', 'identifier', 'name', 'alias', 'start_key', 'end_key'];
+        for (const key of keysToCompare) {
+            if (targetAttrs[key] !== undefined && fileTagAttrs[key] !== undefined) {
+                let v1 = String(fileTagAttrs[key]).trim();
+                let v2 = String(targetAttrs[key]).trim();
+                if (v1 === v2) continue;
+                
+                if (!isNaN(v1) && !isNaN(v2) && v1 !== "" && v2 !== "") {
+                    if (parseInt(v1, 10) !== parseInt(v2, 10)) {
+                        isMatch = false;
+                        break;
+                    }
+                } else {
+                    if (v1.toLowerCase().replace(/\\/g, '/') !== v2.toLowerCase().replace(/\\/g, '/')) {
+                        isMatch = false;
+                        break;
+                    }
+                }
+            } else if (targetAttrs[key] !== undefined && fileTagAttrs[key] === undefined) {
+                if (key === 'x' || key === 'y' || key === 'w' || key === 'h' || key === 'width' || key === 'height') {
+                    if (key === 'w' && fileTagAttrs['width'] !== undefined) continue;
+                    if (key === 'width' && fileTagAttrs['w'] !== undefined) continue;
+                    if (key === 'h' && fileTagAttrs['height'] !== undefined) continue;
+                    if (key === 'height' && fileTagAttrs['h'] !== undefined) continue;
+                    
+                    isMatch = false;
+                    break;
+                }
+            }
+        }
+
+        if (isMatch) {
+            console.log(`[XML Finder] Signature match verified successfully at file index: ${index}`);
+            if (openingTagText.trim().endsWith('/>')) {
+                return { index: index, length: (closeIndex - index) + 1, exactStr: openingTagText };
+            }
+            
+            const closeTagSearch = `</${tagName}>`;
+            let nesting = 1;
+            let currentPos = closeIndex + 1;
+            const openTagSearch = `<${tagName}`;
+            
+            while (nesting > 0) {
+                const nextOpen = fileContent.indexOf(openTagSearch, currentPos);
+                const nextClose = fileContent.indexOf(closeTagSearch, currentPos);
+                
+                if (nextClose === -1) {
+                    const simpleClose = fileContent.indexOf(closeTagSearch, index);
+                    if (simpleClose !== -1) {
+                        return { index: index, length: (simpleClose - index) + closeTagSearch.length, exactStr: fileContent.slice(index, simpleClose + closeTagSearch.length) };
+                    }
+                    break;
+                }
+                
+                if (nextOpen !== -1 && nextOpen < nextClose) {
+                    const nc = fileContent.charAt(nextOpen + openTagSearch.length);
+                    if (nc === ' ' || nc === '\t' || nc === '\r' || nc === '\n' || nc === '>' || nc === '/') {
+                        const nextOpenClose = fileContent.indexOf('>', nextOpen);
+                        if (nextOpenClose !== -1 && fileContent.slice(nextOpen, nextOpenClose + 1).trim().endsWith('/>')) {
+                            currentPos = nextOpenClose + 1;
+                        } else {
+                            nesting++;
+                            currentPos = nextOpen + openTagSearch.length;
+                        }
+                    } else {
+                        currentPos = nextOpen + openTagSearch.length;
+                    }
+                } else {
+                    nesting--;
+                    currentPos = nextClose + closeTagSearch.length;
+                    if (nesting === 0) {
+                        return { index: index, length: currentPos - index, exactStr: fileContent.slice(index, currentPos) };
+                    }
+                }
+            }
+            
+            const finalClose = fileContent.indexOf(closeTagSearch, index);
+            if (finalClose !== -1) {
+                return { index: index, length: (finalClose - index) + closeTagSearch.length, exactStr: fileContent.slice(index, finalClose + closeTagSearch.length) };
+            }
+            return { index: index, length: openingTagText.length, exactStr: openingTagText };
+        }
+    }
+    console.warn(`[XML Finder] Signature match failed for <${tagName}> with attributes:`, targetAttrs);
+    return null;
+}
+
 export function syncElementChangesToXmlSource(el) {
     const filePath = el.dataset.sourcePath;
-    if (!filePath) return;
+    if (!filePath) {
+        console.error("[Reconciliation Engine] Element missing valid dataset sourcePath.");
+        return;
+    }
 
     const tagName = el.dataset.xmlTagName;
     const oldRawXml = el.dataset.rawXml || "";
-    if (!tagName || !oldRawXml) return;
+    if (!tagName || !oldRawXml) {
+        console.error("[Reconciliation Engine] Element missing xmlTagName or rawXml reference.");
+        return;
+    }
 
     let attributesStr = "";
     const attributesArray = [];
+    const targetAttrs = {};
     for (const key in el.dataset) {
         if (key.startsWith('xmlAttr_')) {
             const attrName = key.slice(8);
             attributesArray.push({ name: attrName, value: el.dataset[key] });
+            targetAttrs[attrName] = el.dataset[key];
         }
     }
     
@@ -264,35 +426,146 @@ export function syncElementChangesToXmlSource(el) {
 
     const fileMap = State.getFileMap();
     const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+    
+    let targetKey = normalizedPath;
     let fileContent = fileMap.get(normalizedPath);
     
-    if (fileContent && fileContent.includes(oldRawXml)) {
-        if (typeof State.pushHistoryState === 'function') {
-            State.pushHistoryState(fileContent);
+    if (!fileContent) {
+        for (const key of fileMap.keys()) {
+            if (key.endsWith('/' + normalizedPath)) {
+                targetKey = key;
+                fileContent = fileMap.get(key);
+                break;
+            }
         }
-        fileContent = fileContent.replace(oldRawXml, newRawXml);
-        fileMap.set(normalizedPath, fileContent);
     }
 
-    const instance = State.getEditorInstanceByPath(normalizedPath);
+    if (!fileContent) {
+        console.error(`[Reconciliation Engine] File content not found in map cache for path: ${normalizedPath}`);
+        return;
+    }
+
+    const matchResult = findElementInXmlContent(fileContent, tagName, targetAttrs);
+    
+    if (matchResult) {
+        if (typeof State.pushHistoryState === 'function') {
+            State.pushHistoryState(targetKey, fileContent);
+        }
+        fileContent = fileContent.slice(0, matchResult.index) + newRawXml + fileContent.slice(matchResult.index + matchResult.length);
+        fileMap.set(targetKey, fileContent);
+        console.log(`[Reconciliation Engine] Successfully updated <${tagName}> inside file cache content.`);
+    } else {
+        console.warn(`[Reconciliation Engine] Could not match <${tagName}> in file content for sync.`);
+    }
+
+    let instance = State.getEditorInstanceByPath(targetKey);
+    if (!instance) {
+        instance = State.getEditorInstanceByPath(normalizedPath);
+    }
     if (instance) {
         let currentEditorContent = instance.currentContent;
-        if (currentEditorContent && currentEditorContent.includes(oldRawXml)) {
-            currentEditorContent = currentEditorContent.replace(oldRawXml, newRawXml);
-            State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
-            
-            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
-            if (textarea) {
-                const scrollPos = textarea.scrollTop;
-                textarea.value = currentEditorContent;
-                textarea.scrollTop = scrollPos;
-                textarea.dispatchEvent(new Event('input'));
+        if (currentEditorContent) {
+            const editorMatch = findElementInXmlContent(currentEditorContent, tagName, targetAttrs);
+            if (editorMatch) {
+                currentEditorContent = currentEditorContent.slice(0, editorMatch.index) + newRawXml + currentEditorContent.slice(editorMatch.index + editorMatch.length);
+                State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
+                
+                const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                if (textarea) {
+                    const scrollPos = textarea.scrollTop;
+                    textarea.value = currentEditorContent;
+                    textarea.scrollTop = scrollPos;
+                    textarea.dispatchEvent(new Event('input'));
+                }
             }
         }
     }
 
     el.dataset.rawXml = newRawXml;
-    console.log(`[Reconciliation Engine] Synced modifications successfully for <${tagName}> in ${filePath}`);
+}
+
+function deleteElementFromXml(el) {
+    const filePath = el.dataset.sourcePath;
+    if (!filePath) {
+        console.error("[Reconciliation Deletion] Element contains no sourcePath reference dataset.");
+        return false;
+    }
+
+    const tagName = el.dataset.xmlTagName;
+    const oldRawXml = el.dataset.rawXml || "";
+    if (!tagName || !oldRawXml) {
+        console.error("[Reconciliation Deletion] Missing element signature tag descriptors.");
+        return false;
+    }
+
+    const fileMap = State.getFileMap();
+    const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+    
+    let targetKey = normalizedPath;
+    let fileContent = fileMap.get(normalizedPath);
+    
+    if (!fileContent) {
+        for (const key of fileMap.keys()) {
+            if (key.endsWith('/' + normalizedPath)) {
+                targetKey = key;
+                fileContent = fileMap.get(key);
+                break;
+            }
+        }
+    }
+
+    if (!fileContent) {
+        console.error(`[Reconciliation Deletion] File mapping cache text is empty for path: ${normalizedPath}`);
+        return false;
+    }
+
+    const targetAttrs = {};
+    for (const key in el.dataset) {
+        if (key.startsWith('xmlAttr_')) {
+            const attrName = key.slice(8);
+            targetAttrs[attrName] = el.dataset[key];
+        }
+    }
+
+    const matchResult = findElementInXmlContent(fileContent, tagName, targetAttrs);
+    
+    if (matchResult) {
+        if (typeof State.pushHistoryState === 'function') {
+            State.pushHistoryState(targetKey, fileContent);
+        }
+        fileContent = fileContent.slice(0, matchResult.index) + fileContent.slice(matchResult.index + matchResult.length);
+        fileMap.set(targetKey, fileContent);
+        console.log(`[Reconciliation Deletion] Successfully removed <${tagName}> from file map.`);
+    } else {
+        console.error(`[Reconciliation Deletion] Critical match failure: could not find tag in source file text.`);
+        return false;
+    }
+
+    let instance = State.getEditorInstanceByPath(targetKey);
+    if (!instance) {
+        instance = State.getEditorInstanceByPath(normalizedPath);
+    }
+    if (instance) {
+        let currentEditorContent = instance.currentContent;
+        if (currentEditorContent) {
+            const editorMatch = findElementInXmlContent(currentEditorContent, tagName, targetAttrs);
+            if (editorMatch) {
+                currentEditorContent = currentEditorContent.slice(0, editorMatch.index) + currentEditorContent.slice(editorMatch.index + editorMatch.length);
+                State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
+                
+                const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                if (textarea) {
+                    const scrollPos = textarea.scrollTop;
+                    textarea.value = currentEditorContent;
+                    textarea.scrollTop = scrollPos;
+                    textarea.dispatchEvent(new Event('input'));
+                }
+            }
+        }
+    }
+
+    State.setXmlEditorDirty(true);
+    return true;
 }
 
 export function updateSelectionOutline() {
@@ -645,6 +918,8 @@ export const SelectionManager = {
         
         // Append the whole overlay directly to the element so it moves and scales with it
         el.appendChild(this.overlay);
+        
+        this.renderContextToolbar(el);
     },
 
     deselect() {
@@ -653,6 +928,8 @@ export const SelectionManager = {
         }
         this.overlay = null;
         this.currentSelection = null;
+        const existingToolbar = document.getElementById('element-context-action-toolbar');
+        if (existingToolbar) existingToolbar.remove();
     },
 
     nudgeElement(el, dx, dy) {
@@ -694,16 +971,35 @@ export const SelectionManager = {
                 let newLeft = startLeft;
                 let newTop = startTop;
 
-                if (pos.includes('e')) newW = startW + deltaX;
-                if (pos.includes('s')) newH = startH + deltaY;
-                
-                if (pos.includes('w')) {
-                    newW = startW - deltaX;
-                    newLeft = startLeft + deltaX;
-                }
-                if (pos.includes('n')) {
-                    newH = startH - deltaY;
-                    newTop = startTop + deltaY;
+                if (moveEvent.ctrlKey) {
+                    if (pos.includes('e')) {
+                        newW = startW + 2 * deltaX;
+                        newLeft = startLeft - deltaX;
+                    }
+                    if (pos.includes('w')) {
+                        newW = startW - 2 * deltaX;
+                        newLeft = startLeft + deltaX;
+                    }
+                    if (pos.includes('s')) {
+                        newH = startH + 2 * deltaY;
+                        newTop = startTop - deltaY;
+                    }
+                    if (pos.includes('n')) {
+                        newH = startH - 2 * deltaY;
+                        newTop = startTop + deltaY;
+                    }
+                } else {
+                    if (pos.includes('e')) newW = startW + deltaX;
+                    if (pos.includes('s')) newH = startH + deltaY;
+                    
+                    if (pos.includes('w')) {
+                        newW = startW - deltaX;
+                        newLeft = startLeft + deltaX;
+                    }
+                    if (pos.includes('n')) {
+                        newH = startH - deltaY;
+                        newTop = startTop + deltaY;
+                    }
                 }
 
                 // Prevent collapsing to negative sizes
@@ -740,6 +1036,8 @@ export const SelectionManager = {
             window.syncElementChangesToXmlSource(el);
         }
         
+        this.renderContextToolbar(el);
+        
         // Auto-update the Quick Inspector if it's open
         const inspectorX = document.getElementById('qi-input-x');
         if (inspectorX) {
@@ -748,6 +1046,273 @@ export const SelectionManager = {
             document.getElementById('qi-input-w').value = el.dataset.xmlAttr_w;
             document.getElementById('qi-input-h').value = el.dataset.xmlAttr_h;
         }
+    },
+
+    renderContextToolbar(el) {
+        const existingToolbar = document.getElementById('element-context-action-toolbar');
+        if (existingToolbar) existingToolbar.remove();
+
+        const canvasViewport = document.getElementById('canvas-viewport');
+        if (!canvasViewport) return;
+
+        const toolbar = document.createElement('div');
+        toolbar.id = 'element-context-action-toolbar';
+        toolbar.className = 'element-context-toolbar';
+
+        // Title bar Header Row containing Tag Name
+        const titleRow = document.createElement('div');
+        titleRow.className = 'context-toolbar-title-row';
+        
+        const nameLabel = document.createElement('span');
+        nameLabel.className = 'context-toolbar-el-name';
+        nameLabel.textContent = el.dataset.xmlTagName || 'Element';
+        
+        titleRow.appendChild(nameLabel);
+        toolbar.appendChild(titleRow);
+
+        // Coordinates Readout Row with Editable and Scrubbable Inputs
+        const coordsRow = document.createElement('div');
+        coordsRow.className = 'context-toolbar-coords';
+        const curX = el.dataset.xmlAttr_x || Math.round(parseFloat(el.style.left) || 0);
+        const curY = el.dataset.xmlAttr_y || Math.round(parseFloat(el.style.top) || 0);
+        const curW = el.dataset.xmlAttr_w || el.dataset.xmlAttr_width || Math.round(parseFloat(el.style.width) || el.clientWidth || 0);
+        const curH = el.dataset.xmlAttr_h || el.dataset.xmlAttr_height || Math.round(parseFloat(el.style.height) || el.clientHeight || 0);
+
+        const fields = [
+            { label: 'X', val: curX, prop: 'left', attr: 'xmlAttr_x' },
+            { label: 'Y', val: curY, prop: 'top', attr: 'xmlAttr_y' },
+            { label: 'W', val: curW, prop: 'width', attr: 'xmlAttr_w' },
+            { label: 'H', val: curH, prop: 'height', attr: 'xmlAttr_h' }
+        ];
+
+        fields.forEach(f => {
+            const group = document.createElement('div');
+            group.className = 'coord-input-group';
+            
+            const label = document.createElement('span');
+            label.className = 'coord-label';
+            label.textContent = f.label;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'coord-input';
+            input.value = f.val;
+            
+            input.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                if (e.button !== 0) return;
+                
+                let isDragging = false;
+                const scrubStartY = e.clientY;
+                const scrubStartVal = parseInt(input.value, 10) || 0;
+                
+                const onScrubMove = (moveEvent) => {
+                    const deltaY = scrubStartY - moveEvent.clientY;
+                    if (Math.abs(deltaY) > 2) {
+                        isDragging = true;
+                    }
+                    if (isDragging) {
+                        moveEvent.preventDefault();
+                        const nextVal = scrubStartVal + Math.round(deltaY);
+                        input.value = nextVal;
+                        
+                        el.style[f.prop] = `${nextVal}px`;
+                        el.dataset[f.attr] = nextVal;
+                        if (f.prop === 'width') el.dataset.xmlAttr_width = nextVal;
+                        if (f.prop === 'height') el.dataset.xmlAttr_height = nextVal;
+                        
+                        if (window.updateSelectionOutline) window.updateSelectionOutline();
+                        if (window.syncElementChangesToXmlSource) window.syncElementChangesToXmlSource(el);
+                        if (typeof State !== 'undefined' && State.setXmlEditorDirty) State.setXmlEditorDirty(true);
+                        if (window.updateInspectorReadout) window.updateInspectorReadout(el);
+                    }
+                };
+                
+                const onScrubUp = () => {
+                    document.removeEventListener('mousemove', onScrubMove);
+                    document.removeEventListener('mouseup', onScrubUp);
+                    if (isDragging) {
+                        SelectionManager.renderContextToolbar(el);
+                    }
+                };
+                
+                document.addEventListener('mousemove', onScrubMove);
+                document.addEventListener('mouseup', onScrubUp);
+            });
+
+            input.addEventListener('input', () => {
+                const val = parseInt(input.value, 10);
+                if (!isNaN(val)) {
+                    el.style[f.prop] = `${val}px`;
+                    el.dataset[f.attr] = val;
+                    if (f.prop === 'width') el.dataset.xmlAttr_width = val;
+                    if (f.prop === 'height') el.dataset.xmlAttr_height = val;
+                    
+                    if (window.updateSelectionOutline) window.updateSelectionOutline();
+                    if (window.syncElementChangesToXmlSource) window.syncElementChangesToXmlSource(el);
+                    if (typeof State !== 'undefined' && State.setXmlEditorDirty) State.setXmlEditorDirty(true);
+                    if (window.updateInspectorReadout) window.updateInspectorReadout(el);
+                }
+            });
+            
+            input.addEventListener('change', () => {
+                SelectionManager.renderContextToolbar(el);
+            });
+
+            group.appendChild(label);
+            group.appendChild(input);
+            coordsRow.appendChild(group);
+        });
+
+        toolbar.appendChild(coordsRow);
+
+        const actions = [
+            { id: 'cut', icon: 'iconoir-scissor', title: 'Cut' },
+            { id: 'paste', icon: 'iconoir-paste-clipboard', title: 'Paste' },
+            { id: 'duplicate', icon: 'iconoir-copy', title: 'Duplicate' },
+            { id: 'delete', icon: 'iconoir-xmark', title: 'Delete' },
+            { id: 'layer-up', icon: 'iconoir-transition-up', title: 'Layer Up' },
+            { id: 'layer-down', icon: 'iconoir-transition-down', title: 'Layer Down' },
+            { id: 'edit', icon: 'iconoir-edit-pencil', title: 'Open Element Editor' },
+            { id: 'jump-to-xml', icon: 'iconoir-code', title: 'Jump to XML' }
+        ];
+
+        actions.forEach(act => {
+            const btn = document.createElement('button');
+            btn.className = 'context-toolbar-btn';
+            if (act.id === 'delete') {
+                btn.className += ' context-btn-delete';
+            }
+            btn.title = act.title;
+            btn.dataset.action = act.id;
+            btn.innerHTML = `<i class="${act.icon}"></i>`;
+            
+            btn.addEventListener('mousedown', (e) => e.stopPropagation());
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (act.id === 'edit') {
+                    el.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true }));
+                    el.dispatchEvent(new MouseEvent('mouseup', { button: 1, bubbles: true }));
+                } else if (act.id === 'jump-to-xml') {
+                    const filePath = el.dataset.sourcePath;
+                    const rawXml = el.dataset.rawXml;
+                    if (filePath && rawXml) {
+                        const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
+                        if (typeof openXmlEditor === 'function') {
+                            openXmlEditor(normalizedPath);
+                            setTimeout(() => {
+                                const instance = State.getEditorInstanceByPath(normalizedPath);
+                                if (instance && instance.uniqueId) {
+                                    const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                                    if (textarea) {
+                                        const textContent = textarea.value;
+                                        let index = textContent.indexOf(rawXml);
+                                        if (index === -1) {
+                                            const tagName = el.dataset.xmlTagName;
+                                            if (tagName) index = textContent.indexOf(`<${tagName}`);
+                                        }
+                                        if (index !== -1) {
+                                            textarea.focus();
+                                            textarea.setSelectionRange(index, index + rawXml.length);
+                                            const numLines = textContent.substring(0, index).split('\n').length;
+                                            const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 16;
+                                            textarea.scrollTop = Math.max(0, (numLines - 5) * lineHeight);
+                                            textarea.dispatchEvent(new Event('scroll'));
+                                        }
+                                    }
+                                }
+                            }, 150);
+                        }
+                    }
+                } else if (act.id === 'cut') {
+                    const rawXml = el.dataset.rawXml;
+                    const tagName = el.dataset.xmlTagName;
+                    if (rawXml) {
+                        State.setProjectClipboard({
+                            tagName: tagName || 'Element',
+                            rawXml: rawXml
+                        });
+                        const success = deleteElementFromXml(el);
+                        if (success) {
+                            showToast(`Cut &lt;${tagName || 'Element'}&gt; to clipboard.`, 'error');
+                            SelectionManager.deselect();
+                            if (typeof window.renderMainGui === 'function') {
+                                window.renderMainGui();
+                            }
+                        } else {
+                            showToast(`Failed to cut element from XML source.`, 'error');
+                        }
+                    } else {
+                        showToast(`No raw XML data associated with this element.`, 'error');
+                    }
+                } else if (act.id === 'delete') {
+                    const tagName = el.dataset.xmlTagName;
+                    if (confirm(`Are you sure you want to delete this <${tagName || 'Element'}>? This will remove it from the XML configuration.`)) {
+                        const success = deleteElementFromXml(el);
+                        if (success) {
+                            showToast(`Deleted &lt;${tagName || 'Element'}&gt; successfully.`, 'error');
+                            SelectionManager.deselect();
+                            if (typeof window.renderMainGui === 'function') {
+                                window.renderMainGui();
+                            }
+                        } else {
+                            showToast(`Failed to delete element from XML source.`, 'error');
+                        }
+                    }
+                } else if (act.id === 'paste') {
+                    const clip = State.getProjectClipboard();
+                    if (clip && clip.rawXml) {
+                        activatePhantomPlacement(clip);
+                    } else {
+                        showToast('Clipboard is empty.', 'warning');
+                    }
+                } else if (act.id === 'duplicate') {
+                    const rawXml = el.dataset.rawXml;
+                    const tagName = el.dataset.xmlTagName;
+                    if (rawXml) {
+                        activatePhantomPlacement({ tagName: tagName || 'Element', rawXml: rawXml });
+                    } else {
+                        showToast('No XML data found on element to duplicate.', 'error');
+                    }
+                } else if (act.id === 'layer-up') {
+                    moveElementLayer(el, 'up');
+                } else if (act.id === 'layer-down') {
+                    moveElementLayer(el, 'down');
+                } else {
+                    console.log(`[Context Toolbar] Action triggered: ${act.id} on element`, el);
+                }
+            });
+            
+            toolbar.appendChild(btn);
+        });
+
+        canvasViewport.appendChild(toolbar);
+
+        const elRect = el.getBoundingClientRect();
+        const vpRect = canvasViewport.getBoundingClientRect();
+
+        const toolbarWidth = toolbar.offsetWidth || 185; 
+        let leftPos = (elRect.left - vpRect.left) + canvasViewport.scrollLeft + (elRect.width / 2) - (toolbarWidth / 2);
+        
+        const minPadding = 8;
+        if (leftPos < minPadding + canvasViewport.scrollLeft) {
+            leftPos = minPadding + canvasViewport.scrollLeft;
+        } else if (leftPos + toolbarWidth > vpRect.width - minPadding + canvasViewport.scrollLeft) {
+            leftPos = vpRect.width - toolbarWidth - minPadding + canvasViewport.scrollLeft;
+        }
+
+        let topPos = (elRect.bottom - vpRect.top) + canvasViewport.scrollTop + 8;
+        const toolbarHeight = toolbar.offsetHeight || 80;
+
+        if (topPos + toolbarHeight > vpRect.height + canvasViewport.scrollTop - minPadding) {
+            topPos = (elRect.top - vpRect.top) + canvasViewport.scrollTop - toolbarHeight - 8;
+            if (topPos < minPadding + canvasViewport.scrollTop) {
+                topPos = minPadding + canvasViewport.scrollTop;
+            }
+        }
+
+        toolbar.style.left = `${leftPos}px`;
+        toolbar.style.top = `${topPos}px`;
     }
 };
 
@@ -774,14 +1339,340 @@ document.addEventListener('mousedown', (e) => {
 
     // 3. We are in Debug Mode: proceed with selection logic
     // Ignore clicks inside the Quick Inspector or on handles/pads
-    if (e.target.closest('#element-quick-inspector') || e.target.closest('#qi-selection-box')) {
+    if (e.target.closest('#element-quick-inspector') || e.target.closest('#qi-selection-box') || e.target.closest('#element-context-action-toolbar')) {
         return;
     }
     
     const guiElement = e.target.closest('.gui-element');
     if (guiElement) {
         SelectionManager.select(guiElement);
+        updateStatus('Press + or - to move item up or down a layer in the container (moves element before or after next element in XML)', 0);
     } else {
         SelectionManager.deselect();
+        updateStatus('Ready.', 0);
     }
 });
+
+let phantomPlacementActive = false;
+let phantomClipboardData = null;
+let phantomGhostElement = null;
+
+function updateXmlCoords(rawXml, newX, newY) {
+    let updated = rawXml;
+    const firstTagEnd = updated.indexOf('>');
+    if (firstTagEnd === -1) return rawXml;
+    let openingTag = updated.substring(0, firstTagEnd);
+    const remainder = updated.substring(firstTagEnd);
+    
+    if (/(\s+x=)["'][^"']*["']/.test(openingTag)) {
+        openingTag = openingTag.replace(/(\s+x=)["'][^"']*["']/, `$1"${newX}"`);
+    } else {
+        if (openingTag.endsWith('/')) {
+            openingTag = openingTag.substring(0, openingTag.length - 1) + ` x="${newX}"/`;
+        } else {
+            openingTag = openingTag + ` x="${newX}"`;
+        }
+    }
+    
+    if (/(\s+y=)["'][^"']*["']/.test(openingTag)) {
+        openingTag = openingTag.replace(/(\s+y=)["'][^"']*["']/, `$1"${newY}"`);
+    } else {
+        if (openingTag.endsWith('/')) {
+            openingTag = openingTag.substring(0, openingTag.length - 1) + ` y="${newY}"/`;
+        } else {
+            openingTag = openingTag + ` y="${newY}"`;
+        }
+    }
+    return openingTag + remainder;
+}
+
+export function activatePhantomPlacement(clipboardData) {
+    if (!clipboardData || !clipboardData.rawXml) return;
+    cancelPhantomPlacement();
+    
+    phantomPlacementActive = true;
+    phantomClipboardData = clipboardData;
+    
+    phantomGhostElement = document.createElement('div');
+    phantomGhostElement.className = 'phantom-ghost-element';
+    phantomGhostElement.style.position = 'absolute';
+    phantomGhostElement.style.pointerEvents = 'none';
+    phantomGhostElement.style.opacity = '0.6';
+    phantomGhostElement.style.border = '2px dashed #3b82f6';
+    phantomGhostElement.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+    phantomGhostElement.style.zIndex = '11000';
+    
+    let w = 60, h = 30;
+    const wMatch = clipboardData.rawXml.match(/(\s(?:w|width))=["']([^"']*)["']/);
+    const hMatch = clipboardData.rawXml.match(/(\s(?:h|height))=["']([^"']*)["']/);
+    if (wMatch) w = parseInt(wMatch[2], 10) || w;
+    if (hMatch) h = parseInt(hMatch[2], 10) || h;
+    
+    phantomGhostElement.style.width = `${w}px`;
+    phantomGhostElement.style.height = `${h}px`;
+    
+    const zoomCanvas = getGuiZoomCanvas();
+    if (zoomCanvas) {
+        zoomCanvas.appendChild(phantomGhostElement);
+    }
+    
+    showToast(`Placement Active: Click canvas container to place <${clipboardData.tagName}> (Esc to cancel)`, 'info');
+    
+    document.addEventListener('keydown', handlePhantomKeyDown);
+    document.addEventListener('click', handlePhantomClick, true);
+    document.addEventListener('mousemove', handlePhantomMouseMove);
+}
+
+function cancelPhantomPlacement() {
+    phantomPlacementActive = false;
+    if (phantomGhostElement && phantomGhostElement.parentNode) {
+        phantomGhostElement.parentNode.removeChild(phantomGhostElement);
+    }
+    phantomGhostElement = null;
+    phantomClipboardData = null;
+    
+    document.removeEventListener('keydown', handlePhantomKeyDown);
+    document.removeEventListener('click', handlePhantomClick, true);
+    document.removeEventListener('mousemove', handlePhantomMouseMove);
+    document.querySelectorAll('.prospective-drop-zone').forEach(el => el.classList.remove('prospective-drop-zone'));
+}
+
+function handlePhantomKeyDown(e) {
+    if (e.key === 'Escape') {
+        cancelPhantomPlacement();
+        showToast('Placement canceled.', 'info');
+    }
+}
+
+function handlePhantomMouseMove(event) {
+    if (!phantomPlacementActive || !phantomGhostElement) return;
+    const zoomCanvas = getGuiZoomCanvas();
+    if (!zoomCanvas) return;
+    
+    const zoomCanvasRect = zoomCanvas.getBoundingClientRect();
+    const currentScale = State.getCurrentZoomLevel() || 1;
+    
+    const skinX = (event.clientX - zoomCanvasRect.left) / currentScale;
+    const skinY = (event.clientY - zoomCanvasRect.top) / currentScale;
+    
+    phantomGhostElement.style.left = `${skinX}px`;
+    phantomGhostElement.style.top = `${skinY}px`;
+    
+    document.querySelectorAll('.prospective-drop-zone').forEach(el => el.classList.remove('prospective-drop-zone'));
+    
+    let targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    let containerElement = null;
+    while (targetElement && targetElement !== document.body) {
+        if (targetElement.dataset && targetElement.dataset.xmlTagName) {
+            const tag = targetElement.dataset.xmlTagName.toLowerCase();
+            if (tag === 'view' || tag === 'pane' || tag === 'group' || tag === 'container') {
+                containerElement = targetElement;
+                break;
+            }
+        }
+        if (targetElement.id === 'skin-container-actual') {
+            containerElement = targetElement;
+            break;
+        }
+        targetElement = targetElement.parentElement;
+    }
+    
+    if (containerElement && containerElement.id !== 'skin-container-actual') {
+        containerElement.classList.add('prospective-drop-zone');
+    }
+}
+
+function handlePhantomClick(event) {
+    if (!phantomPlacementActive || !phantomClipboardData) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    let targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    let containerElement = null;
+    while (targetElement && targetElement !== document.body) {
+        if (targetElement.dataset && targetElement.dataset.xmlTagName) {
+            const tag = targetElement.dataset.xmlTagName.toLowerCase();
+            if (tag === 'view' || tag === 'pane' || tag === 'group' || tag === 'container') {
+                containerElement = targetElement;
+                break;
+            }
+        }
+        if (targetElement.id === 'skin-container-actual') {
+            containerElement = targetElement;
+            break;
+        }
+        targetElement = targetElement.parentElement;
+    }
+    
+    if (!containerElement) {
+        containerElement = document.getElementById('skin-container-actual');
+    }
+    if (!containerElement) {
+        showToast('No valid placement container found.', 'error');
+        cancelPhantomPlacement();
+        return;
+    }
+    
+    const containerRect = containerElement.getBoundingClientRect();
+    const currentScale = State.getCurrentZoomLevel() || 1;
+    const localX = Math.round((event.clientX - containerRect.left) / currentScale);
+    const localY = Math.round((event.clientY - containerRect.top) / currentScale);
+    
+    const finalXml = updateXmlCoords(phantomClipboardData.rawXml, localX, localY);
+    const fileMap = State.getFileMap();
+    let targetFilePath = containerElement.dataset.sourcePath || State.getDefaultMainGuiXmlPath();
+    const targetKey = targetFilePath.toLowerCase().replace(/\\/g, '/');
+    let fileContent = fileMap.get(targetKey);
+    
+    if (!fileContent) {
+        showToast(`Source file content not found for ${targetKey}`, 'error');
+        cancelPhantomPlacement();
+        return;
+    }
+    
+    if (typeof State.pushHistoryState === 'function') {
+        State.pushHistoryState(targetKey, fileContent);
+    }
+    
+    let insertionSuccess = false;
+    let updatedContent = "";
+    
+    if (containerElement.id === 'skin-container-actual' || !containerElement.dataset.xmlTagName) {
+        const lastCloseIndex = fileContent.lastIndexOf('</');
+        if (lastCloseIndex !== -1) {
+            updatedContent = fileContent.slice(0, lastCloseIndex) + "\n" + finalXml + "\n" + fileContent.slice(lastCloseIndex);
+            insertionSuccess = true;
+        }
+    } else {
+        const containerTagName = containerElement.dataset.xmlTagName;
+        const containerAttrs = {};
+        for (const key in containerElement.dataset) {
+            if (key.startsWith('xmlAttr_')) containerAttrs[key.slice(8)] = containerElement.dataset[key];
+        }
+        
+        const matchResult = findElementInXmlContent(fileContent, containerTagName, containerAttrs);
+        if (matchResult) {
+            const matchStr = matchResult.exactStr;
+            if (matchStr.trim().endsWith('/>')) {
+                const expandedContainer = matchStr.replace('/>', `>\n${finalXml}\n</${containerTagName}>`);
+                updatedContent = fileContent.slice(0, matchResult.index) + expandedContainer + fileContent.slice(matchResult.index + matchResult.length);
+                insertionSuccess = true;
+            } else {
+                const closingTagStr = `</${containerTagName}>`;
+                const closeTagIdx = matchStr.lastIndexOf(closingTagStr);
+                if (closeTagIdx !== -1) {
+                    const updatedMatchStr = matchStr.slice(0, closeTagIdx) + "\n" + finalXml + "\n" + matchStr.slice(closeTagIdx);
+                    updatedContent = fileContent.slice(0, matchResult.index) + updatedMatchStr + fileContent.slice(matchResult.index + matchResult.length);
+                    insertionSuccess = true;
+                }
+            }
+        }
+    }
+    
+    if (insertionSuccess) {
+        fileMap.set(targetKey, updatedContent);
+        State.setXmlEditorDirty(true);
+        
+        const instance = State.getEditorInstanceByPath(targetKey);
+        if (instance) {
+            State.updateEditorInstance(instance.uniqueId, { currentContent: updatedContent });
+            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+            if (textarea) {
+                const scrollPos = textarea.scrollTop;
+                textarea.value = updatedContent;
+                textarea.scrollTop = scrollPos;
+                textarea.dispatchEvent(new Event('input'));
+            }
+        }
+        
+        showToast(`Successfully pasted <${phantomClipboardData.tagName}>`, 'success');
+        cancelPhantomPlacement();
+        if (typeof window.renderMainGui === 'function') {
+            window.renderMainGui();
+        }
+    } else {
+        showToast('Failed to find container insertion point in XML.', 'error');
+        cancelPhantomPlacement();
+    }
+}
+
+export function moveElementLayer(el, direction) {
+    const filePath = el.dataset.sourcePath;
+    if (!filePath) return;
+    
+    const sibling = (direction === 'up') ? el.nextElementSibling : el.previousElementSibling;
+    if (!sibling || !sibling.classList.contains('gui-element')) {
+        showToast(`No layout sibling found to shift layer ${direction}.`, 'warning');
+        return;
+    }
+    
+    const fileMap = State.getFileMap();
+    const targetKey = filePath.toLowerCase().replace(/\\/g, '/');
+    let fileContent = fileMap.get(targetKey);
+    if (!fileContent) return;
+    
+    const elAttrs = {};
+    for (const key in el.dataset) {
+        if (key.startsWith('xmlAttr_')) elAttrs[key.slice(8)] = el.dataset[key];
+    }
+    
+    const sibAttrs = {};
+    for (const key in sibling.dataset) {
+        if (key.startsWith('xmlAttr_')) sibAttrs[key.slice(8)] = sibling.dataset[key];
+    }
+    
+    const matchEl = findElementInXmlContent(fileContent, el.dataset.xmlTagName, elAttrs);
+    const matchSib = findElementInXmlContent(fileContent, sibling.dataset.xmlTagName, sibAttrs);
+    
+    if (!matchEl || !matchSib) {
+        showToast("Could not locate element coordinates in XML source file.", "error");
+        return;
+    }
+    
+    if (typeof State.pushHistoryState === 'function') {
+        State.pushHistoryState(targetKey, fileContent);
+    }
+    
+    let newContent = "";
+    if (matchEl.index < matchSib.index) {
+        const before = fileContent.slice(0, matchEl.index);
+        const middle = fileContent.slice(matchEl.index + matchEl.length, matchSib.index);
+        const after = fileContent.slice(matchSib.index + matchSib.length);
+        newContent = before + matchSib.exactStr + middle + matchEl.exactStr + after;
+    } else {
+        const before = fileContent.slice(0, matchSib.index);
+        const middle = fileContent.slice(matchSib.index + matchSib.length, matchEl.index);
+        const after = fileContent.slice(matchEl.index + matchEl.length);
+        newContent = before + matchEl.exactStr + middle + matchSib.exactStr + after;
+    }
+    
+    fileMap.set(targetKey, newContent);
+    State.setXmlEditorDirty(true);
+    
+    const instance = State.getEditorInstanceByPath(targetKey);
+    if (instance) {
+        State.updateEditorInstance(instance.uniqueId, { currentContent: newContent });
+        const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+        if (textarea) {
+            const scrollPos = textarea.scrollTop;
+            textarea.value = newContent;
+            textarea.scrollTop = scrollPos;
+            textarea.dispatchEvent(new Event('input'));
+        }
+    }
+    
+    showToast(`Moved structural layer ${direction}.`, 'info');
+    if (typeof window.renderMainGui === 'function') {
+        window.renderMainGui();
+        setTimeout(() => {
+            const elements = document.querySelectorAll('.gui-element');
+            for (const candidate of elements) {
+                if (candidate.dataset.xmlTagName === el.dataset.xmlTagName && candidate.dataset.xmlAttr_x === el.dataset.xmlAttr_x && candidate.dataset.xmlAttr_y === el.dataset.xmlAttr_y) {
+                    SelectionManager.select(candidate);
+                    break;
+                }
+            }
+        }, 50);
+    }
+}

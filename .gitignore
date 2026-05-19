@@ -4,3 +4,5 @@ vibe_config.json
 *.bak
 *.safe
 *.zip
+
+.vibe_map.json

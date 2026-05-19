@@ -42,6 +42,7 @@ let savedZoomLevel = 1;
 let simulateSplashOverlay = false;
 let guiSettingsXmlParsedForNames = false;
 let currentZoomLevel = 1;
+let projectClipboard = null;
 
 let undoStack = [];
 let redoStack = [];
@@ -441,6 +442,8 @@ export function getActiveEditorInstanceId() { return activeEditorInstanceId; }
 // --- Zoom Level ---
 export function getCurrentZoomLevel() { return currentZoomLevel; }
 export function setCurrentZoomLevel(level) { currentZoomLevel = Math.max(0.1, Math.min(level, 10)); }
+export function getProjectClipboard() { return projectClipboard; }
+export function setProjectClipboard(value) { projectClipboard = value; }
 
 // --- Undo / Redo History ---
 export function pushHistoryState(path, xmlContent) {
@@ -510,9 +513,12 @@ export function clearAllState() {
     guiSettingsXmlParsedForNames = false;
     currentZoomLevel = 1;
     isXmlEditorDirty = false;
+    projectClipboard = null;
 
     visibilityStates = {}; clearExpandableViewContainers(); clearScrollViewStates(); clearAllElementStates();
     clearHistory();
+    const badge = document.getElementById('clipboard-badge');
+    if (badge) badge.classList.add('hidden');
 
     editorInstances.clear(); activeEditorInstanceId = null; nextEditorInstanceNumericId = 1;
 

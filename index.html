@@ -27,6 +27,7 @@
     
     <link rel="stylesheet" href="style/style.css">
     <style id="dynamic-styles"></style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-800"> <div id="text-logo">chip<b>synth</b> skin editor</div>
 
@@ -39,6 +40,12 @@
             <div id="canvas-controls-mid" class="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2 controls-hidden transition-opacity duration-300">
                 <button id="undo-btn" class="sidebar-header-button shadow disabled" title="Undo (Ctrl+Z)"><i class="iconoir-undo-circle"></i></button>
                 <button id="redo-btn" class="sidebar-header-button shadow disabled" title="Redo (Ctrl+Shift+Z)"><i class="iconoir-redo-circle"></i></button>
+                <div id="clipboard-badge" style="display: none; align-items: center; justify-content: center; font-size: 10px; background: #1a202c; color: #4ade80; padding: 4px 6px; border: 1px solid #2d3748; border-radius: 4px; font-family: monospace; user-select: none; margin-top: 4px; writing-mode: vertical-lr;">
+                    📋 <span id="clipboard-badge-text">Empty</span>
+                </div>
+                <div id="clipboard-badge" class="hidden items-center justify-center text-[10px] bg-gray-900 text-green-400 px-1.5 py-1 rounded border border-green-800 font-mono select-none" style="margin-top: 4px; writing-mode: vertical-lr;">
+                    📋 <span id="clipboard-badge-text">Empty</span>
+                </div>
             </div>
             <div id="canvas-viewport"> <div id="gui-zoom-canvas" style="transform-origin: top left; transform: scale(1);"> <div id="fixed-dimension-content"> <div id="skin-container-actual">
                             </div>
@@ -109,6 +116,9 @@
                         <div class="load-button-area flex-grow">
                             <button id="load-folder-button" class="sidebar-bottom-button open-button" title="Upload root chipsynth product folder">
                                 <i class="iconoir-folder"></i> Open
+                            </button>
+                            <button id="save-project-button" class="sidebar-bottom-button save-button" title="Download entire project zipped up">
+                                <i class="iconoir-download-square"></i> Save
                             </button>
                             <input type="file" id="file-input" webkitdirectory directory multiple style="display: none;" />
                            <input type="file" id="scl-file-input" accept=".scl" style="display: none;" />

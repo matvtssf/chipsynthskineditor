@@ -82,7 +82,8 @@
 .gui-image-button, 
 .gui-control-text-button, 
 .gui-expand-view-trigger,
-.gui-onoff-button {
+.gui-onoff-button,
+.gui-radio-option-button {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
@@ -91,6 +92,125 @@
     appearance: none !important;
     -webkit-appearance: none !important;
     text-indent: 0 !important;
+}
+
+/* --- Element Context Action Toolbar Overlay --- */
+.element-context-toolbar {
+    position: absolute;
+    z-index: 10005;
+    pointer-events: auto;
+    background-color: rgba(243, 244, 246, 0.95);
+    padding: 4px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(209, 213, 219, 0.8);
+    white-space: nowrap;
+    display: block;
+}
+
+body[data-app-theme="dark"] .element-context-toolbar {
+    background-color: rgba(31, 41, 55, 0.95) !important;
+    border-color: rgba(75, 85, 99, 0.8) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.context-toolbar-btn {
+    width: 26px !important;
+    height: 26px !important;
+    padding: 0 !important;
+    border-radius: 4px !important;
+    cursor: pointer;
+    display: inline-block !important;
+    vertical-align: middle;
+    text-align: center;
+    box-sizing: border-box;
+    margin-right: 4px;
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    color: #374151 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.context-toolbar-btn:last-child {
+    margin-right: 0;
+}
+
+.context-btn-delete {
+    margin-right: 12px !important;
+}
+
+body[data-app-theme="dark"] .context-toolbar-btn {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #f3f4f6 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.context-toolbar-btn:hover {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    color: #3b82f6 !important;
+}
+
+body[data-app-theme="dark"] .context-toolbar-btn:hover {
+    background-color: rgba(59, 130, 246, 0.25) !important;
+    border-color: rgba(96, 165, 250, 0.6) !important;
+    color: #60a5fa !important;
+}
+
+.context-toolbar-btn i {
+    font-size: 0.9rem !important;
+    vertical-align: middle;
+    line-height: 24px;
+}
+
+.context-toolbar-coords {
+    display: block;
+    font-family: monospace !important;
+    font-size: 0.7rem !important;
+    color: #4b5563 !important;
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: 4px;
+    margin-bottom: 6px;
+    border-radius: 3px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    text-align: center;
+}
+
+body[data-app-theme="dark"] .context-toolbar-coords {
+    color: #e5e7eb !important;
+    background-color: rgba(255, 255, 255, 0.06);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.coord-input-group {
+    display: inline-block;
+    margin: 0 3px;
+}
+
+.coord-label {
+    display: inline-block;
+    margin-right: 2px;
+    font-weight: bold;
+    font-size: 0.7rem;
+}
+
+.coord-input {
+    width: 36px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    padding: 1px 2px;
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: #374151;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+body[data-app-theme="dark"] .coord-input {
+    background: #1f2937;
+    border-color: #4b5563;
+    color: #f3f4f6;
 }
 
 /* Dynamic Styles Placeholder */
