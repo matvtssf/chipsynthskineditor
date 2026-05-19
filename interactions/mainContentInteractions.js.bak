@@ -1139,6 +1139,9 @@ export const SelectionManager = {
         // Title bar Header Row containing Tag Name
         const titleRow = document.createElement('div');
         titleRow.className = 'context-toolbar-title-row';
+        titleRow.style.display = 'flex';
+        titleRow.style.justifyContent = 'space-between';
+        titleRow.style.alignItems = 'center';
         
         const nameLabel = document.createElement('span');
         nameLabel.className = 'context-toolbar-el-name';
@@ -1149,23 +1152,147 @@ export const SelectionManager = {
             nameLabel.style.color = '#ef4444'; 
         }
 
-        const toggleBtn = document.createElement('button');
-        toggleBtn.className = 'context-toolbar-btn toggle-comment-btn';
-        toggleBtn.title = el.dataset.isCommented === 'true' ? 'Turn element on' : 'Turn element off';
-        toggleBtn.innerHTML = el.dataset.isCommented === 'true' ? '<i class="iconoir-on-tag"></i>' : '<i class="iconoir-off-tag"></i>';
-        toggleBtn.style.padding = '2px 4px';
-        toggleBtn.style.marginLeft = 'auto';
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = `editor-toggle-switch ${el.dataset.isCommented === 'true' ? 'off' : ''}`;
+        toggleWrapper.title = el.dataset.isCommented === 'true' ? 'Enable Element' : 'Disable Element';
         
-        toggleBtn.addEventListener('mousedown', (e) => e.stopPropagation());
-        toggleBtn.addEventListener('click', (e) => {
+        toggleWrapper.addEventListener('mousedown', (e) => e.stopPropagation());
+        toggleWrapper.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleElementCommentState(el);
             this.renderContextToolbar(el);
         });
         
         titleRow.appendChild(nameLabel);
-        titleRow.appendChild(toggleBtn);
+        titleRow.appendChild(toggleWrapper);
         toolbar.appendChild(titleRow);
+
+        // Coordinates Readout Row with Editable and Scrubbable Inputs
+        const coordsRow = document.createElement('div');
+        coordsRow.className = 'context-toolbar-coords';
+        const curX = el.dataset.xmlAttr_x || Math.round(parseFloat(el.style.left) || 0);
+        const curY = el.dataset.xmlAttr_y || Math.round(parseFloat(el.style.top) || 0);
+        const curW = el.dataset.xmlAttr_w || el.dataset.xmlAttr_width || Math.round(parseFloat(el.style.width) || el.clientWidth || 0);
+        const curH = el.dataset.xmlAttr_h || el.dataset.xmlAttr_height || Math.round(parseFloat(el.style.height) || el.clientHeight || 0);
+
+        const fields = [
+            { label: 'X', val: curX, prop: 'left', attr: 'xmlAttr_x' },
+            { label: 'Y', val: curY, prop: 'top', attr: 'xmlAttr_y' },
+            { label: 'W', val: curW, prop: 'width', attr: 'xmlAttr_w' },
+            { label: 'H', val: curH, prop: 'height', attr: 'xmlAttr_h' }
+        ];
+
+        fields.forEach(f => {
+            const group = document.createElement('div');
+            group.className = 'coord-input-group';
+            
+            const label = document.createElement('span');
+            label.className = 'coord-label';
+            label.textContent = f.label;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'coord-input';
+            input.value = f.val;
+            
+            input.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                if (e.button !== 0) return;
+                
+                let isDragging = false;
+                const scrubStartY = e.clientY;
+                const scrubStartVal = parseInt(input.value, 10) || 0;
+                
+                const onScrubMove = (moveEvent) => {
+                    const deltaY = scrubStartY - moveEvent.clientY;
+                    if (Math.abs(deltaY) > 2) {
+                        isDragging = true;
+                    }
+                    if (isDragging) {
+                        moveEvent.preventDefault();
+                        const nextVal = scrubStartVal + Math.round(deltaY);
+                        input.value = nextVal;
+                        
+                        el.style[f.prop] = `${nextVal}px`;
+                        el.dataset[f.attr] = nextVal;
+                        if (f.prop === 'width') el.dataset.xmlAttr_width = nextVal;
+                        if (f.prop === 'height') el.dataset.xmlAttr_height = nextVal;
+                        
+                        if (window.updateSelectionOutline) window.updateSelectionOutline();
+                        if (window.syncElementChangesToXmlSource) window.syncElementChangesToXmlSource(el);
+                        if (typeof State !== 'undefined' && State.setXmlEditorDirty) State.setXmlEditorDirty(true);
+                        if (window.updateInspectorReadout) window.updateInspectorReadout(el);
+                    }
+                };
+                
+                const onScrubUp = () => {
+                    document.removeEventListener('mousemove', onScrubMove);
+                    document.removeEventListener('mouseup', onScrubUp);
+                    if (isDragging) {
+                        SelectionManager.renderContextToolbar(el);
+                    }
+                };
+                
+                document.addEventListener('mousemove', onScrubMove);
+                document.addEventListener('mouseup', onScrubUp);
+            });
+
+            input.addEventListener('input', () => {
+                const val = parseInt(input.value, 10);
+                if (!isNaN(val)) {
+                    el.style[f.prop] = `${val}px`;
+                    el.dataset[f.attr] = val;
+                    if (f.prop === 'width') el.dataset.xmlAttr_width = val;
+                    if (f.prop === 'height') el.dataset.xmlAttr_height = val;
+                    
+                    if (window.updateSelectionOutline) window.updateSelectionOutline();
+                    if (window.syncElementChangesToXmlSource) window.syncElementChangesToXmlSource(el);
+                    if (typeof State !== 'undefined' && State.setXmlEditorDirty) State.setXmlEditorDirty(true);
+                    if (window.updateInspectorReadout) window.updateInspectorReadout(el);
+                }
+            });
+            
+            input.addEventListener('change', () => {
+                SelectionManager.renderContextToolbar(el);
+            });
+
+            group.appendChild(label);
+            group.appendChild(input);
+            coordsRow.appendChild(group);
+        });
+
+        toolbar.appendChild(coordsRow);
+
+        // New: Display Style Attributes if 'style' attribute is present
+        const styleNameAttr = el.dataset.xmlAttr_style;
+        if (styleNameAttr) {
+            const parsedStyles = State.getStyles();
+            const styleNames = styleNameAttr.split(';').map(s => s.trim()).filter(s => s);
+            
+            styleNames.forEach(styleName => {
+                if (parsedStyles && parsedStyles[styleName]) {
+                    const styleAttributes = parsedStyles[styleName];
+                    const styleSection = document.createElement('div');
+                    styleSection.className = 'context-toolbar-style-section';
+                    styleSection.innerHTML = `<div class="style-section-header">Style: <span class="style-name">${styleName}</span></div>`;
+                    
+                    const attributesList = document.createElement('ul');
+                    attributesList.className = 'style-attributes-list';
+                    for (const attrName in styleAttributes) {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${attrName}: ${styleAttributes[attrName]}`;
+                        attributesList.appendChild(listItem);
+                    }
+                    styleSection.appendChild(attributesList);
+                    toolbar.appendChild(styleSection);
+                } else {
+                    const styleSection = document.createElement('div');
+                    styleSection.className = 'context-toolbar-style-section';
+                    styleSection.innerHTML = `<div class="style-section-header">Style: <span class="style-name">${styleName} (Not Found)</span></div>`;
+                    toolbar.appendChild(styleSection);
+                }
+            });
+        }
 
         const actions = [
             { id: 'cut', icon: 'iconoir-scissor', title: 'Cut' },

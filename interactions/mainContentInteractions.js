@@ -1263,6 +1263,8 @@ export const SelectionManager = {
 
         toolbar.appendChild(coordsRow);
 
+
+
         const actions = [
             { id: 'cut', icon: 'iconoir-scissor', title: 'Cut' },
             { id: 'paste', icon: 'iconoir-paste-clipboard', title: 'Paste' },
