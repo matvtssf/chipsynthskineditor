@@ -37,8 +37,41 @@ const ATTRIBUTE_TYPES = ['string', 'integer', 'float', 'boolean', 'color', 'font
 /**
  * Sets up all event listeners for the Attribute Editor modal.
  */
+function setupListFilter(inputId, listId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', e => {
+        const term = e.target.value.toLowerCase();
+        const items = document.querySelectorAll(`#${listId} li`);
+        let lastHeader = null;
+        let headerHasVisibleItems = false;
+        items.forEach(li => {
+            if (li.classList.contains('element-category-header') || li.classList.contains('attribute-category-header')) {
+                if (lastHeader && !headerHasVisibleItems) {
+                    lastHeader.style.display = 'none';
+                }
+                lastHeader = li;
+                headerHasVisibleItems = false;
+                li.style.display = '';
+            } else {
+                const text = li.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    li.style.display = '';
+                    headerHasVisibleItems = true;
+                } else {
+                    li.style.display = 'none';
+                }
+            }
+        });
+        if (lastHeader && !headerHasVisibleItems) {
+            lastHeader.style.display = 'none';
+        }
+    });
+}
+
 export function setupAttributeEditorModalListeners() {
     console.log("[attributeEditor] Setting up Attribute Editor listeners...");
+    setupListFilter('attr-editor-search', 'attribute-editor-list');
     // Assumes the button to open this modal (#manage-attribute-definitions-btn) is handled elsewhere
     safelyAttachListener(getCloseAttributeEditorBtn, 'click', () => handleAttributeEditorToggle(false));
     safelyAttachListener(getEditAttributeCategoriesBtnAttr, 'click', handleEditAttributeCategories);

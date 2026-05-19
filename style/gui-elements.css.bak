@@ -100,7 +100,7 @@
     z-index: 10005;
     pointer-events: auto;
     background-color: rgba(243, 244, 246, 0.95);
-    padding: 4px;
+    padding: 5px;
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(209, 213, 219, 0.8);
@@ -112,6 +112,62 @@ body[data-app-theme="dark"] .element-context-toolbar {
     background-color: rgba(31, 41, 55, 0.95) !important;
     border-color: rgba(75, 85, 99, 0.8) !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.context-toolbar-title-row {
+    display: block;
+    padding: 2px 4px 4px 4px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body[data-app-theme="dark"] .context-toolbar-title-row {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.context-toolbar-el-name {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    vertical-align: middle;
+}
+
+body[data-app-theme="dark"] .context-toolbar-el-name {
+    color: #f3f4f6;
+}
+
+.context-toolbar-pencil-btn {
+    width: 18px !important;
+    height: 18px !important;
+    padding: 0 !important;
+    border-radius: 3px !important;
+    cursor: pointer;
+    display: inline-block !important;
+    vertical-align: middle;
+    text-align: center;
+    box-sizing: border-box;
+    margin-left: 8px;
+    background-color: transparent !important;
+    color: #4b5563 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+
+body[data-app-theme="dark"] .context-toolbar-pencil-btn {
+    color: #d1d5db !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.context-toolbar-pencil-btn:hover {
+    color: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+.context-toolbar-pencil-btn i {
+    font-size: 0.75rem !important;
+    vertical-align: middle;
+    line-height: 16px;
 }
 
 .context-toolbar-btn {
@@ -136,7 +192,7 @@ body[data-app-theme="dark"] .element-context-toolbar {
 }
 
 .context-btn-delete {
-    margin-right: 12px !important;
+    margin-right: 14px !important;
 }
 
 body[data-app-theme="dark"] .context-toolbar-btn {
@@ -163,55 +219,57 @@ body[data-app-theme="dark"] .context-toolbar-btn:hover {
     line-height: 24px;
 }
 
-.context-toolbar-coords {
+.quick-inspector-search {
     display: block;
+    width: 100%;
+    box-sizing: border-box;
     font-family: monospace !important;
-    font-size: 0.7rem !important;
+    font-size: 0.75rem !important;
     color: #4b5563 !important;
-    background-color: rgba(0, 0, 0, 0.04);
-    padding: 4px;
+    background-color: #ffffff;
+    padding: 4px 6px;
     margin-bottom: 6px;
     border-radius: 3px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-    text-align: center;
-}
-
-body[data-app-theme="dark"] .context-toolbar-coords {
-    color: #e5e7eb !important;
-    background-color: rgba(255, 255, 255, 0.06);
-    border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.coord-input-group {
-    display: inline-block;
-    margin: 0 3px;
-}
-
-.coord-label {
-    display: inline-block;
-    margin-right: 2px;
-    font-weight: bold;
-    font-size: 0.7rem;
-}
-
-.coord-input {
-    width: 36px;
-    background: #ffffff;
     border: 1px solid #d1d5db;
-    border-radius: 3px;
-    padding: 1px 2px;
-    font-size: 0.7rem;
-    font-family: monospace;
-    color: #374151;
-    text-align: center;
-    box-sizing: border-box;
+    outline: none;
 }
 
-body[data-app-theme="dark"] .coord-input {
-    background: #1f2937;
+.quick-inspector-search:focus {
+    border-color: #3b82f6;
+}
+
+body[data-app-theme="dark"] .quick-inspector-search {
+    color: #f3f4f6 !important;
+    background-color: #1f2937;
     border-color: #4b5563;
-    color: #f3f4f6;
 }
 
 /* Dynamic Styles Placeholder */
 #dynamic-styles { }
+
+/* --- Disabled/Commented Element State --- */
+.is-commented-element {
+    opacity: 0.4 !important;
+    filter: grayscale(100%);
+}
+
+.is-commented-element .is-commented-element {
+    opacity: 1 !important; /* Prevent double-fading nested children */
+    filter: none;
+}
+
+/* --- Phantom Placement Drop Zones --- */
+.prospective-drop-zone {
+    outline: 2px dashed #3b82f6 !important;
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    z-index: 10000 !important;
+    position: relative; /* Ensure z-index is respected over absolute siblings */
+}
+
+.prospective-drop-zone::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: rgba(59, 130, 246, 0.05); /* Extra tinting layer for empty containers */
+}

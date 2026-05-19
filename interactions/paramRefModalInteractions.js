@@ -33,8 +33,41 @@ let isParamRefModalDraggable = false; // Flag for dragging setup
 /**
  * Sets up all event listeners for the Parameter Reference modal.
  */
+function setupListFilter(inputId, listId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', e => {
+        const term = e.target.value.toLowerCase();
+        const items = document.querySelectorAll(`#${listId} li`);
+        let lastHeader = null;
+        let headerHasVisibleItems = false;
+        items.forEach(li => {
+            if (li.classList.contains('element-category-header') || li.classList.contains('attribute-category-header')) {
+                if (lastHeader && !headerHasVisibleItems) {
+                    lastHeader.style.display = 'none';
+                }
+                lastHeader = li;
+                headerHasVisibleItems = false;
+                li.style.display = '';
+            } else {
+                const text = li.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    li.style.display = '';
+                    headerHasVisibleItems = true;
+                } else {
+                    li.style.display = 'none';
+                }
+            }
+        });
+        if (lastHeader && !headerHasVisibleItems) {
+            lastHeader.style.display = 'none';
+        }
+    });
+}
+
 export function setupParamReferenceModalListeners() {
     console.log("[paramRefModal] Setting up Parameter Reference Modal listeners...");
+    setupListFilter('param-search', 'param-list');
     // Assumes the button to open this modal is handled elsewhere (e.g., elementRefModalInteractions.js)
     safelyAttachListener(getCloseParamRefBtn, 'click', handleParamReferenceToggle);
     safelyAttachListener(getImportParamRefBtn, 'click', handleImportParamReference);

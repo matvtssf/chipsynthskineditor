@@ -42,11 +42,48 @@ export function setupConfigModalListeners() {
     const themeToggle = document.getElementById('theme-toggle');
     const themeCheckbox = document.getElementById('theme-toggle-checkbox');
 
-    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox || !themeToggle || !themeCheckbox) {
+    const gridSizeSlider = document.getElementById('grid-size-slider');
+    const gridSizeValueSpan = document.getElementById('grid-size-value');
+    const snapToggle = document.getElementById('snap-toggle');
+    const snapCheckbox = document.getElementById('snap-toggle-checkbox');
+    const snapSensitivitySlider = document.getElementById('snap-sensitivity-slider');
+    const snapSensitivityValueSpan = document.getElementById('snap-sensitivity-value');
+    const snapTypeSelect = document.getElementById('snap-type-select');
+
+    if (!modal || !closeBtn || !gridToggle || !gridCheckbox || !bgColorInput || !bgColorValueSpan || !bgModeToggle || !bgModeCheckbox || !splashToggle || !splashCheckbox || !themeToggle || !themeCheckbox || !gridSizeSlider || !gridSizeValueSpan || !snapToggle || !snapCheckbox || !snapSensitivitySlider || !snapSensitivityValueSpan || !snapTypeSelect) {
         logError("[configModal setup] CRITICAL: One or more config modal elements not found during listener setup! Listeners NOT attached.", null, true);
         configListenersSetup = false; // Explicitly keep false if setup fails
         return;
     }
+
+    gridSizeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10) || 8;
+        if (gridSizeValueSpan) gridSizeValueSpan.textContent = `${val}px`;
+        State.setSnappingGrid(val);
+        const viewport = document.getElementById('canvas-viewport');
+        if (viewport) {
+            viewport.style.setProperty('--grid-background-size', `${val}px`);
+        }
+    });
+
+    snapToggle.addEventListener('click', () => {
+        const newState = !snapToggle.getAttribute('aria-checked') || snapToggle.getAttribute('aria-checked') === 'false';
+        snapToggle.setAttribute('aria-checked', String(newState));
+        snapCheckbox.checked = newState;
+        State.setSnappingEnabled(newState);
+        updateGridSnapGlow();
+    });
+
+    snapSensitivitySlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10) || 8;
+        if (snapSensitivityValueSpan) snapSensitivityValueSpan.textContent = `${val}px`;
+        State.setSnappingSensitivity(val);
+    });
+
+    snapTypeSelect.addEventListener('change', (e) => {
+        State.setSnappingMode(e.target.value);
+        updateGridSnapGlow();
+    });
 
     // Theme toggle
     themeToggle.addEventListener('click', () => {
@@ -191,6 +228,37 @@ function initConfigModalValues() {
              guiZoomCanvas.classList.toggle('grid-active', showGrid);
         }
 
+        // Init Grid Size
+        const gridSize = State.getSnappingGrid ? State.getSnappingGrid() : 8;
+        const gridSizeSlider = document.getElementById('grid-size-slider');
+        const gridSizeValueSpan = document.getElementById('grid-size-value');
+        if (gridSizeSlider) gridSizeSlider.value = gridSize;
+        if (gridSizeValueSpan) gridSizeValueSpan.textContent = `${gridSize}px`;
+        if (guiZoomCanvas && guiZoomCanvas.parentElement) {
+            guiZoomCanvas.parentElement.style.setProperty('--grid-background-size', `${gridSize}px`);
+        }
+
+        // Init Snap Enablement
+        const snapActive = State.getSnappingEnabled ? State.getSnappingEnabled() : false;
+        const snapToggle = document.getElementById('snap-toggle');
+        const snapCheckbox = document.getElementById('snap-toggle-checkbox');
+        if (snapToggle && snapCheckbox) {
+            snapToggle.setAttribute('aria-checked', String(snapActive));
+            snapCheckbox.checked = snapActive;
+        }
+
+        // Init Snap Sensitivity
+        const sensitivity = State.getSnappingSensitivity ? State.getSnappingSensitivity() : 8;
+        const snapSensitivitySlider = document.getElementById('snap-sensitivity-slider');
+        const snapSensitivityValueSpan = document.getElementById('snap-sensitivity-value');
+        if (snapSensitivitySlider) snapSensitivitySlider.value = sensitivity;
+        if (snapSensitivityValueSpan) snapSensitivityValueSpan.textContent = `${sensitivity}px`;
+
+        // Init Snap Type
+        const snapType = State.getSnappingMode ? State.getSnappingMode() : 'gridlines';
+        const snapTypeSelect = document.getElementById('snap-type-select');
+        if (snapTypeSelect) snapTypeSelect.value = snapType;
+
         // Init Background Color
         const customBgColor = State.getCustomBackgroundColor();
         bgColorInput.value = customBgColor;
@@ -217,8 +285,22 @@ function initConfigModalValues() {
         splashToggle.setAttribute('aria-checked', String(simulateSplash));
         splashCheckbox.checked = simulateSplash;
 
+        updateGridSnapGlow();
+
         console.log("[configModal] Modal values initialized successfully.");
     } catch (error) {
         logError("[configModal init] Error initializing config modal values", error, true);
+    }
+}
+
+export function updateGridSnapGlow() {
+    const mainContentArea = getMainContentArea();
+    if (!mainContentArea) return;
+    const snapActive = State.getSnappingEnabled ? State.getSnappingEnabled() : false;
+    const snapType = State.getSnappingMode ? State.getSnappingMode() : 'gridlines';
+    if (snapActive && snapType === 'gridlines') {
+        mainContentArea.classList.add('snap-grid-glow');
+    } else {
+        mainContentArea.classList.remove('snap-grid-glow');
     }
 }

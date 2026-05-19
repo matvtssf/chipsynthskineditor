@@ -6,7 +6,6 @@ Canvas Buttons:
 
 place the icons in a logical ux friendly area but do not obscure the status line at hte bottom left
 
-
 Add new working buttons above the file list in the sidebar:
 -"New XML" (creates a new file for the product) Icoinoir icon = "page-plus-in")
 -"New Folder" (creates a new folder in the tree based on which sub folder you have clicked. Iconoir icon = "folder-plus")
@@ -14,46 +13,74 @@ Add new working buttons above the file list in the sidebar:
 -"Remove" (removes a file or folder from the blob and the project. Iconoir icon = "page-minus-in")
 -"Export" (Downloads the individual selected file. If a folder is selected, it downloads the folder zipped. Iconoir icon = "download")
 
+
 The Open button at the bottom:
--We need to make the open button smaller and make a new "Save" button. It will download the entire project zipped up. If a project has a change that hasn't been saved, make sure to colour this up green. the icon that it uses will be "INSERTICONHERE"
-When opening a new project:
--warn if there are changes that need to be saved and to download the project
--edit mode should shut off, all windows should be closed. It's a clean slate.
+-We need to make the open button a bit smaller smaller and make a new "Save" button that will sit to its right. It will download the entire project zipped up. the icon that it uses will be "download-square"
 -Iconoir icon for saving: regular project save is "download-square". When there are unsaved changes, use the icon "download-square-solid"
+-If a project has a change that hasn't been saved, make sure to colour this icon green. 
+
+
+
+When opening a new project:
+
+-warn if there are changes that need to be saved and to download the project
+
+-edit mode should shut off, all windows should be closed. It's a clean slate.
 
 
 When an element is selected:
--Show small buttons under the element (or above if the canvas border is too close): buttons include: "copy", "duplicate", 
+-Show small buttons under the element (or above if the canvas border is too close): buttons include: "cut", "paste", "duplicate", "delete", "layer up", "layer down"
+
+iconoir icons:
+cut: scissor
+paste: paste-clipboard
+duplicate: copy 
+delete:xmark
+layer up: transition-up
+layer down: transition-down
+
+buttons should be side by side and half the size of the sidebar buttons, and use the same style. Lay them horizontally beside each other, and they should be centered under the element that's selected. If the element is too close to the canvas edge, have the buttons bind to the edge of the canvas with some padding.
+buttons are placeholders for now and we will implement functionality later.
+
 -When element is selected by default, a status msg at the bottom should say "Press + or - to move item up or down a layer in the container (moves element before or after next element in XML)"
--
+
+
+Implementing the buttons:
+alright let's implement button functionality, but let's plan this out so you don't crash. don't write code yet, but let's go through this. Let me know if you have any suggestions or if I'm missing anything. You also surprised me with some special features that I may have missed in the past, I wouldn't be mad if you have ideas :)
+
+cut: cuts the element but puts it into clipboard memory (I don't know how you're going to do this and display it, when it cuts it should cut the XML block for that element)
+
+paste: pastes the element from clipboard memory. Note: it should paste at the highest "layer" (ie: in front of any other elements in that container).. it should spawn and follow your mouse until you click and "place" it (the debug overlay will tell us the coordinates). it should also probably highlight the container you're pasting into so the tool knows where to put it and you know where it's going to "land". the respective XML will then have the XML code for that element
+
+duplicate: basically an instant copy/paste. spawn behaviour is similar to regular pasting
+delete: removes the element (and deletes the xml code block from whatever xml file it was in)
+
+Layer up and down buttons: activated with key "+" or when you press the layer up button. This will take the currently selected element and move its xml code block above whatever element was before it..effectively "moving it up a layer". The opposite is true for layer down.
+
 
 When Scaling Elements:
--The x/y/w/h coordinates should display under the element
--holding CTRL will centre scale
+-holding CTRL while clicking a scale handle  will centre scale
 
 
 Dragging elements:
--Drag and drop element to another container if it exists (this might be hard)
 -holding ctrl will duplicate the element
 -holding ctrl while dragging an element will force the element to drag along a horizontal or vertical path depending on how the mouse is moved
+-Drag and drop element to another container if it exists (this might be hard)
+
+
+*************
+
 -Turn on snapping mode with sensitivity gauge (done in config)
 -holding shift while dragging the element will bypass the snapping
--holding alt while dragging an element will clone/duplicate the element (create a new element in the XML
 
 
-Possible local Ollama AI features:
--In config, "enable AI" can be a toggle
--In XML Editor: Clean up XML / validate syntax
--In XML Editor: when text is highlighted, allow the AI to see the code blocks and manipulate them (easy way to better spread out and align elements? like buttons, quickly fix the alignment of elements to other elements? etc)
 
 Element Editor:
 -Make nothing selectable
 -Button to sort the attributes more humanly (ie: coordinates / dimensions first, labels next, style sheet linking next, colours, then do the same for other groupsets ie label coordinates, etc..it needs to be whatever makes most logical sense that a human would want to see first when they're editing the element). Then the attribute order would dynamically change in the element  menu)
 -allow the user to drag attribute orders around (will need handles)
 -If a style= attribute is detected, show the attributes from styles.xml
-
-... Lists:
--Needs a filter bar so the user can zero in on it easier
+-All lists need filters so the user can zero in on it easier
 
 XML Editor:
 -implement a word wrap
@@ -61,3 +88,8 @@ XML Editor:
 
 Styles Editing:
 -When editing styles.xml (it must match the styles path defined in gui.xml), open new Styles Editor (XML editor with extra content on the right)
+
+Possible local Ollama AI features:
+-In config, "enable AI" can be a toggle
+-In XML Editor: Clean up XML / validate syntax
+-In XML Editor: when text is highlighted, allow the AI to see the code blocks and manipulate them (easy way to better spread out and align elements? like buttons, quickly fix the alignment of elements to other elements? etc)

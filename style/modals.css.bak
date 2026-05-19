@@ -258,6 +258,47 @@ body[data-app-theme="dark"] #attribute-editor-list li:hover {
 } 
 .toast-close-btn:hover { background-color: rgba(0, 0, 0, 0.4); }
 
+/* Accessibility Enhancements for Config Toggle Switches */
+.config-toggle-btn {
+    position: relative !important;
+    display: inline-block !important;
+    width: 48px !important;
+    height: 24px !important;
+    background-color: #cbd5e1 !important;
+    border-radius: 9999px !important;
+    border: 1px solid #94a3b8 !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    transition: background-color 0.2s ease, border-color 0.2s ease !important;
+}
+
+body[data-app-theme="dark"] .config-toggle-btn {
+    background-color: #374151 !important;
+    border-color: #4b5563 !important;
+}
+
+.config-toggle-btn[aria-checked="true"] {
+    background-color: #10b981 !important;
+    border-color: #059669 !important;
+}
+
+.toggle-circle {
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
+    width: 18px !important;
+    height: 18px !important;
+    background-color: #ffffff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    pointer-events: none !important;
+}
+
+.config-toggle-btn[aria-checked="true"] .toggle-circle {
+    transform: translateX(24px) !important;
+}
+
 /* Unsaved Changes specific to modals */
 #export-reference-btn.unsaved-changes, #export-param-ref-btn.unsaved-changes { 
     background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; animation: pulse-yellow 1.5s infinite; 

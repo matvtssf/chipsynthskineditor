@@ -311,7 +311,7 @@ function saveChanges(instanceId) {
     }
 }
 
-function checkAndRerender(instanceId) {
+function checkAndRerender(instanceId, isLivePreview = false) {
     const instance = State.getEditorInstance(instanceId);
     if (!instance) {
         logError(`[checkAndRerender] No instance found for ID: ${instanceId}`);
@@ -370,15 +370,21 @@ function checkAndRerender(instanceId) {
     if (rootSkinContent !== undefined && rootSkinContent !== null) {
         loadSkin(expectedMainSkinFile, rootSkinContent)
             .then(() => {
-                showToast(`Skin hot-reloaded with changes from ${editedFilePath.split('/').pop()}.`, 'info');
+                if (!isLivePreview) {
+                    showToast(`Skin hot-reloaded with changes from ${editedFilePath.split('/').pop()}.`, 'info');
+                }
             })
             .catch(err => {
                 logError(`[checkAndRerender] Error reloading skin ${expectedMainSkinFile}:`, err);
-                showToast(`Error reloading skin. See console.`, 'error');
+                if (!isLivePreview) {
+                    showToast(`Error reloading skin. See console.`, 'error');
+                }
             });
     } else {
         logError(`[checkAndRerender] Could not fetch root content for ${expectedMainSkinFile} to reload skin.`);
-        showToast('Internal error: Could not resolve root skin data.', 'error');
+        if (!isLivePreview) {
+            showToast('Internal error: Could not resolve root skin data.', 'error');
+        }
     }
 }
 
@@ -1016,6 +1022,7 @@ function handleEditorInput(instanceId) {
     
     typingDebounceTimers.set(instanceId, setTimeout(() => {
         updateUIDisplay(instanceId);
+        checkAndRerender(instanceId, true);
         typingDebounceTimers.delete(instanceId);
     }, 250));
 }

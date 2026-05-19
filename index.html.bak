@@ -40,6 +40,9 @@
             <div id="canvas-controls-mid" class="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2 controls-hidden transition-opacity duration-300">
                 <button id="undo-btn" class="sidebar-header-button shadow disabled" title="Undo (Ctrl+Z)"><i class="iconoir-undo-circle"></i></button>
                 <button id="redo-btn" class="sidebar-header-button shadow disabled" title="Redo (Ctrl+Shift+Z)"><i class="iconoir-redo-circle"></i></button>
+                <div id="clipboard-badge" style="display: none; align-items: center; justify-content: center; font-size: 10px; background: #1a202c; color: #4ade80; padding: 4px 6px; border: 1px solid #2d3748; border-radius: 4px; font-family: monospace; user-select: none; margin-top: 4px; writing-mode: vertical-lr;">
+                    📋 <span id="clipboard-badge-text">Empty</span>
+                </div>
                 <div id="clipboard-badge" class="hidden items-center justify-center text-[10px] bg-gray-900 text-green-400 px-1.5 py-1 rounded border border-green-800 font-mono select-none" style="margin-top: 4px; writing-mode: vertical-lr;">
                     📋 <span id="clipboard-badge-text">Empty</span>
                 </div>
@@ -48,8 +51,8 @@
                             </div>
                     </div>
                 </div>
-                <div id="status" class="status-message">Initializing...</div>
             </div>
+            <div id="status" class="status-message">Initializing...</div>
             <div id="error-log-container" class="mt-auto pt-2 border-t flex-shrink-0" style="display: none;">
                 <div class="flex justify-between items-center mb-1">
                     <strong class="text-sm text-red-800">Internal Errors:</strong>
@@ -232,6 +235,34 @@
                     </button>
                     <input type="checkbox" id="grid-toggle-checkbox" class="hidden">
                 </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center justify-between">
+                        <label for="grid-size-slider" class="text-sm font-medium text-gray-700">Grid Size</label>
+                        <span id="grid-size-value" class="text-xs text-gray-500 font-mono">8px</span>
+                    </div>
+                    <input type="range" id="grid-size-slider" min="2" max="64" step="1" value="8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label for="snap-toggle" class="text-sm font-medium text-gray-700">Enable Grid Snapping</label>
+                    <button id="snap-toggle" role="switch" aria-checked="false" class="config-toggle-btn">
+                        <span class="toggle-circle"></span>
+                    </button>
+                    <input type="checkbox" id="snap-toggle-checkbox" class="hidden">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center justify-between">
+                        <label for="snap-sensitivity-slider" class="text-sm font-medium text-gray-700">Snap Sensitivity</label>
+                        <span id="snap-sensitivity-value" class="text-xs text-gray-500 font-mono">8px</span>
+                    </div>
+                    <input type="range" id="snap-sensitivity-slider" min="1" max="32" step="1" value="8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label for="snap-type-select" class="text-sm font-medium text-gray-700">Snap Type</label>
+                    <select id="snap-type-select" class="p-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                        <option value="gridlines">Snap to Gridlines</option>
+                        <option value="element">Snap to Element</option>
+                    </select>
+                </div>
                 <div class="flex items-center justify-between">
                     <label for="bg-color-input" class="text-sm font-medium text-gray-700">Custom Background</label>
                     <div class="flex items-center space-x-2">
@@ -293,6 +324,9 @@
                             <button id="add-element-ref-btn" title="Add New Element Definition"><i class="iconoir-plus"></i></button>
                              </div>
                     </div>
+                    <div class="p-1 border-b border-gray-200 flex-shrink-0">
+                        <input type="text" id="ref-element-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search elements...">
+                    </div>
                     <p id="reference-placeholder-text" class="text-gray-500 italic p-4 text-center" style="display: none;">No data loaded. Import JSON.</p>
                     <ul id="reference-element-list"></ul>
                 </div>
@@ -305,6 +339,9 @@
                          <div class="header-actions">
                             <button id="add-attribute-ref-btn" title="Add Existing Attribute to Selected Element"><i class="iconoir-plus"></i></button>
                              </div>
+                    </div>
+                    <div class="p-1 border-b border-gray-200 flex-shrink-0">
+                        <input type="text" id="ref-attribute-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search attributes...">
                     </div>
                     <ul id="reference-attribute-list"></ul>
                 </div>
@@ -348,6 +385,9 @@
                          <div>
                             <button id="add-new-attribute-btn" title="Define New Attribute" class="text-xs p-1 hover:bg-gray-200 rounded"><i class="iconoir-plus"></i></button>
                              </div>
+                     </div>
+                     <div class="mb-2 flex-shrink-0">
+                         <input type="text" id="attr-editor-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search defined attributes...">
                      </div>
                      <ul id="attribute-editor-list" class="flex-grow overflow-y-auto text-sm space-y-1">
                          <li>Loading...</li>

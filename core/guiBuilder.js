@@ -150,6 +150,9 @@ export function buildGui(mainGuiXmlContent, mainGuiXmlPath) {
                 if (!['Styles', 'Font', 'Property', 'Define', 'XMLMacroText', 'Style', 'StyleMacro'].includes(child.tagName)) {
                     renderElement(child, skinHolder, {}, mainGuiXmlPath);
                 }
+            } else if (child.nodeType === Node.COMMENT_NODE && State.getDebugEnabled && State.getDebugEnabled()) {
+                // Parse and render disabled elements in edit mode
+                renderElement(child, skinHolder, {}, mainGuiXmlPath, true);
             }
         }
 

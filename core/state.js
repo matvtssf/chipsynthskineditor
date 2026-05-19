@@ -36,6 +36,10 @@ let skinDefaultBackgroundColor = null;
 let showGridLines = false;
 let debugEnabled = false;
 let selectedElement = null;
+let snappingEnabled = false;
+let snappingGrid = 8;
+let snappingSensitivity = 8;
+let snappingMode = 'absolute';
 let savedViewportScrollLeft = 0;
 let savedViewportScrollTop = 0;
 let savedZoomLevel = 1;
@@ -160,6 +164,14 @@ export function setSkinDefaultBackgroundColor(value) { skinDefaultBackgroundColo
 export function getShowGridLines() { return showGridLines; }
 export function setShowGridLines(value) { showGridLines = !!value; }
 export function getDebugEnabled() { return debugEnabled; }
+export function getSnappingEnabled() { return snappingEnabled; }
+export function setSnappingEnabled(value) { snappingEnabled = !!value; }
+export function getSnappingGrid() { return snappingGrid; }
+export function setSnappingGrid(value) { snappingGrid = parseInt(value, 10) || 8; }
+export function getSnappingSensitivity() { return snappingSensitivity; }
+export function setSnappingSensitivity(value) { snappingSensitivity = parseInt(value, 10) || 8; }
+export function getSnappingMode() { return snappingMode; }
+export function setSnappingMode(value) { snappingMode = value === 'element' ? 'element' : 'gridlines'; }
 export function setDebugEnabled(value) { debugEnabled = !!value; if (!value) { setSelectedElement(null); } }
 export function getSelectedElement() { return selectedElement; }
 export function setSelectedElement(el) { selectedElement = el; if (window.updateSelectionOutline) window.updateSelectionOutline(); }

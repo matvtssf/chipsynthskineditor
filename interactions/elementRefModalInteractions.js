@@ -51,8 +51,42 @@ const ATTRIBUTE_CATEGORIES = ['Layout & Position', 'Value & Parameter', 'Appeara
  * Sets up all event listeners for the Element Reference modal.
  * Needs to be called after the main DOM is ready and reference data loaded.
  */
+function setupListFilter(inputId, listId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', e => {
+        const term = e.target.value.toLowerCase();
+        const items = document.querySelectorAll(`#${listId} li`);
+        let lastHeader = null;
+        let headerHasVisibleItems = false;
+        items.forEach(li => {
+            if (li.classList.contains('element-category-header') || li.classList.contains('attribute-category-header')) {
+                if (lastHeader && !headerHasVisibleItems) {
+                    lastHeader.style.display = 'none';
+                }
+                lastHeader = li;
+                headerHasVisibleItems = false;
+                li.style.display = ''; // assume visible until proven empty
+            } else {
+                const text = li.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    li.style.display = '';
+                    headerHasVisibleItems = true;
+                } else {
+                    li.style.display = 'none';
+                }
+            }
+        });
+        if (lastHeader && !headerHasVisibleItems) {
+            lastHeader.style.display = 'none';
+        }
+    });
+}
+
 export function setupReferenceModalListeners() {
     console.log("[elementRefModal] Setting up Reference Modal listeners...");
+    setupListFilter('ref-element-search', 'reference-element-list');
+    setupListFilter('ref-attribute-search', 'reference-attribute-list');
     // Assume getReferenceButton() is handled elsewhere (e.g., sidebar module) to call handleReferenceToggle
     safelyAttachListener(getCloseReferenceBtn, 'click', handleReferenceToggle);
     safelyAttachListener(getImportReferenceBtn, 'click', handleImportElementReference);
@@ -88,6 +122,32 @@ export function setupReferenceModalListeners() {
         attributeList.addEventListener('click', handleAttributeListItemClick);
         attributeList.addEventListener('mouseover', handleListItemHover);
         attributeList.addEventListener('mouseout', handleListItemHoverOut);
+
+        let draggedItem = null;
+        attributeList.addEventListener('dragstart', (e) => {
+            if (e.target.tagName === 'LI' && e.target.hasAttribute('draggable')) {
+                draggedItem = e.target;
+                e.target.style.opacity = '0.5';
+            }
+        });
+        attributeList.addEventListener('dragend', (e) => {
+            if (e.target.tagName === 'LI') {
+                e.target.style.opacity = '1';
+                draggedItem = null;
+                saveAttributeOrder();
+            }
+        });
+        attributeList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(attributeList, e.clientY);
+            if (draggedItem) {
+                if (afterElement == null) {
+                    attributeList.appendChild(draggedItem);
+                } else {
+                    attributeList.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
     }
     const descriptionArea = getReferenceDescriptionTextarea();
     if (descriptionArea) {
@@ -197,6 +257,45 @@ function handleJumpToParam(event) {
     }
 }
 
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('li[draggable="true"]:not([style*="opacity: 0.5"])')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function saveAttributeOrder() {
+    if (!currentSelectedElementName) return;
+    const elementsArray = Refs.getElementReferenceData();
+    const elementData = elementsArray.find(el => el.element === currentSelectedElementName);
+    if (!elementData || !elementData.attributes) return;
+
+    const newAttributesObj = {};
+    const listItems = document.querySelectorAll('#reference-attribute-list li[data-attribute-name]');
+    listItems.forEach(li => {
+        const attrName = li.dataset.attributeName;
+        if (elementData.attributes[attrName] !== undefined) {
+            newAttributesObj[attrName] = elementData.attributes[attrName];
+        }
+    });
+    
+    // Ensure any attributes not in the list are retained at the end (just in case)
+    Object.keys(elementData.attributes).forEach(key => {
+        if (newAttributesObj[key] === undefined) {
+            newAttributesObj[key] = elementData.attributes[key];
+        }
+    });
+
+    elementData.attributes = newAttributesObj;
+    setElementUnsavedChanges(true);
+}
+
 /** Toggles the visibility of the Element Reference modal */
 export function handleReferenceToggle() {
     console.log("[elementRefModal] handleReferenceToggle called.");
@@ -279,7 +378,7 @@ function loadElementReferenceUI() {
     const addElementListItem = (elementObj) => {
         const li = document.createElement('li');
         li.dataset.elementName = elementObj.element;
-        li.innerHTML = `<span class="font-mono text-blue-700">&lt;${elementObj.element}&gt;</span>`;
+        li.innerHTML = `<span class="font-mono text-blue-700 select-none">&lt;${elementObj.element}&gt;</span>`;
         // Toggle class based on supported status
         li.classList.toggle('element-supported', !!elementObj.supported);
         elementList.appendChild(li);
@@ -367,12 +466,13 @@ function populateAttributeList(elementName) {
     ATTRIBUTE_CATEGORIES.forEach(category => {
         if (categorizedAttributes[category]) {
             const headerLi = document.createElement('li'); headerLi.className = 'attribute-category-header'; headerLi.textContent = category; attributeList.appendChild(headerLi);
-            categorizedAttributes[category].sort((a, b) => a.name.localeCompare(b.name));
+            // Preserving original order (no sort) for specific attributes to allow custom dragging order
             categorizedAttributes[category].forEach(attr => {
                 const li = document.createElement('li'); const attributeNameString = attr.name;
                 if (typeof attributeNameString !== 'string' || !attributeNameString) { console.error("Invalid attribute name.", attr); return; }
                 li.dataset.attributeName = attributeNameString; li.dataset.attributeType = attr.data.isCommon ? 'common-attribute' : 'specific-attribute'; li.dataset.hasOverride = attr.data.hasOverrideDescription ? 'true' : 'false';
-                li.innerHTML = `<span>${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
+                li.setAttribute('draggable', 'true');
+                li.innerHTML = `<i class="iconoir-menu drag-handle mr-2 text-gray-400 cursor-grab active:cursor-grabbing"></i><span class="flex-grow select-none">${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
                 attributeList.appendChild(li);
             });
         }
@@ -381,12 +481,12 @@ function populateAttributeList(elementName) {
      Object.keys(categorizedAttributes).forEach(cat => { if (!ATTRIBUTE_CATEGORIES.includes(cat) && cat !== 'Other') { otherAttributes.push(...categorizedAttributes[cat]); } });
      if (otherAttributes.length > 0) {
          const headerLi = document.createElement('li'); headerLi.className = 'attribute-category-header'; headerLi.textContent = 'Other'; attributeList.appendChild(headerLi);
-         otherAttributes.sort((a, b) => a.name.localeCompare(b.name));
          otherAttributes.forEach(attr => {
              const li = document.createElement('li'); const attributeNameString = attr.name;
              if (typeof attributeNameString !== 'string' || !attributeNameString) { console.error("Invalid attribute name (Other).", attr); return; }
              li.dataset.attributeName = attributeNameString; li.dataset.attributeType = attr.data.isCommon ? 'common-attribute' : 'specific-attribute'; li.dataset.hasOverride = attr.data.hasOverrideDescription ? 'true' : 'false';
-             li.innerHTML = `<span>${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
+             li.setAttribute('draggable', 'true');
+             li.innerHTML = `<i class="iconoir-menu drag-handle mr-2 text-gray-400 cursor-grab active:cursor-grabbing"></i><span class="flex-grow select-none">${attributeNameString}</span> ${attr.data.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}`;
              attributeList.appendChild(li);
          });
      }

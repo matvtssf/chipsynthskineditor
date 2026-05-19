@@ -22,6 +22,7 @@ import {
 } from '../core/domUtils.js';
 import { updateZoomControlsDisplay } from './sidebarControlsInteractions.js';
 import { openXmlEditor } from '../core/xmlEditor.js';
+import { syncElementChangesToXmlSource, deleteElementFromXml, findElementInXmlContent, updateXmlCoords, toggleElementCommentState } from '../core/xmlReconciler.js';
 
 // --- Module State ---
 let isPanning = false;
@@ -34,6 +35,10 @@ let transformType = null;
 let transformStartX = 0, transformStartY = 0;
 let transformStartLeft = 0, transformStartTop = 0;
 let transformStartWidth = 0, transformStartHeight = 0;
+let ctrlPressedAtStart = false;
+let hasDuplicatedForThisDrag = false;
+let activeDragDropZone = null;
+let targetDragContainer = null;
 
 // --- Initialization ---
 export function setupMainContentInteractions() {
@@ -207,27 +212,191 @@ function handleTransformStart(e) {
     transformStartTop = parseFloat(targetEl.style.top) || 0;
     transformStartWidth = parseFloat(targetEl.style.width) || targetEl.clientWidth || 0;
     transformStartHeight = parseFloat(targetEl.style.height) || targetEl.clientHeight || 0;
+    ctrlPressedAtStart = e.ctrlKey;
+    hasDuplicatedForThisDrag = false;
     document.addEventListener('mousemove', handleTransformMove);
     document.addEventListener('mouseup', handleTransformEnd, { once: true });
 }
 
 function handleTransformMove(e) {
     if (!isTransforming) return;
-    const targetEl = State.getSelectedElement();
+    let targetEl = State.getSelectedElement();
+    if (!targetEl && typeof SelectionManager !== 'undefined') targetEl = SelectionManager.currentSelection;
     if (!targetEl) { handleTransformEnd(); return; }
     const zoom = State.getCurrentZoomLevel() || 1;
     const dx = (e.clientX - transformStartX) / zoom;
     const dy = (e.clientY - transformStartY) / zoom;
     if (transformType === 'move') {
-        const newLeft = Math.round(transformStartLeft + dx);
-        const newTop = Math.round(transformStartTop + dy);
+        if (ctrlPressedAtStart && !hasDuplicatedForThisDrag) {
+            hasDuplicatedForThisDrag = true;
+            console.log("[mainContent] CTRL drag duplicate triggered.");
+            
+            const rawXml = targetEl.dataset.rawXml;
+            const sourcePath = targetEl.dataset.sourcePath;
+            if (rawXml && sourcePath) {
+                // 1. Visually clone the element so drag can continue seamlessly
+                const clone = targetEl.cloneNode(true);
+                targetEl.parentNode.appendChild(clone);
+                
+                // 2. Inject identical XML into the file cache right after the original
+                const fileMap = State.getFileMap();
+                const targetKey = sourcePath.toLowerCase().replace(/\\/g, '/');
+                let fileContent = fileMap.get(targetKey);
+                
+                if (fileContent) {
+                    if (typeof State.pushHistoryState === 'function') State.pushHistoryState(targetKey, fileContent);
+                    
+                    const elAttrs = {};
+                    for (const key in targetEl.dataset) {
+                        if (key.startsWith('xmlAttr_')) elAttrs[key.slice(8)] = targetEl.dataset[key];
+                    }
+                    const matchResult = findElementInXmlContent(fileContent, targetEl.dataset.xmlTagName, elAttrs);
+                    
+                    if (matchResult) {
+                        const duplicateXml = matchResult.exactStr;
+                        const commentedXml = `\n\t${duplicateXml}`;
+                        const insertionIndex = matchResult.index + matchResult.length;
+                        const newContent = fileContent.slice(0, insertionIndex) + "\n\t" + commentedXml + fileContent.slice(insertionIndex);
+                        
+                        fileMap.set(targetKey, newContent);
+                        if (typeof State.setXmlEditorDirty === 'function') State.setXmlEditorDirty(true);
+                        
+                        const instance = State.getEditorInstanceByPath(targetKey);
+                        if (instance) {
+                            if (typeof State.updateEditorInstance === 'function') State.updateEditorInstance(instance.uniqueId, { currentContent: newContent });
+                            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+                            if (textarea) {
+                                textarea.value = newContent;
+                                textarea.dispatchEvent(new Event('input'));
+                            }
+                        }
+                        clone.dataset.rawXml = duplicateXml;
+                    }
+                }
+                
+                // 3. Swap the active drag target to the new clone
+                targetEl = clone;
+                if (typeof SelectionManager !== 'undefined' && SelectionManager.select) {
+                    SelectionManager.select(targetEl);
+                } else if (typeof State.setSelectedElement === 'function') {
+                    State.setSelectedElement(targetEl);
+                }
+                if (typeof showToast === 'function') showToast("Element duplicated on drag.", "info");
+            }
+        }
+
+        let currentDx = dx;
+        let currentDy = dy;
+
+        if (!ctrlPressedAtStart && e.ctrlKey) {
+            // Lock axis dynamically based on dominant movement
+            if (Math.abs(currentDx) > Math.abs(currentDy)) {
+                currentDy = 0;
+            } else {
+                currentDx = 0;
+            }
+        }
+
+        let newLeft = Math.round(transformStartLeft + currentDx);
+        let newTop = Math.round(transformStartTop + currentDy);
+
+        const snapEnabled = typeof State.getSnappingEnabled === 'function' ? State.getSnappingEnabled() : false;
+        if (snapEnabled && !e.shiftKey) {
+            const gridSize = typeof State.getSnappingGrid === 'function' ? State.getSnappingGrid() : 8;
+            const sensitivity = typeof State.getSnappingSensitivity === 'function' ? State.getSnappingSensitivity() : 8;
+            const snapMode = typeof State.getSnappingMode === 'function' ? State.getSnappingMode() : 'absolute';
+
+            if (snapMode === 'element') {
+                const elements = Array.from(document.querySelectorAll('.gui-element')).filter(el => el !== targetEl && !targetEl.contains(el));
+                const targetW = targetEl.offsetWidth || 0;
+                const targetH = targetEl.offsetHeight || 0;
+                
+                let snappedLeft = false;
+                let snappedTop = false;
+
+                elements.forEach(el => el.classList.remove('snap-target-glow'));
+
+                for (const other of elements) {
+                    const oLeft = parseFloat(other.style.left) || 0;
+                    const oTop = parseFloat(other.style.top) || 0;
+                    const oW = other.offsetWidth || 0;
+                    const oH = other.offsetHeight || 0;
+                    const oRight = oLeft + oW;
+                    const oBottom = oTop + oH;
+
+                    let snappedThisElement = false;
+
+                    if (!snappedLeft) {
+                        if (Math.abs(newLeft - oLeft) <= sensitivity) { newLeft = oLeft; snappedLeft = true; snappedThisElement = true; }
+                        else if (Math.abs(newLeft - oRight) <= sensitivity) { newLeft = oRight; snappedLeft = true; snappedThisElement = true; }
+                        else if (Math.abs((newLeft + targetW) - oLeft) <= sensitivity) { newLeft = oLeft - targetW; snappedLeft = true; snappedThisElement = true; }
+                        else if (Math.abs((newLeft + targetW) - oRight) <= sensitivity) { newLeft = oRight - targetW; snappedLeft = true; snappedThisElement = true; }
+                    }
+                    if (!snappedTop) {
+                        if (Math.abs(newTop - oTop) <= sensitivity) { newTop = oTop; snappedTop = true; snappedThisElement = true; }
+                        else if (Math.abs(newTop - oBottom) <= sensitivity) { newTop = oBottom; snappedTop = true; snappedThisElement = true; }
+                        else if (Math.abs((newTop + targetH) - oTop) <= sensitivity) { newTop = oTop - targetH; snappedTop = true; snappedThisElement = true; }
+                        else if (Math.abs((newTop + targetH) - oBottom) <= sensitivity) { newTop = oBottom - targetH; snappedTop = true; snappedThisElement = true; }
+                    }
+
+                    if (snappedThisElement) {
+                        other.classList.add('snap-target-glow');
+                    }
+                }
+            } else {
+                document.querySelectorAll('.snap-target-glow').forEach(el => el.classList.remove('snap-target-glow'));
+                const snappedLeft = Math.round(newLeft / gridSize) * gridSize;
+                if (Math.abs(newLeft - snappedLeft) <= sensitivity) {
+                    newLeft = snappedLeft;
+                }
+                const snappedTop = Math.round(newTop / gridSize) * gridSize;
+                if (Math.abs(newTop - snappedTop) <= sensitivity) {
+                    newTop = snappedTop;
+                }
+            }
+        }
+
         targetEl.style.left = `${newLeft}px`;
         targetEl.style.top = `${newTop}px`;
         targetEl.dataset.xmlAttr_x = newLeft;
         targetEl.dataset.xmlAttr_y = newTop;
     } else if (transformType === 'resize') {
-        const newWidth = Math.max(8, Math.round(transformStartWidth + dx));
-        const newHeight = Math.max(8, Math.round(transformStartHeight + dy));
+        let newWidth = Math.max(8, Math.round(transformStartWidth + dx));
+        let newHeight = Math.max(8, Math.round(transformStartHeight + dy));
+
+        if (e.shiftKey && transformStartHeight > 0) {
+            const aspect = transformStartWidth / transformStartHeight;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                newHeight = Math.max(8, Math.round(newWidth / aspect));
+            } else {
+                newWidth = Math.max(8, Math.round(newHeight * aspect));
+            }
+        }
+
+        if (e.ctrlKey) {
+            if (e.shiftKey && transformStartHeight > 0) {
+                const aspect = transformStartWidth / transformStartHeight;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    newWidth = Math.max(8, Math.round(transformStartWidth + 2 * dx));
+                    newHeight = Math.max(8, Math.round(newWidth / aspect));
+                } else {
+                    newHeight = Math.max(8, Math.round(transformStartHeight + 2 * dy));
+                    newWidth = Math.max(8, Math.round(newHeight * aspect));
+                }
+            } else {
+                newWidth = Math.max(8, Math.round(transformStartWidth + 2 * dx));
+                newHeight = Math.max(8, Math.round(transformStartHeight + 2 * dy));
+            }
+
+            const newLeft = Math.round(transformStartLeft - (newWidth - transformStartWidth) / 2);
+            const newTop = Math.round(transformStartTop - (newHeight - transformStartHeight) / 2);
+            
+            targetEl.style.left = `${newLeft}px`;
+            targetEl.style.top = `${newTop}px`;
+            targetEl.dataset.xmlAttr_x = newLeft;
+            targetEl.dataset.xmlAttr_y = newTop;
+        }
+
         targetEl.style.width = `${newWidth}px`;
         targetEl.style.height = `${newHeight}px`;
         targetEl.dataset.xmlAttr_w = newWidth;
@@ -235,6 +404,39 @@ function handleTransformMove(e) {
         targetEl.dataset.xmlAttr_width = newWidth;
         targetEl.dataset.xmlAttr_height = newHeight;
     }
+
+    // Cross-container drag detection
+    if (transformType === 'move') {
+        const originalPointerEvents = targetEl.style.pointerEvents;
+        targetEl.style.pointerEvents = 'none';
+        
+        const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+        const childTag = targetEl.dataset.xmlTagName || 'element';
+        const prospectiveContainer = getValidDropContainer(hitEl, childTag);
+        
+        targetEl.style.pointerEvents = originalPointerEvents;
+
+        // Prevent dropping an element inside itself
+        if (prospectiveContainer && !targetEl.contains(prospectiveContainer) && prospectiveContainer !== targetEl) {
+            targetDragContainer = prospectiveContainer;
+            if (activeDragDropZone && activeDragDropZone !== prospectiveContainer) {
+                activeDragDropZone.classList.remove('prospective-drop-zone');
+            }
+            if (prospectiveContainer !== targetEl.parentElement) {
+                prospectiveContainer.classList.add('prospective-drop-zone');
+                activeDragDropZone = prospectiveContainer;
+            } else {
+                activeDragDropZone = null;
+            }
+        } else {
+            if (activeDragDropZone) {
+                activeDragDropZone.classList.remove('prospective-drop-zone');
+                activeDragDropZone = null;
+            }
+            targetDragContainer = targetEl.parentElement; // Default to safe parent
+        }
+    }
+
     updateSelectionOutline();
     if (SelectionManager.currentSelection === targetEl) {
         SelectionManager.renderContextToolbar(targetEl);
@@ -249,350 +451,167 @@ function handleTransformEnd() {
     isTransforming = false;
     transformType = null;
     document.removeEventListener('mousemove', handleTransformMove);
+    
+    if (activeDragDropZone) {
+        activeDragDropZone.classList.remove('prospective-drop-zone');
+        activeDragDropZone = null;
+    }
+
+    document.querySelectorAll('.snap-target-glow').forEach(el => el.classList.remove('snap-target-glow'));
+
     State.setXmlEditorDirty(true);
     
     const targetEl = State.getSelectedElement();
     if (targetEl) {
-        syncElementChangesToXmlSource(targetEl);
+        if (targetDragContainer && targetDragContainer !== targetEl.parentElement && targetDragContainer !== targetEl && !targetEl.contains(targetDragContainer)) {
+            reparentElement(targetEl, targetDragContainer);
+        } else {
+            syncElementChangesToXmlSource(targetEl);
+        }
     }
+    targetDragContainer = null;
 }
 
-function getAttributesFromTagString(tagString) {
-    const attrs = {};
-    const closingBracketIndex = tagString.indexOf('>');
-    const openingTagContent = closingBracketIndex !== -1 ? tagString.slice(0, closingBracketIndex) : tagString;
+function reparentElement(el, newParent) {
+    const rawXml = el.dataset.rawXml;
+    let targetFilePath = el.dataset.sourcePath || newParent.dataset.sourcePath || (typeof State.getActiveFilePath === 'function' ? State.getActiveFilePath() : '');
     
-    const regex = /([a-zA-Z0-9_\-:]+)=\s*["']([^"']*)["']/g;
-    let match;
-    while ((match = regex.exec(openingTagContent)) !== null) {
-        const name = match[1];
-        const value = match[2];
-        if (name !== 'xmlns' && !name.startsWith('xmlns:')) {
-            attrs[name] = value;
-        }
+    if (!rawXml || !targetFilePath) {
+        syncElementChangesToXmlSource(el);
+        return;
     }
-    return attrs;
-}
 
-function findElementInXmlContent(fileContent, tagName, targetAttrs) {
-    let indices = [];
-    const regexSearch = new RegExp(`<${tagName}\\b`, 'gi');
-    let match;
-    while ((match = regexSearch.exec(fileContent)) !== null) {
-        indices.push(match.index);
+    const currentScale = State.getCurrentZoomLevel() || 1;
+    const parentRect = newParent.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    
+    const localX = Math.round((elRect.left - parentRect.left) / currentScale);
+    const localY = Math.round((elRect.top - parentRect.top) / currentScale);
+    
+    // Save current drag coords
+    const draggedX = el.dataset.xmlAttr_x;
+    const draggedY = el.dataset.xmlAttr_y;
+
+    // Restore start coords temporarily so the xmlReconciler can find the original element signature to delete it
+    el.dataset.xmlAttr_x = transformStartLeft;
+    el.dataset.xmlAttr_y = transformStartTop;
+
+    const deleteSuccess = deleteElementFromXml(el);
+
+    // Put the new target coords back
+    el.dataset.xmlAttr_x = localX;
+    el.dataset.xmlAttr_y = localY;
+    
+    if (!deleteSuccess) {
+        el.dataset.xmlAttr_x = draggedX;
+        el.dataset.xmlAttr_y = draggedY;
+        syncElementChangesToXmlSource(el);
+        return;
     }
-    
-    console.log(`[XML Finder] Found ${indices.length} potential case-insensitive occurrences for <${tagName}>`);
-    
-    let bestMatch = null;
-    let maxScore = -1;
-    
-    for (const index of indices) {
-        const closeIndex = fileContent.indexOf('>', index);
-        if (closeIndex === -1) continue;
-        
-        const openingTagText = fileContent.slice(index, closeIndex + 1);
-        const fileTagAttrs = getAttributesFromTagString(openingTagText);
-        
-        let score = 0;
-        let isStrictMismatch = false;
-        
-        if (fileTagAttrs['x'] !== undefined && targetAttrs['x'] !== undefined) {
-            if (parseInt(fileTagAttrs['x'], 10) === parseInt(targetAttrs['x'], 10)) {
-                score += 100;
-            } else {
-                isStrictMismatch = true;
+
+    const rawFinalXml = updateXmlCoords(rawXml, localX, localY);
+    const finalXml = `\n\t${rawFinalXml}`;
+
+    const fileMap = State.getFileMap();
+    const normalizedPath = targetFilePath.toLowerCase().replace(/\\/g, '/');
+    let targetKey = normalizedPath;
+    let fileContent = fileMap.get(normalizedPath);
+
+    if (!fileContent) {
+        for (const key of fileMap.keys()) {
+            if (key.endsWith('/' + normalizedPath) || normalizedPath.endsWith('/' + key)) {
+                targetKey = key;
+                fileContent = fileMap.get(key);
+                break;
             }
         }
-        
-        if (fileTagAttrs['y'] !== undefined && targetAttrs['y'] !== undefined) {
-            if (parseInt(fileTagAttrs['y'], 10) === parseInt(targetAttrs['y'], 10)) {
-                score += 100;
-            } else {
-                isStrictMismatch = true;
-            }
+    }
+
+    if (!fileContent) {
+        showToast("Failed to locate file content for reparenting.", "error");
+        return;
+    }
+
+    let insertionSuccess = false;
+    let updatedContent = "";
+
+    if (newParent.id === 'skin-container-actual' || !newParent.dataset.xmlTagName) {
+        const lastCloseIndex = fileContent.lastIndexOf('</');
+        if (lastCloseIndex !== -1) {
+            updatedContent = fileContent.slice(0, lastCloseIndex) + "\n\t" + finalXml + "\n" + fileContent.slice(lastCloseIndex);
+            insertionSuccess = true;
+        }
+    } else {
+        const containerTagName = newParent.dataset.xmlTagName;
+        const containerAttrs = {};
+        for (const key in newParent.dataset) {
+            if (key.startsWith('xmlAttr_')) containerAttrs[key.slice(8)] = newParent.dataset[key];
         }
         
-        if (isStrictMismatch) continue;
-        
-        const fW = fileTagAttrs['w'] !== undefined ? fileTagAttrs['w'] : fileTagAttrs['width'];
-        const tW = targetAttrs['w'] !== undefined ? targetAttrs['w'] : targetAttrs['width'];
-        if (fW !== undefined && tW !== undefined) {
-            if (parseInt(fW, 10) === parseInt(tW, 10)) {
-                score += 50;
+        const matchResult = findElementInXmlContent(fileContent, containerTagName, containerAttrs);
+        if (matchResult) {
+            const matchStr = matchResult.exactStr;
+            if (matchStr.trim().endsWith('/>')) {
+                const expandedContainer = matchStr.replace('/>', `>\n\t${finalXml}\n</${containerTagName}>`);
+                updatedContent = fileContent.slice(0, matchResult.index) + expandedContainer + fileContent.slice(matchResult.index + matchResult.length);
+                insertionSuccess = true;
             } else {
-                score -= 10;
-            }
-        }
-        
-        const fH = fileTagAttrs['h'] !== undefined ? fileTagAttrs['h'] : fileTagAttrs['height'];
-        const tH = targetAttrs['h'] !== undefined ? targetAttrs['h'] : targetAttrs['height'];
-        if (fH !== undefined && tH !== undefined) {
-            if (parseInt(fH, 10) === parseInt(tH, 10)) {
-                score += 50;
-            } else {
-                score -= 10;
-            }
-        }
-        
-        const otherKeys = ['param', 'identifier', 'name', 'text', 'style', 'alignment', 'font', 'alias', 'start_key', 'end_key'];
-        for (const key of otherKeys) {
-            if (fileTagAttrs[key] !== undefined && targetAttrs[key] !== undefined) {
-                if (String(fileTagAttrs[key]).trim().toLowerCase() === String(targetAttrs[key]).trim().toLowerCase()) {
-                    score += 30;
-                } else {
-                    score -= 20;
+                const closingTagStr = `</${containerTagName}>`;
+                const closeTagIdx = matchStr.lastIndexOf(closingTagStr);
+                if (closeTagIdx !== -1) {
+                    const updatedMatchStr = matchStr.slice(0, closeTagIdx) + "\n\t" + finalXml + "\n" + matchStr.slice(closeTagIdx);
+                    updatedContent = fileContent.slice(0, matchResult.index) + updatedMatchStr + fileContent.slice(matchResult.index + matchResult.length);
+                    insertionSuccess = true;
                 }
             }
         }
+    }
+
+    if (insertionSuccess) {
+        fileMap.set(targetKey, updatedContent);
+        if (typeof State.setXmlEditorDirty === 'function') State.setXmlEditorDirty(true);
         
-        if (score > maxScore) {
-            maxScore = score;
-            
-            if (openingTagText.trim().endsWith('/>')) {
-                bestMatch = { index: index, length: (closeIndex - index) + 1, exactStr: openingTagText };
-                continue;
+        const instance = State.getEditorInstanceByPath(targetKey);
+        if (instance) {
+            if (typeof State.updateEditorInstance === 'function') State.updateEditorInstance(instance.uniqueId, { currentContent: updatedContent });
+            const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
+            if (textarea) {
+                const scrollPos = textarea.scrollTop;
+                textarea.value = updatedContent;
+                textarea.scrollTop = scrollPos;
+                textarea.dispatchEvent(new Event('input'));
             }
-            
-            const closeTagSearch = `</${tagName}>`.toLowerCase();
-            let nesting = 1;
-            let currentPos = closeIndex + 1;
-            const openTagSearch = `<${tagName}`.toLowerCase();
-            const lowerContent = fileContent.toLowerCase();
-            let matchedLength = openingTagText.length;
-            let matchedStr = openingTagText;
-            
-            while (nesting > 0) {
-                const nextOpen = lowerContent.indexOf(openTagSearch, currentPos);
-                const nextClose = lowerContent.indexOf(closeTagSearch, currentPos);
-                
-                if (nextClose === -1) {
-                    const simpleClose = lowerContent.indexOf(closeTagSearch, index);
-                    if (simpleClose !== -1) {
-                        matchedLength = (simpleClose - index) + closeTagSearch.length;
-                        matchedStr = fileContent.slice(index, simpleClose + closeTagSearch.length);
-                    }
-                    break;
-                }
-                
-                if (nextOpen !== -1 && nextOpen < nextClose) {
-                    const nc = lowerContent.charAt(nextOpen + openTagSearch.length);
-                    if (nc === ' ' || nc === '\t' || nc === '\r' || nc === '\n' || nc === '>' || nc === '/') {
-                        const nextOpenClose = lowerContent.indexOf('>', nextOpen);
-                        if (nextOpenClose !== -1 && fileContent.slice(nextOpen, nextOpenClose + 1).trim().endsWith('/>')) {
-                            currentPos = nextOpenClose + 1;
-                        } else {
-                            nesting++;
-                            currentPos = nextOpen + openTagSearch.length;
+        }
+        
+        showToast(`Element moved to new container.`, 'success');
+        
+        const droppedTag = el.dataset.xmlTagName;
+        const targetX = localX;
+        const targetY = localY;
+
+        if (typeof window.renderMainGui === 'function') {
+            window.renderMainGui();
+            setTimeout(() => {
+                const elements = document.querySelectorAll('.gui-element');
+                for (let candidate of elements) {
+                    if (candidate.dataset.xmlTagName === droppedTag && 
+                        parseInt(candidate.dataset.xmlAttr_x, 10) === targetX && 
+                        parseInt(candidate.dataset.xmlAttr_y, 10) === targetY) {
+                        if (typeof SelectionManager !== 'undefined') {
+                            SelectionManager.select(candidate);
                         }
-                    } else {
-                        currentPos = nextOpen + openTagSearch.length;
-                    }
-                } else {
-                    nesting--;
-                    currentPos = nextClose + closeTagSearch.length;
-                    if (nesting === 0) {
-                        matchedLength = currentPos - index;
-                        matchedStr = fileContent.slice(index, currentPos);
+                        break;
                     }
                 }
-            }
-            
-            bestMatch = { index: index, length: matchedLength, exactStr: matchedStr };
+            }, 50);
         }
+    } else {
+        showToast("Failed to insert element into new container.", "error");
+        syncElementChangesToXmlSource(el);
     }
-    
-    if (bestMatch) {
-        console.log(`[XML Finder] Best verified match at index ${bestMatch.index} with score ${maxScore}`);
-        return bestMatch;
-    }
-    
-    console.warn(`[XML Finder] Signature match failed for <${tagName}> with attributes:`, targetAttrs);
-    return null;
 }
 
-export function syncElementChangesToXmlSource(el) {
-    const filePath = el.dataset.sourcePath;
-    if (!filePath) {
-        console.error("[Reconciliation Engine] Element missing valid dataset sourcePath.");
-        return;
-    }
 
-    const tagName = el.dataset.xmlTagName;
-    const oldRawXml = el.dataset.rawXml || "";
-    if (!tagName || !oldRawXml) {
-        console.error("[Reconciliation Engine] Element missing xmlTagName or rawXml reference.");
-        return;
-    }
-
-    let attributesStr = "";
-    const attributesArray = [];
-    const targetAttrs = {};
-    for (const key in el.dataset) {
-        if (key.startsWith('xmlAttr_')) {
-            const attrName = key.slice(8);
-            attributesArray.push({ name: attrName, value: el.dataset[key] });
-            targetAttrs[attrName] = el.dataset[key];
-        }
-    }
-    
-    attributesArray.sort((a, b) => a.name.localeCompare(b.name));
-    attributesArray.forEach(attr => {
-        attributesStr += ` ${attr.name}="${attr.value}"`;
-    });
-
-    let newRawXml = "";
-    if (oldRawXml.trim().endsWith('/>')) {
-        newRawXml = `<${tagName}${attributesStr} />`;
-    } else {
-        const closingBracketIndex = oldRawXml.indexOf('>');
-        const originalRemainder = oldRawXml.slice(closingBracketIndex);
-        newRawXml = `<${tagName}${attributesStr}${originalRemainder.startsWith(' />') ? ' /' : ''}>`;
-    }
-
-    const fileMap = State.getFileMap();
-    const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
-    
-    let targetKey = normalizedPath;
-    let fileContent = fileMap.get(normalizedPath);
-    
-    if (!fileContent) {
-        for (const key of fileMap.keys()) {
-            if (key.endsWith('/' + normalizedPath)) {
-                targetKey = key;
-                fileContent = fileMap.get(key);
-                break;
-            }
-        }
-    }
-
-    if (!fileContent) {
-        console.error(`[Reconciliation Engine] File content not found in map cache for path: ${normalizedPath}`);
-        return;
-    }
-
-    const matchResult = findElementInXmlContent(fileContent, tagName, targetAttrs);
-    
-    if (matchResult) {
-        if (typeof State.pushHistoryState === 'function') {
-            State.pushHistoryState(targetKey, fileContent);
-        }
-        fileContent = fileContent.slice(0, matchResult.index) + newRawXml + fileContent.slice(matchResult.index + matchResult.length);
-        fileMap.set(targetKey, fileContent);
-        console.log(`[Reconciliation Engine] Successfully updated <${tagName}> inside file cache content.`);
-    } else {
-        console.warn(`[Reconciliation Engine] Could not match <${tagName}> in file content for sync.`);
-    }
-
-    let instance = State.getEditorInstanceByPath(targetKey);
-    if (!instance) {
-        instance = State.getEditorInstanceByPath(normalizedPath);
-    }
-    if (instance) {
-        let currentEditorContent = instance.currentContent;
-        if (currentEditorContent) {
-            const editorMatch = findElementInXmlContent(currentEditorContent, tagName, targetAttrs);
-            if (editorMatch) {
-                currentEditorContent = currentEditorContent.slice(0, editorMatch.index) + newRawXml + currentEditorContent.slice(editorMatch.index + editorMatch.length);
-                State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
-                
-                const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
-                if (textarea) {
-                    const scrollPos = textarea.scrollTop;
-                    textarea.value = currentEditorContent;
-                    textarea.scrollTop = scrollPos;
-                    textarea.dispatchEvent(new Event('input'));
-                }
-            }
-        }
-    }
-
-    el.dataset.rawXml = newRawXml;
-}
-
-function deleteElementFromXml(el) {
-    const filePath = el.dataset.sourcePath;
-    if (!filePath) {
-        console.error("[Reconciliation Deletion] Element contains no sourcePath reference dataset.");
-        return false;
-    }
-
-    const tagName = el.dataset.xmlTagName;
-    const oldRawXml = el.dataset.rawXml || "";
-    if (!tagName || !oldRawXml) {
-        console.error("[Reconciliation Deletion] Missing element signature tag descriptors.");
-        return false;
-    }
-
-    const fileMap = State.getFileMap();
-    const normalizedPath = filePath.toLowerCase().replace(/\\/g, '/');
-    
-    let targetKey = normalizedPath;
-    let fileContent = fileMap.get(normalizedPath);
-    
-    if (!fileContent) {
-        for (const key of fileMap.keys()) {
-            if (key.endsWith('/' + normalizedPath)) {
-                targetKey = key;
-                fileContent = fileMap.get(key);
-                break;
-            }
-        }
-    }
-
-    if (!fileContent) {
-        console.error(`[Reconciliation Deletion] File mapping cache text is empty for path: ${normalizedPath}`);
-        return false;
-    }
-
-    const targetAttrs = {};
-    for (const key in el.dataset) {
-        if (key.startsWith('xmlAttr_')) {
-            const attrName = key.slice(8);
-            targetAttrs[attrName] = el.dataset[key];
-        }
-    }
-
-    const matchResult = findElementInXmlContent(fileContent, tagName, targetAttrs);
-    
-    if (matchResult) {
-        if (typeof State.pushHistoryState === 'function') {
-            State.pushHistoryState(targetKey, fileContent);
-        }
-        fileContent = fileContent.slice(0, matchResult.index) + fileContent.slice(matchResult.index + matchResult.length);
-        fileMap.set(targetKey, fileContent);
-        console.log(`[Reconciliation Deletion] Successfully removed <${tagName}> from file map.`);
-    } else {
-        console.error(`[Reconciliation Deletion] Critical match failure: could not find tag in source file text.`);
-        return false;
-    }
-
-    let instance = State.getEditorInstanceByPath(targetKey);
-    if (!instance) {
-        instance = State.getEditorInstanceByPath(normalizedPath);
-    }
-    if (instance) {
-        let currentEditorContent = instance.currentContent;
-        if (currentEditorContent) {
-            const editorMatch = findElementInXmlContent(currentEditorContent, tagName, targetAttrs);
-            if (editorMatch) {
-                currentEditorContent = currentEditorContent.slice(0, editorMatch.index) + currentEditorContent.slice(editorMatch.index + editorMatch.length);
-                State.updateEditorInstance(instance.uniqueId, { currentContent: currentEditorContent });
-                
-                const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
-                if (textarea) {
-                    const scrollPos = textarea.scrollTop;
-                    textarea.value = currentEditorContent;
-                    textarea.scrollTop = scrollPos;
-                    textarea.dispatchEvent(new Event('input'));
-                }
-            }
-        }
-    }
-
-    State.setXmlEditorDirty(true);
-    return true;
-}
 
 export function updateSelectionOutline() {
     if (SelectionManager && typeof SelectionManager.updatePosition === 'function') {
@@ -1028,6 +1047,38 @@ export const SelectionManager = {
                     }
                 }
 
+                if (moveEvent.shiftKey && startH > 0) {
+                    const aspect = startW / startH;
+                    let useWidthDrives = false;
+                    if (pos === 'e' || pos === 'w') {
+                        useWidthDrives = true;
+                    } else if (pos === 'n' || pos === 's') {
+                        useWidthDrives = false;
+                    } else {
+                        useWidthDrives = Math.abs(newW - startW) / startW > Math.abs(newH - startH) / startH;
+                    }
+
+                    if (useWidthDrives) {
+                        const targetH = newW / aspect;
+                        const hDiff = targetH - newH;
+                        newH = targetH;
+                        if (moveEvent.ctrlKey) {
+                            newTop = startTop - (newH - startH) / 2;
+                        } else if (pos.includes('n')) {
+                            newTop = newTop - hDiff;
+                        }
+                    } else {
+                        const targetW = newH * aspect;
+                        const wDiff = targetW - newW;
+                        newW = targetW;
+                        if (moveEvent.ctrlKey) {
+                            newLeft = startLeft - (newW - startW) / 2;
+                        } else if (pos.includes('w')) {
+                            newLeft = newLeft - wDiff;
+                        }
+                    }
+                }
+
                 // Prevent collapsing to negative sizes
                 if (newW > 10) {
                     el.style.width = `${newW}px`;
@@ -1088,12 +1139,32 @@ export const SelectionManager = {
         // Title bar Header Row containing Tag Name
         const titleRow = document.createElement('div');
         titleRow.className = 'context-toolbar-title-row';
+        titleRow.style.display = 'flex';
+        titleRow.style.justifyContent = 'space-between';
+        titleRow.style.alignItems = 'center';
         
         const nameLabel = document.createElement('span');
         nameLabel.className = 'context-toolbar-el-name';
         nameLabel.textContent = el.dataset.xmlTagName || 'Element';
+
+        if (el.dataset.isCommented === 'true') {
+            nameLabel.textContent += ' (disabled)';
+            nameLabel.style.color = '#ef4444'; 
+        }
+
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = `editor-toggle-switch ${el.dataset.isCommented === 'true' ? 'off' : ''}`;
+        toggleWrapper.title = el.dataset.isCommented === 'true' ? 'Enable Element' : 'Disable Element';
+        
+        toggleWrapper.addEventListener('mousedown', (e) => e.stopPropagation());
+        toggleWrapper.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleElementCommentState(el);
+            this.renderContextToolbar(el);
+        });
         
         titleRow.appendChild(nameLabel);
+        titleRow.appendChild(toggleWrapper);
         toolbar.appendChild(titleRow);
 
         // Coordinates Readout Row with Editable and Scrubbable Inputs
@@ -1383,35 +1454,6 @@ let phantomPlacementActive = false;
 let phantomClipboardData = null;
 let phantomGhostElement = null;
 
-function updateXmlCoords(rawXml, newX, newY) {
-    let updated = rawXml;
-    const firstTagEnd = updated.indexOf('>');
-    if (firstTagEnd === -1) return rawXml;
-    let openingTag = updated.substring(0, firstTagEnd);
-    const remainder = updated.substring(firstTagEnd);
-    
-    if (/(\s+x=)["'][^"']*["']/.test(openingTag)) {
-        openingTag = openingTag.replace(/(\s+x=)["'][^"']*["']/, `$1"${newX}"`);
-    } else {
-        if (openingTag.endsWith('/')) {
-            openingTag = openingTag.substring(0, openingTag.length - 1) + ` x="${newX}"/`;
-        } else {
-            openingTag = openingTag + ` x="${newX}"`;
-        }
-    }
-    
-    if (/(\s+y=)["'][^"']*["']/.test(openingTag)) {
-        openingTag = openingTag.replace(/(\s+y=)["'][^"']*["']/, `$1"${newY}"`);
-    } else {
-        if (openingTag.endsWith('/')) {
-            openingTag = openingTag.substring(0, openingTag.length - 1) + ` y="${newY}"/`;
-        } else {
-            openingTag = openingTag + ` y="${newY}"`;
-        }
-    }
-    return openingTag + remainder;
-}
-
 export function activatePhantomPlacement(clipboardData) {
     if (!clipboardData || !clipboardData.rawXml) return;
     cancelPhantomPlacement();
@@ -1442,11 +1484,17 @@ export function activatePhantomPlacement(clipboardData) {
         zoomCanvas.appendChild(phantomGhostElement);
     }
     
-    showToast(`Placement Active: Click canvas container to place <${clipboardData.tagName}> (Esc to cancel)`, 'info');
+    updateStatus(`Placement Active: Click canvas container to place <${clipboardData.tagName}> (Esc to cancel)`, 0);
     
     document.addEventListener('keydown', handlePhantomKeyDown);
-    document.addEventListener('click', handlePhantomClick, true);
     document.addEventListener('mousemove', handlePhantomMouseMove);
+    
+    // Defer click listener to prevent catching the click that initiated placement
+    setTimeout(() => {
+        if (phantomPlacementActive) {
+            document.addEventListener('click', handlePhantomClick, true);
+        }
+    }, 50);
 }
 
 function cancelPhantomPlacement() {
@@ -1461,12 +1509,14 @@ function cancelPhantomPlacement() {
     document.removeEventListener('click', handlePhantomClick, true);
     document.removeEventListener('mousemove', handlePhantomMouseMove);
     document.querySelectorAll('.prospective-drop-zone').forEach(el => el.classList.remove('prospective-drop-zone'));
+    updateStatus('Ready.', 0);
 }
 
 function handlePhantomKeyDown(e) {
     if (e.key === 'Escape') {
         cancelPhantomPlacement();
-        showToast('Placement canceled.', 'info');
+        updateStatus('Placement canceled.', 0);
+        setTimeout(() => updateStatus('Ready.', 0), 2000);
     }
 }
 
@@ -1486,26 +1536,35 @@ function handlePhantomMouseMove(event) {
     
     document.querySelectorAll('.prospective-drop-zone').forEach(el => el.classList.remove('prospective-drop-zone'));
     
-    let targetElement = document.elementFromPoint(event.clientX, event.clientY);
-    let containerElement = null;
-    while (targetElement && targetElement !== document.body) {
-        if (targetElement.dataset && targetElement.dataset.xmlTagName) {
-            const tag = targetElement.dataset.xmlTagName.toLowerCase();
-            if (tag === 'view' || tag === 'pane' || tag === 'group' || tag === 'container') {
-                containerElement = targetElement;
-                break;
-            }
-        }
-        if (targetElement.id === 'skin-container-actual') {
-            containerElement = targetElement;
-            break;
-        }
-        targetElement = targetElement.parentElement;
-    }
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    const childTag = phantomClipboardData ? (phantomClipboardData.tagName || 'element') : 'element';
+    const containerElement = getValidDropContainer(targetElement, childTag);
     
     if (containerElement && containerElement.id !== 'skin-container-actual') {
         containerElement.classList.add('prospective-drop-zone');
     }
+}
+
+function getValidDropContainer(startElement, childTag) {
+    let target = startElement;
+    while (target && target !== document.body) {
+        if (target.dataset && target.dataset.xmlTagName) {
+            const parentTag = target.dataset.xmlTagName.toLowerCase();
+            if (parentTag.includes('container') || parentTag.includes('view') || parentTag === 'pane' || parentTag === 'group' || parentTag === 'tabview') {
+                // Panes are strictly bound to TabView structures
+                if (childTag.toLowerCase() === 'pane' && parentTag !== 'tabview') {
+                    // Keep traversing upward
+                } else {
+                    return target;
+                }
+            }
+        }
+        if (target.id === 'skin-container-actual') {
+            return target;
+        }
+        target = target.parentElement;
+    }
+    return document.getElementById('skin-container-actual');
 }
 
 function handlePhantomClick(event) {
@@ -1513,27 +1572,12 @@ function handlePhantomClick(event) {
     
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation();
     
-    let targetElement = document.elementFromPoint(event.clientX, event.clientY);
-    let containerElement = null;
-    while (targetElement && targetElement !== document.body) {
-        if (targetElement.dataset && targetElement.dataset.xmlTagName) {
-            const tag = targetElement.dataset.xmlTagName.toLowerCase();
-            if (tag === 'view' || tag === 'pane' || tag === 'group' || tag === 'container') {
-                containerElement = targetElement;
-                break;
-            }
-        }
-        if (targetElement.id === 'skin-container-actual') {
-            containerElement = targetElement;
-            break;
-        }
-        targetElement = targetElement.parentElement;
-    }
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    const childTag = phantomClipboardData.tagName || 'element';
+    const containerElement = getValidDropContainer(targetElement, childTag);
     
-    if (!containerElement) {
-        containerElement = document.getElementById('skin-container-actual');
-    }
     if (!containerElement) {
         showToast('No valid placement container found.', 'error');
         cancelPhantomPlacement();
@@ -1545,14 +1589,39 @@ function handlePhantomClick(event) {
     const localX = Math.round((event.clientX - containerRect.left) / currentScale);
     const localY = Math.round((event.clientY - containerRect.top) / currentScale);
     
-    const finalXml = updateXmlCoords(phantomClipboardData.rawXml, localX, localY);
+    const rawFinalXml = updateXmlCoords(phantomClipboardData.rawXml, localX, localY);
+    const finalXml = `\n\t${rawFinalXml}`;
     const fileMap = State.getFileMap();
-    let targetFilePath = containerElement.dataset.sourcePath || State.getDefaultMainGuiXmlPath();
-    const targetKey = targetFilePath.toLowerCase().replace(/\\/g, '/');
-    let fileContent = fileMap.get(targetKey);
+    
+    // Fallback to active file path correctly to prevent crashes if container lacks source
+    let targetFilePath = containerElement.dataset.sourcePath || (typeof State.getActiveFilePath === 'function' ? State.getActiveFilePath() : '');
+    if (!targetFilePath) {
+        if (fileMap && fileMap.size > 0) {
+            targetFilePath = Array.from(fileMap.keys())[0];
+        } else {
+            showToast('No active file context found to paste into.', 'error');
+            cancelPhantomPlacement();
+            return;
+        }
+    }
+
+    const normalizedPath = targetFilePath.toLowerCase().replace(/\\/g, '/');
+    let targetKey = normalizedPath;
+    let fileContent = fileMap.get(normalizedPath);
+
+    // Cross-check memory mapping dynamically incase path segments differ
+    if (!fileContent) {
+        for (const key of fileMap.keys()) {
+            if (key.endsWith('/' + normalizedPath) || normalizedPath.endsWith('/' + key)) {
+                targetKey = key;
+                fileContent = fileMap.get(key);
+                break;
+            }
+        }
+    }
     
     if (!fileContent) {
-        showToast(`Source file content not found for ${targetKey}`, 'error');
+        showToast(`Source file content not found for insertion.`, 'error');
         cancelPhantomPlacement();
         return;
     }
@@ -1567,7 +1636,7 @@ function handlePhantomClick(event) {
     if (containerElement.id === 'skin-container-actual' || !containerElement.dataset.xmlTagName) {
         const lastCloseIndex = fileContent.lastIndexOf('</');
         if (lastCloseIndex !== -1) {
-            updatedContent = fileContent.slice(0, lastCloseIndex) + "\n" + finalXml + "\n" + fileContent.slice(lastCloseIndex);
+            updatedContent = fileContent.slice(0, lastCloseIndex) + "\n\t" + finalXml + "\n" + fileContent.slice(lastCloseIndex);
             insertionSuccess = true;
         }
     } else {
@@ -1581,14 +1650,14 @@ function handlePhantomClick(event) {
         if (matchResult) {
             const matchStr = matchResult.exactStr;
             if (matchStr.trim().endsWith('/>')) {
-                const expandedContainer = matchStr.replace('/>', `>\n${finalXml}\n</${containerTagName}>`);
+                const expandedContainer = matchStr.replace('/>', `>\n\t${finalXml}\n</${containerTagName}>`);
                 updatedContent = fileContent.slice(0, matchResult.index) + expandedContainer + fileContent.slice(matchResult.index + matchResult.length);
                 insertionSuccess = true;
             } else {
                 const closingTagStr = `</${containerTagName}>`;
                 const closeTagIdx = matchStr.lastIndexOf(closingTagStr);
                 if (closeTagIdx !== -1) {
-                    const updatedMatchStr = matchStr.slice(0, closeTagIdx) + "\n" + finalXml + "\n" + matchStr.slice(closeTagIdx);
+                    const updatedMatchStr = matchStr.slice(0, closeTagIdx) + "\n\t" + finalXml + "\n" + matchStr.slice(closeTagIdx);
                     updatedContent = fileContent.slice(0, matchResult.index) + updatedMatchStr + fileContent.slice(matchResult.index + matchResult.length);
                     insertionSuccess = true;
                 }
@@ -1598,11 +1667,11 @@ function handlePhantomClick(event) {
     
     if (insertionSuccess) {
         fileMap.set(targetKey, updatedContent);
-        State.setXmlEditorDirty(true);
+        if (typeof State.setXmlEditorDirty === 'function') State.setXmlEditorDirty(true);
         
         const instance = State.getEditorInstanceByPath(targetKey);
         if (instance) {
-            State.updateEditorInstance(instance.uniqueId, { currentContent: updatedContent });
+            if (typeof State.updateEditorInstance === 'function') State.updateEditorInstance(instance.uniqueId, { currentContent: updatedContent });
             const textarea = document.getElementById(`xml-editor-textarea-${instance.uniqueId}`);
             if (textarea) {
                 const scrollPos = textarea.scrollTop;
@@ -1613,9 +1682,30 @@ function handlePhantomClick(event) {
         }
         
         showToast(`Successfully pasted <${phantomClipboardData.tagName}>`, 'success');
+        
+        // Cache tag and coords for post-render selection targeting
+        const droppedTag = phantomClipboardData.tagName;
+        const targetX = localX;
+        const targetY = localY;
+
         cancelPhantomPlacement();
+        
         if (typeof window.renderMainGui === 'function') {
             window.renderMainGui();
+            // Wait for DOM to finish mounting before acquiring target
+            setTimeout(() => {
+                const elements = document.querySelectorAll('.gui-element');
+                for (let candidate of elements) {
+                    if (candidate.dataset.xmlTagName === droppedTag && 
+                        parseInt(candidate.dataset.xmlAttr_x, 10) === targetX && 
+                        parseInt(candidate.dataset.xmlAttr_y, 10) === targetY) {
+                        if (typeof SelectionManager !== 'undefined') {
+                            SelectionManager.select(candidate);
+                        }
+                        break;
+                    }
+                }
+            }, 50);
         }
     } else {
         showToast('Failed to find container insertion point in XML.', 'error');

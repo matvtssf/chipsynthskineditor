@@ -146,7 +146,24 @@ const tagToRendererMap = {
     'CS01AssignmentMap': ContainerRenderer,
 };
 
-export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, sourcePath = 'unknown.xml') {
+export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, sourcePath = 'unknown.xml', isCommented = false) {
+    let nodeIsCommented = isCommented;
+    let rawXmlOverride = null;
+
+    if (xmlNode && xmlNode.nodeType === Node.COMMENT_NODE) {
+        const commentText = xmlNode.nodeValue.trim();
+        if (commentText.startsWith('<') && commentText.endsWith('>')) {
+            const tempParser = new DOMParser();
+            const tempDoc = tempParser.parseFromString(commentText, "application/xml");
+            const parseErr = tempDoc.querySelector("parsererror");
+            if (!parseErr && tempDoc.documentElement) {
+                rawXmlOverride = "";
+                xmlNode = tempDoc.documentElement; // Reassign parameter to parse the inner block!
+                nodeIsCommented = true;
+            } else { return; }
+        } else { return; }
+    }
+
     if (!xmlNode || xmlNode.nodeType !== Node.ELEMENT_NODE || !parentHtmlElement) {
         return;
     }
@@ -729,10 +746,18 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             }
             mainElementForAttributes.dataset.xmlTagName = tagName;
             mainElementForAttributes.dataset.sourcePath = sourcePath;
-            try {
-                mainElementForAttributes.dataset.rawXml = new XMLSerializer().serializeToString(xmlNode);
-            } catch (e) {
-                mainElementForAttributes.dataset.rawXml = `<${tagName}></${tagName}>`;
+            if (nodeIsCommented) {
+                mainElementForAttributes.dataset.isCommented = 'true';
+                mainElementForAttributes.classList.add('is-commented-element');
+            }
+            if (rawXmlOverride) {
+                mainElementForAttributes.dataset.rawXml = rawXmlOverride;
+            } else {
+                try {
+                    mainElementForAttributes.dataset.rawXml = new XMLSerializer().serializeToString(xmlNode);
+                } catch (e) {
+                    mainElementForAttributes.dataset.rawXml = `<${tagName}></${tagName}>`;
+                }
             }
             
             for (const attr of xmlNode.attributes) {
@@ -1108,7 +1133,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             const parentForChildren = childAppendElement; 
             for (const childNode of xmlNode.children) {
                 if (childNode.nodeType === Node.ELEMENT_NODE) {
-                    renderElement(childNode, parentForChildren, currentParams, sourcePath);
+                    renderElement(childNode, parentForChildren, currentParams, sourcePath, nodeIsCommented);
                 }
             }
         }

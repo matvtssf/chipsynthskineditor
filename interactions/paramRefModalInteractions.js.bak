@@ -158,26 +158,18 @@ function loadParamReferenceUI() {
 
     categories.forEach(cat => { const option = document.createElement('option'); option.value = cat; option.textContent = cat; categorySelect.appendChild(option); });
 
-    let defaultCategory = categories[0];
+    let detectedCategory = null;
     const skinRoot = (typeof State.getCurrentSkinRoot === 'function' ? State.getCurrentSkinRoot() : '') || '';
-    const productMapping = {
-        'cssfc': 'sfc',
-        'csportafm': 'portafm',
-        'csops7': 'ops7',
-        'csmd': 'md',
-        'csc64': 'c64'
-    };
-    for (const prod in productMapping) {
-        if (skinRoot.toLowerCase().includes(prod)) {
-            const match = categories.find(cat => cat.toLowerCase().includes(productMapping[prod]) || cat.toLowerCase().includes(prod));
-            if (match) {
-                defaultCategory = match;
-                break;
-            }
+    const productKeywords = ['sfc', 'portafm', 'ops7', 'md', 'c64'];
+    
+    for (const keyword of productKeywords) {
+        if (skinRoot.toLowerCase().includes(keyword)) {
+            detectedCategory = categories.find(cat => cat.toLowerCase().includes(keyword));
+            if (detectedCategory) break;
         }
     }
 
-    const categoryToLoad = currentSelectedParamCategory && categories.includes(currentSelectedParamCategory) ? currentSelectedParamCategory : defaultCategory;
+    const categoryToLoad = detectedCategory || (currentSelectedParamCategory && categories.includes(currentSelectedParamCategory) ? currentSelectedParamCategory : categories[0]);
     if (categoryToLoad) { categorySelect.value = categoryToLoad; populateParamList(categoryToLoad); }
     else { placeholder.textContent = "No categories found."; placeholder.style.display = 'block'; }
 

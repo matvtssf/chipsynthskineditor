@@ -5,8 +5,8 @@
  * FIXED: Added call to makeModalDraggable.
  * FIXED: Removed unused import for getCancelAttributeEditBtn.
  */
-import * as Refs from './core/references.js'; // Import reference data functions
-import { makeModalDraggable } from './managers/modalManager.js';
+import * as Refs from '../core/references.js'; // Import reference data functions
+import { makeModalDraggable } from '../managers/modalManager.js';
 import {
     // Getters for Attribute Editor Modal elements
     getAttributeEditorModal, getCloseAttributeEditorBtn, getAttributeEditorTitle,
@@ -18,7 +18,7 @@ import {
     getAttributeEditorModalContent, getAttributeEditorModalHeader,
     // Utility functions
     logError, showToast, getAttributeCategory
-} from './core/domUtils.js';
+} from '../core/domUtils.js';
 // TODO: Replace direct toggle logic with import from modalManager.js later
 // import { toggleModalVisibility } from './modalManager.js';
 
