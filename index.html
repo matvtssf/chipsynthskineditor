@@ -34,19 +34,6 @@
     <div class="editor-container">
 
         <div id="main-content-area" class="main-content">
-            <div id="canvas-controls-top" class="absolute left-4 top-20 z-50 controls-hidden transition-opacity duration-300">
-                <button id="add-element-canvas-btn" class="sidebar-header-button shadow" title="Add New Element"><i class="iconoir-plus-circle-solid"></i></button>
-            </div>
-            <div id="canvas-controls-mid" class="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2 controls-hidden transition-opacity duration-300">
-                <button id="undo-btn" class="sidebar-header-button shadow disabled" title="Undo (Ctrl+Z)"><i class="iconoir-undo-circle"></i></button>
-                <button id="redo-btn" class="sidebar-header-button shadow disabled" title="Redo (Ctrl+Shift+Z)"><i class="iconoir-redo-circle"></i></button>
-                <div id="clipboard-badge" style="display: none; align-items: center; justify-content: center; font-size: 10px; background: #1a202c; color: #4ade80; padding: 4px 6px; border: 1px solid #2d3748; border-radius: 4px; font-family: monospace; user-select: none; margin-top: 4px; writing-mode: vertical-lr;">
-                    📋 <span id="clipboard-badge-text">Empty</span>
-                </div>
-                <div id="clipboard-badge" class="hidden items-center justify-center text-[10px] bg-gray-900 text-green-400 px-1.5 py-1 rounded border border-green-800 font-mono select-none" style="margin-top: 4px; writing-mode: vertical-lr;">
-                    📋 <span id="clipboard-badge-text">Empty</span>
-                </div>
-            </div>
             <div id="canvas-viewport"> <div id="gui-zoom-canvas" style="transform-origin: top left; transform: scale(1);"> <div id="fixed-dimension-content"> <div id="skin-container-actual">
                             </div>
                     </div>
@@ -145,6 +132,28 @@
                      </div>
                  </div>
              </div>
+        </div>
+        
+        <div id="canvas-controls-top" class="absolute left-4 bottom-4 z-50 controls-hidden transition-opacity duration-300 pointer-events-none">
+            <button id="add-element-canvas-btn" class="sidebar-header-button shadow pointer-events-auto" style="width: 64px; height: 64px; font-size: 2.2rem;" title="Add New Element"><i class="iconoir-plus-circle-solid"></i></button>
+        </div>
+        <div id="canvas-controls-mid" class="absolute bottom-4 z-50 flex items-center gap-2 controls-hidden pointer-events-none">
+            <div class="flex gap-2">
+                <button id="placeholder-1-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 1">P1</button>
+                <button id="placeholder-2-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 2">P2</button>
+                <button id="placeholder-3-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 3">P3</button>
+                <button id="placeholder-4-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 4">P4</button>
+                <button id="placeholder-5-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 5">P5</button>
+                <button id="placeholder-6-btn" class="sidebar-header-button shadow pointer-events-auto font-medium text-xs" title="Placeholder 6">P6</button>
+            </div>
+            <div style="width: 66px;" class="flex-shrink-0"></div>
+            <div class="flex gap-2 flex-shrink-0" style="width: 140px;">
+                <button id="undo-btn" class="sidebar-header-button shadow disabled pointer-events-auto" style="flex: 1;" title="Undo (Ctrl+Z)"><i class="iconoir-undo-circle"></i></button>
+                <button id="redo-btn" class="sidebar-header-button shadow disabled pointer-events-auto" style="flex: 1;" title="Redo (Ctrl+Shift+Z)"><i class="iconoir-redo-circle"></i></button>
+            </div>
+            <div id="clipboard-badge" class="hidden items-center justify-center text-[10px] bg-gray-900 text-green-400 px-1.5 py-1 rounded border border-green-800 font-mono select-none pointer-events-auto">
+                📋 <span id="clipboard-badge-text">Empty</span>
+            </div>
         </div>
 
     <div id="xml-editor-modal" class="modal-overlay">
@@ -467,9 +476,12 @@
                      <label for="element-editor-uses-common" class="ml-2 block text-sm text-gray-900">Uses Common Attributes (x, y, w, h, style...)</label>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Specific Attributes (Read-only)</label>
-                    <p class="text-xs text-gray-500 mb-1">Use Reference Modal to manage attribute usage.</p>
-                    <textarea id="element-editor-specific-attributes" name="specific-attributes" rows="3" class="w-full p-1 border border-gray-300 rounded text-sm font-mono bg-gray-100" readonly placeholder="{ ... }"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Specific Attributes</label>
+                    <div class="p-1 border border-gray-200 rounded mb-2">
+                        <input type="text" id="element-editor-attr-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Filter element attributes...">
+                    </div>
+                    <ul id="element-editor-attributes-list" class="border border-gray-300 rounded p-2 text-sm max-h-40 overflow-y-auto space-y-1">
+                        </ul>
                 </div>
                  <div>
                     <label for="element-editor-notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
@@ -482,11 +494,39 @@
             </div>
         </div>
     </div>
+    <div id="canvas-insert-element-modal" class="modal-overlay canvas-insert-modal-overlay">
+        <div class="modal-content-container active-editor-modal w-full max-w-xl flex flex-col" style="max-height: 500px;">
+            <div class="flex justify-between items-center p-2 border-b border-gray-300 dark:border-gray-600">
+                <h2 class="text-base font-semibold">Insert Element</h2>
+                <button id="close-canvas-insert-btn" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+            <div class="flex flex-1 overflow-hidden">
+                <div class="w-1/2 border-r border-gray-200 dark:border-gray-600 flex flex-col overflow-hidden">
+                    <div class="p-2 border-b border-gray-200 dark:border-gray-600">
+                        <input type="text" id="canvas-insert-search" class="w-full p-1.5 border border-gray-300 dark:border-gray-600 bg-transparent rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Search elements...">
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-1 text-sm">
+                        <ul id="canvas-insert-element-list" class="space-y-1 outline-none" tabindex="0">
+                        </ul>
+                    </div>
+                </div>
+                <div class="w-1/2 p-3 flex flex-col overflow-y-auto">
+                    <strong id="canvas-insert-details-name" class="block text-lg mb-1">Select an element</strong>
+                    <span id="canvas-insert-details-desc" class="text-gray-500 text-xs mb-3 flex-shrink-0"></span>
+                    <div id="canvas-insert-details-attributes" class="text-xs text-gray-400 mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="xml-insert-element-modal" class="modal-overlay">
         <div class="modal-content-container w-full max-w-md bg-white">
             <div class="flex justify-between items-center p-3 border-b border-gray-300">
                 <h2 class="text-lg font-semibold">Insert Element</h2>
                 <button id="close-xml-insert-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+             </div>
+             <div class="p-2 border-b border-gray-200">
+                 <input type="text" id="xml-insert-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search elements...">
              </div>
              <div class="p-4" style="max-height: 60vh; overflow-y: auto;">
                  <p class="text-sm text-gray-600 mb-2">Select an element to insert:</p>

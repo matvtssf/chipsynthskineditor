@@ -27,6 +27,7 @@ import { handleConfigToggle } from './configModalInteractions.js';
 import { makeModalDraggable, toggleModalVisibility } from '../managers/modalManager.js';
 import { openXmlEditor } from '../core/xmlEditor.js';
 import { updateGuiZoom } from './mainContentInteractions.js';
+import { cancelCanvasInsertMode } from './canvasInsertInteractions.js';
 
 let previewArea = null;
 let previewItemModal = null;
@@ -88,6 +89,7 @@ function disableEditMode() {
         document.body.classList.remove('edit-mode-active');
         debugOverlayElement.style.display = 'none';
         debugOverlayElement.textContent = '';
+        cancelCanvasInsertMode();
     }
 }
 
@@ -730,6 +732,7 @@ function handleDebugToggle() {
         debugOverlayElement.style.display = newCheckedState ? 'block' : 'none';
         if (!newCheckedState && debugOverlayElement) { // Clear overlay when disabling
             debugOverlayElement.textContent = '';
+            cancelCanvasInsertMode();
         }
         showToast(`Edit Mode: ${newCheckedState ? 'ON' : 'OFF'}`, 'info', 1500);
     } else {

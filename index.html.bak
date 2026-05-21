@@ -488,6 +488,9 @@
                 <h2 class="text-lg font-semibold">Insert Element</h2>
                 <button id="close-xml-insert-btn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
              </div>
+             <div class="p-2 border-b border-gray-200">
+                 <input type="text" id="xml-insert-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search elements...">
+             </div>
              <div class="p-4" style="max-height: 60vh; overflow-y: auto;">
                  <p class="text-sm text-gray-600 mb-2">Select an element to insert:</p>
                  <ul id="xml-insert-element-list" class="space-y-1">
@@ -525,6 +528,9 @@
                             <div class="header-actions">
                                 <button id="add-param-ref-btn" title="Add New Parameter to Selected Category"><i class="iconoir-plus"></i></button>
                                 </div>
+                        </div>
+                        <div class="p-1 border-b border-gray-200 flex-shrink-0 mb-1">
+                            <input type="text" id="param-search" class="w-full p-1 border border-gray-300 rounded text-xs" placeholder="Search parameters...">
                         </div>
                         <p id="param-placeholder-text" class="text-gray-500 italic p-4 text-center" style="display: none;">No data loaded or no category selected.</p>
                         <ul id="param-list" class="flex-grow overflow-y-auto text-sm space-y-1 pr-1">

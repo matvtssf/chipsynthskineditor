@@ -34,6 +34,10 @@ body.logo-hover #text-logo { opacity: 0.1; }
 #canvas-controls-top, #canvas-controls-mid {
     pointer-events: none; /* Let empty space pass clicks */
 }
+#canvas-controls-mid {
+    right: calc(1rem + 320px + 1rem);
+    transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease, visibility 0.4s ease !important;
+}
 .controls-hidden {
     opacity: 0 !important;
     visibility: hidden !important;
@@ -48,38 +52,59 @@ body.logo-hover #text-logo { opacity: 0.1; }
     display: flex !important;
     align-items: center;
     justify-content: center;
-    width: 32px;
     height: 32px;
     background-color: rgb(243, 244, 246) !important; 
     color: rgb(55, 65, 81) !important;
     border-radius: 6px;
     border: 1px solid rgb(209, 213, 219);
 }
+#canvas-controls-top button {
+    width: 32px;
+}
+#canvas-controls-mid button {
+    width: 66px;
+}
 #canvas-controls-top button:hover, #canvas-controls-mid button:hover {
     opacity: 1;
     background-color: rgb(229, 231, 235) !important;
 }
 
-/* Retracted state (hidden offscreen left) */
-body.controls-retracted #canvas-controls-top button,
+/* Retracted state (hidden offscreen bottom) */
 body.controls-retracted #canvas-controls-mid button {
-    transform: translateX(-100px) !important;
+    transform: translateY(100px) !important;
     opacity: 0 !important;
     pointer-events: none !important;
 }
 
-/* Staggered bounce back in */
+/* Staggered bounce back in (entrance wave) */
 body:not(.controls-retracted) #add-element-canvas-btn { transition-delay: 0.0s; }
-body:not(.controls-retracted) #undo-btn { transition-delay: 0.05s; }
-body:not(.controls-retracted) #redo-btn { transition-delay: 0.1s; }
+body:not(.controls-retracted) #placeholder-1-btn { transition-delay: 0.02s; }
+body:not(.controls-retracted) #placeholder-2-btn { transition-delay: 0.04s; }
+body:not(.controls-retracted) #placeholder-3-btn { transition-delay: 0.06s; }
+body:not(.controls-retracted) #placeholder-4-btn { transition-delay: 0.08s; }
+body:not(.controls-retracted) #placeholder-5-btn { transition-delay: 0.10s; }
+body:not(.controls-retracted) #placeholder-6-btn { transition-delay: 0.12s; }
+body:not(.controls-retracted) #undo-btn { transition-delay: 0.14s; }
+body:not(.controls-retracted) #redo-btn { transition-delay: 0.16s; }
 
-/* Staggered bounce away */
-body.controls-retracted #add-element-canvas-btn { transition-delay: 0.1s; }
-body.controls-retracted #undo-btn { transition-delay: 0.05s; }
+/* Staggered bounce away (retraction wave) */
 body.controls-retracted #redo-btn { transition-delay: 0.0s; }
+body.controls-retracted #undo-btn { transition-delay: 0.02s; }
+body.controls-retracted #placeholder-6-btn { transition-delay: 0.04s; }
+body.controls-retracted #placeholder-5-btn { transition-delay: 0.06s; }
+body.controls-retracted #placeholder-4-btn { transition-delay: 0.08s; }
+body.controls-retracted #placeholder-3-btn { transition-delay: 0.10s; }
+body.controls-retracted #placeholder-2-btn { transition-delay: 0.12s; }
+body.controls-retracted #placeholder-1-btn { transition-delay: 0.14s; }
+
 #undo-btn.disabled, #redo-btn.disabled {
     opacity: 0.3 !important;
     cursor: not-allowed;
+}
+
+/* Sidebar tracking for mid controls */
+#sidebar.collapsed ~ #canvas-controls-mid {
+    right: calc(1rem + 48px + 1rem) !important;
 }
 
 /* Apply the red glow directly as an inset shadow on the main content flex container so it NEVER alters the box model */
@@ -112,44 +137,29 @@ body.edit-mode-active #main-content-area {
     background-color: var(--canvas-bg, #4B5563); 
 }
 
-/* --- Status Overlay --- */
+/* --- Status Overlay (Floating Canvas Message) --- */
 #status {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
     z-index: 100;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem;
     background-color: transparent;
     color: #ffffff;
     font-size: 0.875rem;
     font-weight: 500;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.8), 1px -1px 2px rgba(0, 0, 0, 0.8), -1px 1px 2px rgba(0, 0, 0, 0.8);
     pointer-events: none;
     display: none;
-    opacity: 0.25;
+    opacity: 0.85;
+    transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 #status.visible {
     display: block;
 }
-
-/* --- Status Overlay --- */
-#status {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    padding: 0.5rem 1rem;
-    background-color: transparent;
-    color: #ffffff;
-    font-size: 0.875rem;
-    font-weight: 500;
-    pointer-events: none;
-    display: none;
-    opacity: 0.25;
-}
-#status.visible {
-    display: block;
+body.edit-mode-active #status {
+    left: calc(1rem + 64px + 1rem); /* Starts to the right of the + new button (16px + 64px + 16px = 96px) */
 }
 
 /* Dynamic Toggleable Grid on the Bottom Floor Canvas Viewport */

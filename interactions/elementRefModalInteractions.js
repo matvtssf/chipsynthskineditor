@@ -125,17 +125,25 @@ export function setupReferenceModalListeners() {
 
         let draggedItem = null;
         attributeList.addEventListener('dragstart', (e) => {
-            if (e.target.tagName === 'LI' && e.target.hasAttribute('draggable')) {
-                draggedItem = e.target;
-                e.target.style.opacity = '0.5';
+            const li = e.target.closest('li');
+            if (li && li.hasAttribute('draggable')) {
+                draggedItem = li;
+                li.style.opacity = '0.5';
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', li.dataset.attributeName || '');
+                }
+            } else {
+                e.preventDefault();
             }
         });
         attributeList.addEventListener('dragend', (e) => {
-            if (e.target.tagName === 'LI') {
-                e.target.style.opacity = '1';
-                draggedItem = null;
-                saveAttributeOrder();
+            const li = e.target.closest('li');
+            if (li) {
+                li.style.opacity = '1';
             }
+            draggedItem = null;
+            saveAttributeOrder();
         });
         attributeList.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -153,6 +161,139 @@ export function setupReferenceModalListeners() {
     if (descriptionArea) {
         descriptionArea.addEventListener('input', handleElementDescriptionChange);
     }
+
+    // --- Element Editor Attribute List Search Filter & Drag/Drop Mechanics ---
+    const elementEditorAttrSearch = document.getElementById('element-editor-attr-search');
+    if (elementEditorAttrSearch) {
+        elementEditorAttrSearch.addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('#element-editor-attributes-list li');
+            items.forEach(li => {
+                const text = li.textContent.toLowerCase();
+                li.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    }
+
+    const elementEditorAttrList = document.getElementById('element-editor-attributes-list');
+    if (elementEditorAttrList) {
+        let draggedEditorItem = null;
+        elementEditorAttrList.addEventListener('dragstart', (e) => {
+            const li = e.target.closest('li');
+            // Only allow drag initiation if clicking the actual menu/drag handle icon specifically
+            if (li && e.target.closest('.drag-handle')) {
+                draggedEditorItem = li;
+                li.style.opacity = '0.5';
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            } else {
+                e.preventDefault();
+            }
+        });
+        elementEditorAttrList.addEventListener('dragend', (e) => {
+            const li = e.target.closest('li');
+            if (li) {
+                li.style.opacity = '1';
+            }
+            draggedEditorItem = null;
+            
+            // Save the newly dragged sequence back into the reference definition array
+            if (currentSelectedElementName) {
+                const elementsArray = Refs.getElementReferenceData();
+                const elementData = elementsArray.find(el => el.element === currentSelectedElementName);
+                if (elementData && elementData.attributes) {
+                    const updatedObj = {};
+                    const currentRows = elementEditorAttrList.querySelectorAll('li[data-attribute-name]');
+                    currentRows.forEach(row => {
+                        const attrName = row.dataset.attributeName;
+                        if (elementData.attributes[attrName] !== undefined) {
+                            updatedObj[attrName] = elementData.attributes[attrName];
+                        }
+                    });
+                    Object.keys(elementData.attributes).forEach(k => {
+                        if (updatedObj[k] === undefined) updatedObj[k] = elementData.attributes[k];
+                    });
+                    elementData.attributes = updatedObj;
+                    setElementUnsavedChanges(true);
+                }
+            }
+        });
+        elementEditorAttrList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(elementEditorAttrList, e.clientY);
+            if (draggedEditorItem) {
+                if (afterElement == null) {
+                    elementEditorAttrList.appendChild(draggedEditorItem);
+                } else {
+                    elementEditorAttrList.insertBefore(draggedEditorItem, afterElement);
+                }
+            }
+        });
+    }
+
+    // Intercept or hook the execution context when rendering the Element Editor form fields
+    window.populateElementEditorAttributesList = function(elementName) {
+        if (!elementEditorAttrList) return;
+        elementEditorAttrList.innerHTML = '';
+        
+        const elementsArray = Refs.getElementReferenceData();
+        const elementData = elementsArray.find(el => el.element === elementName);
+        if (!elementData) return;
+
+        const commonAttributes = Refs.getCommonAttributes();
+        const combined = [];
+
+        // Gather local element specific attributes
+        if (elementData.attributes && typeof elementData.attributes === 'object') {
+            Object.keys(elementData.attributes).forEach(attrName => {
+                combined.push({ name: attrName, isCommon: false });
+            });
+        }
+        // Gather common attributes fallback if enabled
+        if (elementData.usesCommonAttributes && commonAttributes) {
+            Object.keys(commonAttributes).forEach(attrName => {
+                if (elementData.attributes && elementData.attributes[attrName] !== undefined) return;
+                combined.push({ name: attrName, isCommon: true });
+            });
+        }
+
+        if (combined.length === 0) {
+            elementEditorAttrList.innerHTML = '<li class="text-gray-500 italic p-1">No attributes defined.</li>';
+            return;
+        }
+
+        combined.forEach(attr => {
+            const li = document.createElement('li');
+            li.dataset.attributeName = attr.name;
+            li.setAttribute('draggable', 'true');
+            li.className = 'flex items-center justify-between p-1 bg-gray-50 border border-gray-200 rounded select-none cursor-default';
+            li.innerHTML = `
+                <div class="flex items-center select-none">
+                    <i class="iconoir-menu drag-handle mr-2 text-gray-400 cursor-grab active:cursor-grabbing"></i>
+                    <span class="font-mono text-xs select-none">${attr.name}</span>
+                </div>
+                ${attr.isCommon ? '<i class="iconoir-globe text-gray-400 text-xs" title="Common Attribute"></i>' : ''}
+            `;
+            elementEditorAttrList.appendChild(li);
+        });
+        
+        // Clear any old leftover search value on show
+        const filterInput = document.getElementById('element-editor-attr-search');
+        if (filterInput) filterInput.value = '';
+    };
+
+    // Global listener catch for the element-editor show trigger to dynamically populate the interactive layout list
+    document.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('#edit-button');
+        if (editBtn) {
+            setTimeout(() => {
+                if (currentSelectedElementName) {
+                    window.populateElementEditorAttributesList(currentSelectedElementName);
+                }
+            }, 50);
+        }
+    });
 
     // Listener for Supported Checkbox
     const supportedCheckbox = document.getElementById('element-ref-supported-checkbox');

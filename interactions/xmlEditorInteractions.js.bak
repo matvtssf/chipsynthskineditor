@@ -110,7 +110,7 @@ export function setupXmlEditorListeners() {
     document.addEventListener('jumpToStyle', handleJumpToStyle);
 
     // Add keyboard listeners for the CTRL toggle mechanic
-    document.addEventListener('keydown', handleEditorKeyDown);
+    window.addEventListener('keydown', handleEditorKeyDown, { capture: true });
     document.addEventListener('keyup', handleEditorKeyUp);
     window.addEventListener('blur', handleEditorWindowBlur);
 }
@@ -668,6 +668,8 @@ function handleOpenXmlInsertModal() {
     const modal = getXmlInsertElementModal();
     const list = getXmlInsertElementList();
     if (!modal || !list) return;
+    const searchInput = document.getElementById('xml-insert-search');
+    if (searchInput) searchInput.value = '';
     const elements = getCachedElementReferenceDataForHover();
     if (!elements || elements.length === 0) {
         list.innerHTML = '<li>No element data loaded.</li>';

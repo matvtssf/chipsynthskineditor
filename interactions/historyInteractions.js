@@ -61,9 +61,9 @@ export function setupCanvasControlButtons() {
         if (undoBtn) undoBtn.classList.toggle('disabled', !State.canUndo());
         if (redoBtn) redoBtn.classList.toggle('disabled', !State.canRedo());
         
-        const hasProject = checkHasProject();
-        if (topControls) topControls.classList.toggle('controls-hidden', !hasProject);
-        if (midControls) midControls.classList.toggle('controls-hidden', !hasProject);
+        const isEditMode = typeof State.getDebugEnabled === 'function' && State.getDebugEnabled();
+        if (topControls) topControls.classList.toggle('controls-hidden', !isEditMode);
+        if (midControls) midControls.classList.toggle('controls-hidden', !isEditMode);
     };
     
     document.addEventListener('historyChanged', updateButtonStates);
@@ -72,12 +72,12 @@ export function setupCanvasControlButtons() {
     document.body.classList.add('controls-retracted');
 
     document.addEventListener('mousemove', (e) => {
-        lastMouseX = e.clientX;
         if (document.body.dataset.showcaseActive === 'true') return;
         
-        if (!checkHasProject()) return;
+        const isEditMode = typeof State.getDebugEnabled === 'function' && State.getDebugEnabled();
+        if (!isEditMode) return;
 
-        if (lastMouseX < 160) {
+        if (e.clientY > window.innerHeight - 120) {
             document.body.classList.remove('controls-retracted');
         } else {
             document.body.classList.add('controls-retracted');
@@ -91,9 +91,7 @@ export function setupCanvasControlButtons() {
         
         setTimeout(() => {
             document.body.dataset.showcaseActive = 'false';
-            if (lastMouseX >= 160) {
-                document.body.classList.add('controls-retracted');
-            }
+            document.body.classList.add('controls-retracted');
         }, 2500); 
     });
     
@@ -107,5 +105,16 @@ export function setupCanvasControlButtons() {
             console.log("[globalListeners] Add Element clicked");
             if (typeof showToast === 'function') showToast("Add Element (Stub)", "info", 1000);
         });
+    }
+
+    // Attach click listeners to all 6 placeholder buttons
+    for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`placeholder-${i}-btn`);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                console.log(`[globalListeners] Placeholder ${i} clicked`);
+                if (typeof showToast === 'function') showToast(`Placeholder ${i} clicked`, "info", 1500);
+            });
+        }
     }
 }

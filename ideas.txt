@@ -68,7 +68,7 @@ Dragging elements:
 -Drag and drop element to another container if it exists (this might be hard)
 
 
-*************
+************* complete up to this point, though major bugs.
 
 -Turn on snapping mode with sensitivity gauge (done in config)
 -holding shift while dragging the element will bypass the snapping

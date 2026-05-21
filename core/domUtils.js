@@ -170,6 +170,13 @@ export function getInsertElementXmlBtn() { return getElement('insert-element-xml
 export function getXmlInsertElementModal() { return getElement('xml-insert-element-modal', false); }
 export function getCloseXmlInsertBtn() { return getElement('close-xml-insert-btn', false); }
 export function getXmlInsertElementList() { return getElement('xml-insert-element-list', false); }
+
+export function getCanvasInsertElementModal() { return getElement('canvas-insert-element-modal', false); }
+export function getCloseCanvasInsertBtn() { return getElement('close-canvas-insert-btn', false); }
+export function getCanvasInsertSearch() { return getElement('canvas-insert-search', false); }
+export function getCanvasInsertElementList() { return getElement('canvas-insert-element-list', false); }
+export function getCanvasInsertDetailsName() { return getElement('canvas-insert-details-name', false); }
+export function getCanvasInsertDetailsDesc() { return getElement('canvas-insert-details-desc', false); }
 export function getXmlHoverInfo() { return getElement('xml-hover-info', false); }
 export function getParamReferenceButton() { return getElement('param-reference-button', false); }
 export function getParamReferenceModal() { return getElement('param-reference-modal'); }
@@ -310,7 +317,23 @@ export function logError(message, errorObject = null, isCritical = false) {
 
 export function clearErrors() { const errorContent = getErrorContent(); const errorLogContainer = getErrorLogContainer(); if (errorContent) errorContent.textContent = ''; if (errorLogContainer) errorLogContainer.style.display = 'none'; }
 
-export function showToast(message, type = 'info', duration = 3000) { const toastContainer = getToastContainer(); if (!toastContainer) { console.log(`Toast (${type}): ${message}`); return; } const toast = document.createElement('div'); toast.className = `toast-notification ${type}`; toast.innerHTML = message; const closeBtn = document.createElement('button'); closeBtn.className = 'toast-close-btn'; closeBtn.innerHTML = '&times;'; closeBtn.setAttribute('aria-label', 'Close notification'); closeBtn.onclick = (e) => { e.stopPropagation(); toast.classList.add('fade-out'); if (toast.timerId) { clearTimeout(toast.timerId); } toast.addEventListener('transitionend', () => { if (toast.parentNode === toastContainer) { toastContainer.removeChild(toast); } }, { once: true }); }; toast.appendChild(closeBtn); toastContainer.appendChild(toast); if (duration > 0) { toast.timerId = setTimeout(() => { closeBtn.click(); }, duration); } else { toast.timerId = null; } }
+export function showToast(message, type = 'info', duration = 3000) {
+    let consoleType = 'info';
+    if (type === 'warn' || type === 'warning') {
+        consoleType = 'warn';
+    } else if (type === 'error') {
+        consoleType = 'error';
+    }
+    try {
+        addConsoleLogEntry(message, consoleType);
+        if (typeof window.updateConsoleView === 'function' && document.getElementById('console-modal')?.classList.contains('visible')) {
+            window.updateConsoleView();
+        }
+    } catch (e) {
+        console.error("Failed to add log entry to console", e);
+    }
+    updateStatus(message, 5000);
+}
 
 export function getParamValue(node, offset = 0, attributeName = 'param') {
     if (!node) { return 'NODE_INVALID';}
@@ -609,8 +632,45 @@ export function applyFont(element, fontAlias) {
     }
 }
 
+let currentStaticStatusMessage = "";
 let statusTimeoutId = null;
-export function updateStatus(message, durationMs = 4000) { const statusDiv = getStatusDiv(); if (!statusDiv) return; console.log(`[Status Update] ${message}`); statusDiv.innerHTML = message; statusDiv.classList.add('visible'); if (statusTimeoutId) { clearTimeout(statusTimeoutId); } if (durationMs > 0) { statusTimeoutId = setTimeout(() => { statusDiv.classList.remove('visible'); statusTimeoutId = null; }, durationMs); } else { statusTimeoutId = null; } }
+let temporaryMessageActive = false;
+
+export function updateStatus(message, durationMs = 4000) {
+    const statusDiv = getStatusDiv();
+    if (!statusDiv) return;
+    
+    console.log(`[Status Update] ${message} (duration: ${durationMs})`);
+    
+    if (durationMs <= 0) {
+        currentStaticStatusMessage = message;
+        if (!temporaryMessageActive) {
+            statusDiv.innerHTML = message;
+            statusDiv.classList.add('visible');
+            if (statusTimeoutId) {
+                clearTimeout(statusTimeoutId);
+                statusTimeoutId = null;
+            }
+        }
+    } else {
+        temporaryMessageActive = true;
+        statusDiv.innerHTML = message;
+        statusDiv.classList.add('visible');
+        if (statusTimeoutId) {
+            clearTimeout(statusTimeoutId);
+        }
+        statusTimeoutId = setTimeout(() => {
+            statusTimeoutId = null;
+            temporaryMessageActive = false;
+            if (currentStaticStatusMessage) {
+                statusDiv.innerHTML = currentStaticStatusMessage;
+                statusDiv.classList.add('visible');
+            } else {
+                statusDiv.classList.remove('visible');
+            }
+        }, durationMs);
+    }
+}
 
 export function polarToCartesian(centerX, centerY, radius, angleInDegrees) { const angleInRadians = angleInDegrees * Math.PI / 180.0; return { x: centerX + (radius * Math.cos(angleInRadians)), y: centerY + (radius * Math.sin(angleInRadians)) }; }
 export function describeArc(x, y, radius, startAngleDegrees, endAngleDegrees) { if (isNaN(x) || isNaN(y) || isNaN(radius) || isNaN(startAngleDegrees) || isNaN(endAngleDegrees)) { return "M 0 0"; } if (Math.abs(endAngleDegrees - startAngleDegrees) < 0.01) return ""; if (Math.abs(endAngleDegrees - startAngleDegrees) >= 360) { endAngleDegrees = startAngleDegrees + 359.99 * Math.sign(endAngleDegrees - startAngleDegrees); } const start = polarToCartesian(x, y, radius, startAngleDegrees); const end = polarToCartesian(x, y, radius, endAngleDegrees); const largeArcFlag = Math.abs(endAngleDegrees - startAngleDegrees) <= 180 ? "0" : "1"; const sweepFlag = endAngleDegrees > startAngleDegrees ? "1" : "0"; const d = [ "M", start.x.toFixed(3), start.y.toFixed(3), "A", radius.toFixed(3), radius.toFixed(3), 0, largeArcFlag, sweepFlag, end.x.toFixed(3), end.y.toFixed(3) ].join(" "); return d; }

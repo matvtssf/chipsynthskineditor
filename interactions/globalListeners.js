@@ -15,6 +15,8 @@ import { updateGuiZoom } from './mainContentInteractions.js';
 import { syncElementChangesToXmlSource } from '../core/xmlReconciler.js';
 import { initializeClipboardAndLayerListeners } from './clipboardInteractions.js'; // Modularized clipboard
 import { handleUndoRedoShortcuts, setupCanvasControlButtons } from './historyInteractions.js'; // Modularized history
+import { handleGlobalAKey, handleGlobalEscKey } from './canvasInsertInteractions.js';
+
 window.syncElementChangesToXmlSource = syncElementChangesToXmlSource;
 
 let middleMouseDownX = 0;
@@ -42,6 +44,16 @@ export function setupGlobalListeners() {
             State.addConsoleLogEntry(`Promise Rejection: ${rejectReason}`, 'error');
         });
         document.body.dataset.browserErrorListenersAttached = 'true';
+    }
+
+    if (!document.body.dataset.keyboardListenersAttached) {
+        document.addEventListener('keydown', (e) => {
+            handleGlobalAKey(e);
+            if (handleGlobalEscKey(e)) {
+                e.preventDefault();
+            }
+        });
+        document.body.dataset.keyboardListenersAttached = 'true';
     }
 
     // Light mode contrast enhancement for settings/open controls right before presentation
@@ -527,6 +539,40 @@ function renderInspectorContent(container, el) {
                     <button class="qi-delete-row-btn" style="background:#e53e3e; color:#fff; border:none; padding:2px 6px; cursor:pointer; font-size:11px; margin-left:4px; border-radius:2px; flex-shrink:0;">X</button>
                 </div>
             `;
+        }
+    }
+
+    const styleName = el.dataset.xmlAttr_style;
+    if (styleName) {
+        const allStyles = typeof State.getStyles === 'function' ? State.getStyles() : {};
+        const styleData = allStyles[styleName];
+        if (styleData && Object.keys(styleData).length > 0) {
+            html += `
+                <div style="font-size: 12px; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #9f7aea; flex-shrink: 0; display:flex; justify-content:space-between; align-items:center; border-top: 1px solid rgba(159,122,234,0.3); padding-top: 8px;">
+                    <span>Style Attributes (<span style="color:#e9d8fd;">${styleName}</span>)</span>
+                </div>
+                <div style="flex-grow: 0; overflow-y: auto; margin-bottom: 12px;">
+            `;
+            for (const [attrName, attrValue] of Object.entries(styleData)) {
+                const lowerAttr = attrName.toLowerCase();
+                const isColor = lowerAttr.includes('color');
+                let safeHex = '#ffffff';
+                if (attrValue && attrValue.startsWith('#')) {
+                    safeHex = attrValue.length === 4 ? '#' + attrValue[1]+attrValue[1] + attrValue[2]+attrValue[2] + attrValue[3]+attrValue[3] : attrValue.substring(0, 7);
+                }
+                
+                html += `
+                    <div style="margin-bottom:4px; position:relative; display:flex; align-items:center;" title="Defined in styles.xml">
+                        <span style="font-size:11px; color:#a0aec0; display:inline-block; width:90px; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;">${attrName}</span>
+                        <input type="text" value="${attrValue}" style="flex-grow:1; width:0; background:rgba(159,122,234,0.1); color:#d6bcfa; border:1px solid rgba(159,122,234,0.3); padding:2px; font-size:11px; border-radius:3px;" readonly />
+                        ${isColor ? `
+                            <div style="position:relative; width:14px; height:14px; background:${attrValue || 'transparent'}; border:1px solid rgba(255,255,255,0.5); margin-left:4px; border-radius:2px; flex-shrink:0; box-sizing:border-box;">
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            html += `</div>`;
         }
     }
 

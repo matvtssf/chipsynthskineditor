@@ -109,6 +109,37 @@ export function setupXmlEditorListeners() {
     }
     document.addEventListener('jumpToStyle', handleJumpToStyle);
 
+    const searchInput = document.getElementById('xml-insert-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('#xml-insert-element-list li');
+            let lastHeader = null;
+            let headerHasVisibleItems = false;
+            items.forEach(li => {
+                if (li.classList.contains('element-category-header')) {
+                    if (lastHeader && !headerHasVisibleItems) {
+                        lastHeader.style.display = 'none';
+                    }
+                    lastHeader = li;
+                    headerHasVisibleItems = false;
+                    li.style.display = '';
+                } else {
+                    const text = li.textContent.toLowerCase();
+                    if (text.includes(term)) {
+                        li.style.display = '';
+                        headerHasVisibleItems = true;
+                    } else {
+                        li.style.display = 'none';
+                    }
+                }
+            });
+            if (lastHeader && !headerHasVisibleItems) {
+                lastHeader.style.display = 'none';
+            }
+        });
+    }
+
     // Add keyboard listeners for the CTRL toggle mechanic
     window.addEventListener('keydown', handleEditorKeyDown, { capture: true });
     document.addEventListener('keyup', handleEditorKeyUp);
@@ -668,6 +699,8 @@ function handleOpenXmlInsertModal() {
     const modal = getXmlInsertElementModal();
     const list = getXmlInsertElementList();
     if (!modal || !list) return;
+    const searchInput = document.getElementById('xml-insert-search');
+    if (searchInput) searchInput.value = '';
     const elements = getCachedElementReferenceDataForHover();
     if (!elements || elements.length === 0) {
         list.innerHTML = '<li>No element data loaded.</li>';

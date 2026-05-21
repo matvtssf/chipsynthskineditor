@@ -122,10 +122,93 @@ export function setupReferenceModalListeners() {
         attributeList.addEventListener('click', handleAttributeListItemClick);
         attributeList.addEventListener('mouseover', handleListItemHover);
         attributeList.addEventListener('mouseout', handleListItemHoverOut);
+
+        let draggedItem = null;
+        attributeList.addEventListener('dragstart', (e) => {
+            const li = e.target.closest('li');
+            if (li && li.hasAttribute('draggable')) {
+                draggedItem = li;
+                li.style.opacity = '0.5';
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', li.dataset.attributeName || '');
+                }
+            } else {
+                e.preventDefault();
+            }
+        });
+        attributeList.addEventListener('dragend', (e) => {
+            const li = e.target.closest('li');
+            if (li) {
+                li.style.opacity = '1';
+            }
+            draggedItem = null;
+            saveAttributeOrder();
+        });
+        attributeList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(attributeList, e.clientY);
+            if (draggedItem) {
+                if (afterElement == null) {
+                    attributeList.appendChild(draggedItem);
+                } else {
+                    attributeList.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
     }
     const descriptionArea = getReferenceDescriptionTextarea();
     if (descriptionArea) {
         descriptionArea.addEventListener('input', handleElementDescriptionChange);
+    }
+
+    // --- Element Editor Attribute List Search Filter & Drag/Drop Mechanics ---
+    const elementEditorAttrSearch = document.getElementById('element-editor-attr-search');
+    if (elementEditorAttrSearch) {
+        elementEditorAttrSearch.addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('#element-editor-attributes-list li');
+            items.forEach(li => {
+                const text = li.textContent.toLowerCase();
+                li.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    }
+
+    const elementEditorAttrList = document.getElementById('element-editor-attributes-list');
+    if (elementEditorAttrList) {
+        let draggedEditorItem = null;
+        elementEditorAttrList.addEventListener('dragstart', (e) => {
+            const li = e.target.closest('li');
+            if (li && li.hasAttribute('draggable')) {
+                draggedEditorItem = li;
+                li.style.opacity = '0.5';
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            } else {
+                e.preventDefault();
+            }
+        });
+        elementEditorAttrList.addEventListener('dragend', (e) => {
+            const li = e.target.closest('li');
+            if (li) {
+                li.style.opacity = '1';
+            }
+            draggedEditorItem = null;
+            // Trigger custom logic to preserve attribute order within the editor definition if needed
+        });
+        elementEditorAttrList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(elementEditorAttrList, e.clientY);
+            if (draggedEditorItem) {
+                if (afterElement == null) {
+                    elementEditorAttrList.appendChild(draggedEditorItem);
+                } else {
+                    elementEditorAttrList.insertBefore(draggedEditorItem, afterElement);
+                }
+            }
+        });
     }
 
     // Listener for Supported Checkbox

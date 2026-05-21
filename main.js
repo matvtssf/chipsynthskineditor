@@ -20,6 +20,7 @@ import { setupMainContentInteractions } from './interactions/mainContentInteract
 import { setupGlobalListeners } from './interactions/globalListeners.js';
 import { setupButtonListeners } from './interactions/buttonInteractions.js'; 
 import { setupSliderListeners } from './interactions/sliderInteractions.js'; 
+import { setupCanvasInsertInteractions } from './interactions/canvasInsertInteractions.js';
 
 /** Capture browser console logs and route them to our UI console */
 function setupConsoleInterception() {
@@ -78,6 +79,7 @@ async function initializeApp() {
         setupGlobalListeners();
         setupButtonListeners(); 
         setupSliderListeners(); 
+        setupCanvasInsertInteractions();
         console.log("Interaction modules setup complete.");
 
         // Disclaimer Visibility State Control
