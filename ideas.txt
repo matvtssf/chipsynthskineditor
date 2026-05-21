@@ -68,19 +68,22 @@ Dragging elements:
 -Drag and drop element to another container if it exists (this might be hard)
 
 
-************* complete up to this point, though major bugs.
+
 
 -Turn on snapping mode with sensitivity gauge (done in config)
 -holding shift while dragging the element will bypass the snapping
-
-
-
 Element Editor:
 -Make nothing selectable
--Button to sort the attributes more humanly (ie: coordinates / dimensions first, labels next, style sheet linking next, colours, then do the same for other groupsets ie label coordinates, etc..it needs to be whatever makes most logical sense that a human would want to see first when they're editing the element). Then the attribute order would dynamically change in the element  menu)
 -allow the user to drag attribute orders around (will need handles)
--If a style= attribute is detected, show the attributes from styles.xml
 -All lists need filters so the user can zero in on it easier
+
+
+-If a style= attribute is detected, show the attributes from styles.xml
+
+*************
+
+-Button to sort the attributes more humanly (ie: coordinates / dimensions first, labels next, style sheet linking next, colours, then do the same for other groupsets ie label coordinates, etc..it needs to be whatever makes most logical sense that a human would want to see first when they're editing the element). Then the attribute order would dynamically change in the element  menu)
+
 
 XML Editor:
 -implement a word wrap
@@ -90,6 +93,27 @@ Styles Editing:
 -When editing styles.xml (it must match the styles path defined in gui.xml), open new Styles Editor (XML editor with extra content on the right)
 
 Possible local Ollama AI features:
+
 -In config, "enable AI" can be a toggle
 -In XML Editor: Clean up XML / validate syntax
 -In XML Editor: when text is highlighted, allow the AI to see the code blocks and manipulate them (easy way to better spread out and align elements? like buttons, quickly fix the alignment of elements to other elements? etc)
+
+Main GUI editor:
+-modal that pops up on left side (about the size of the new element modal) with listed font definitions with a + and - button that allows for adding font definitions. fonts will be listed using a "..." button and a list with a filter of all fonts in the project similar to the element inspector.
+There will also be a toggle switch for DrawingBoundaries="0" (turning this on will dynamically automatically turn on boundary boarders for all elements)
+there will be a line for entering the boundary color 
+	color_DrawingBoundaries="#0000FFFF"
+(use the standard alpha / color swatch)
+there will be a line for default background colour:
+	color_back="#232373FF"
+there will be a line for default text colour:
+	color_text="#FFBF00FF"
+There will be a line for default border colour:
+	color_border="#000000FF"
+There will be a line for default font size:
+	font_size="Small" (make htis a dropdown with multiple sizes)
+There will be a line with a text input for modulated Param Source (there's no resoureces on what this is so we'll just keep it a text input):
+	modulatedParamSource="com.Plogue.Emulator.OPS7|0|30D1|0"
+there will be a line for highlight luminance, and make this a gauge:
+	highlight_Luminance="0.2">
+There should be a line for default style sheet and that will have a "..." button that will list in the similar style as a list found in the element inspector (with a search filter) that will list all XML files.

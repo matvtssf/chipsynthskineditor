@@ -1146,6 +1146,7 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
         case 'CS01Browser':
         case 'CS01WaveEditorContainer':
         case 'CS01WaveEditor':
+        case 'CS01CurveEditorContainer':
             return renderViewContainer(tagName, xmlNode, mergedAttributes, renderElementCallback, currentParams, sourcePath);
         case 'CS01AssignmentMap':
             return renderCS01AssignmentMap(xmlNode, mergedAttributes, currentParams, sourcePath);

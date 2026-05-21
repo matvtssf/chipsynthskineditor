@@ -162,7 +162,7 @@ export function setupReferenceModalListeners() {
         descriptionArea.addEventListener('input', handleElementDescriptionChange);
     }
 
-    // --- Element Editor Attribute List Search Filter & Drag/Drop Mechanics ---
+    // --- Element Reference Attribute List Search Filter & Drag/Drop Mechanics ---
     const elementEditorAttrSearch = document.getElementById('element-editor-attr-search');
     if (elementEditorAttrSearch) {
         elementEditorAttrSearch.addEventListener('input', e => {
@@ -220,6 +220,8 @@ export function setupReferenceModalListeners() {
             }
         });
         elementEditorAttrList.addEventListener('dragover', (e) => {
+      // existing dragover logic
+
             e.preventDefault();
             const afterElement = getDragAfterElement(elementEditorAttrList, e.clientY);
             if (draggedEditorItem) {
@@ -232,7 +234,7 @@ export function setupReferenceModalListeners() {
         });
     }
 
-    // Intercept or hook the execution context when rendering the Element Editor form fields
+    // Intercept or hook the execution context when rendering the Element Inspector form fields
     window.populateElementEditorAttributesList = function(elementName) {
         if (!elementEditorAttrList) return;
         elementEditorAttrList.innerHTML = '';
@@ -828,7 +830,7 @@ function handleSupportedCheckboxChange(event) {
 
 /** Placeholder for Add Element button click */
 function handleAddElementRef() {
-     showToast("Use the Element Editor modal (TODO) to add new elements.", "info");
+     showToast("Use the Element Inspector modal (TODO) to add new elements.", "info");
 }
 
 /** Placeholder for Add Attribute to Element button click */

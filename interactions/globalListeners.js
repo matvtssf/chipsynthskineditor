@@ -413,6 +413,19 @@ function handleGlobalMiddleClickOpenEditor(event) {
     }
 }
 
+function getDragAfterElementQI(container, y) {
+    const draggableElements = [...container.querySelectorAll('.qi-attr-row:not([style*="opacity: 0.4"])')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
 function renderInspectorContent(container, el) {
     const tagName = el.dataset.xmlTagName || 'Unknown';
     const x = parseFloat(el.style.left) || 0;
@@ -469,8 +482,11 @@ function renderInspectorContent(container, el) {
 
     let html = `
         <div id="qi-header" style="background: rgba(26, 32, 44, 0.7); color: #fff; padding: 10px; font-weight: bold; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; height: ${headerH}px; box-sizing: border-box;">
-            <span>Element: &lt;${tagName}&gt;</span>
-            <button id="qi-close-btn" style="background: none; border: none; color: #fff; cursor: pointer; font-weight: bold; font-size: 14px;">X</button>
+            <span>Element Inspector: &lt;${tagName}&gt;</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <button id="qi-jump-editor-btn" style="background:#4a5568;color:#fff;border:none;padding:4px 8px;cursor:pointer;font-size:11px; border-radius:3px; transition: background 0.2s;" title="Jump to XML Source"><i class="iconoir-code" style="font-size:13px;"></i></button>
+                <button id="qi-close-btn" style="background: none; border: none; color: #fff; cursor: pointer; font-weight: bold; font-size: 14px;">X</button>
+            </div>
         </div>
         <div style="display: flex; flex-direction: row; height: ${previewH}px; overflow: hidden;">
             <div style="width: ${previewW}px; height: ${previewH}px; background: rgba(0,0,0,0.2); border-right: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; flex-shrink: 0;">
@@ -478,9 +494,10 @@ function renderInspectorContent(container, el) {
                 <div id="qi-preview-wrapper" style="transform: scale(${previewScale}); transform-origin: center; display: flex; align-items: center; justify-content: center; width: ${w}px; height: ${h}px; pointer-events: none; position: relative;">
                 </div>
             </div>
-            <div style="flex-grow: 1; padding: 12px; overflow-y: auto; color: #fff; width: ${panelW}px; box-sizing: border-box; display: flex; flex-direction: column;">
-                <div style="margin-bottom: 6px; flex-shrink: 0;">
-                    <input type="text" id="qi-attr-search" class="quick-inspector-search" placeholder="Search within element's attributes...">
+            <div style="flex-grow: 1; padding: 12px; overflow-y: auto; color: #fff; width: ${panelW}px; box-sizing: border-box; display: flex; flex-direction: column; user-select: none;">
+                <div style="margin-bottom: 6px; flex-shrink: 0; display:flex; gap:4px; align-items:center;">
+                    <input type="text" id="qi-attr-search" class="quick-inspector-search" placeholder="Search attributes..." style="flex-grow:1;">
+                    <button id="qi-sort-attrs-btn" style="background:rgba(255,255,255,0.1); color:#cbd5e0; border:1px solid rgba(255,255,255,0.2); padding:3px 8px; cursor:pointer; font-size:11px; border-radius:3px; white-space:nowrap; flex-shrink:0;" title="Sort attributes by logical grouping"><i class="iconoir-sort" style="font-size:12px;"></i> Sort</button>
                 </div>
                 <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px; color: #cbd5e0; flex-shrink: 0; display:flex; justify-content:space-between; align-items:center;">
                     <span>Attributes Layout</span>
@@ -528,8 +545,9 @@ function renderInspectorContent(container, el) {
             }
 
             html += `
-                <div class="qi-attr-row" style="margin-bottom:4px; position:relative; display:flex; align-items:center;" data-attr-name="${attrName}">
-                    <span class="${linkClass}" style="font-size:11px; color:${linkColor}; display:inline-block; width:90px; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; cursor:${linkCursor}; text-decoration:${linkDecoration};" title="${linkTitle}">${attrName}</span>
+                <div class="qi-attr-row" draggable="true" style="margin-bottom:4px; position:relative; display:flex; align-items:center; user-select:none;" data-attr-name="${attrName}">
+                    <span class="qi-drag-handle" style="cursor:grab; color:rgba(255,255,255,0.3); margin-right:4px; font-size:12px; flex-shrink:0;" title="Drag to reorder">☰</span>
+                    <span class="${linkClass}" style="font-size:11px; color:${linkColor}; display:inline-block; width:82px; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; cursor:${linkCursor}; text-decoration:${linkDecoration}; user-select:none;" title="${linkTitle}">${attrName}</span>
                     <input type="text" class="qi-attr-val-input" data-attr-key="${key}" value="${attrValue}" style="flex-grow:1; width:0; background:rgba(0,0,0,0.3); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:2px; font-size:11px; border-radius:3px;" />
                     ${isColor ? `
                         <div class="qi-color-preview" data-attr-name="${attrName}" style="position:relative; width:14px; height:14px; background:${attrValue || 'transparent'}; border:1px solid rgba(255,255,255,0.5); margin-left:4px; border-radius:2px; flex-shrink:0; box-sizing:border-box; cursor:pointer;" title="Click to Pick Color">
@@ -614,9 +632,6 @@ function renderInspectorContent(container, el) {
                 </select>
                 <button id="qi-add-attr-btn" style="background:#3182ce; color:#fff; border:none; padding:3px 8px; cursor:pointer; font-size:11px; border-radius:3px;">Add</button>
             </div>
-            <div style="margin-top:12px; text-align:right; flex-shrink: 0;">
-                <button id="qi-jump-editor-btn" style="background:#4a5568;color:#fff;border:none;padding:5px 10px;cursor:pointer;font-size:11px; border-radius:3px; transition: background 0.2s;">Jump to XML Source</button>
-            </div>
         </div></div>
     `;
 
@@ -640,6 +655,67 @@ function renderInspectorContent(container, el) {
             });
         });
     }
+
+    // Sort button handler
+    const sortBtn = container.querySelector('#qi-sort-attrs-btn');
+    if (sortBtn) {
+        sortBtn.addEventListener('click', () => {
+            const attrList = container.querySelector('#qi-attributes-list');
+            if (!attrList) return;
+            const priorityGroups = [
+                ['x','y','w','h','roundedRatio','width','height'],
+                ['labelText','text','label_font','font','font_size'],
+                ['style','param'],
+                ['color_text','backgroundColor','color_back','color_back_disabled','color_text_disabled']
+            ];
+            const rows = Array.from(attrList.querySelectorAll('.qi-attr-row'));
+            rows.sort((a, b) => {
+                const nameA = a.dataset.attrName || '';
+                const nameB = b.dataset.attrName || '';
+                const groupA = priorityGroups.findIndex(g => g.includes(nameA));
+                const groupB = priorityGroups.findIndex(g => g.includes(nameB));
+                if (groupA === -1 && groupB === -1) return nameA.localeCompare(nameB);
+                if (groupA === -1) return 1;
+                if (groupB === -1) return -1;
+                if (groupA === groupB) return nameA.localeCompare(nameB);
+                return groupA - groupB;
+            });
+            rows.forEach(row => attrList.appendChild(row));
+        });
+    }
+
+    // Drag-and-drop reorder logic for attribute rows
+    const attrListEl = container.querySelector('#qi-attributes-list');
+    if (attrListEl) {
+        let draggedRow = null;
+        attrListEl.addEventListener('dragstart', (e) => {
+            const row = e.target.closest('.qi-attr-row');
+            if (row && e.target.closest('.qi-drag-handle')) {
+                draggedRow = row;
+                row.style.opacity = '0.4';
+                if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+            } else {
+                e.preventDefault();
+            }
+        });
+        attrListEl.addEventListener('dragend', (e) => {
+            if (draggedRow) {
+                draggedRow.style.opacity = '1';
+                draggedRow = null;
+            }
+        });
+        attrListEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (!draggedRow) return;
+            const afterElement = getDragAfterElementQI(attrListEl, e.clientY);
+            if (afterElement == null) {
+                attrListEl.appendChild(draggedRow);
+            } else {
+                attrListEl.insertBefore(draggedRow, afterElement);
+            }
+        });
+    }
+
 
     // Create the global floating dropdown context menu for options if it doesn't exist
     let popup = document.getElementById('qi-options-popup');

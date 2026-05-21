@@ -47,7 +47,6 @@ body.logo-hover #text-logo { opacity: 0.1; }
 #canvas-controls-top button, #canvas-controls-mid button {
     pointer-events: auto !important; 
     opacity: 0.85;
-    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, background-color 0.2s ease !important;
     transform: translateX(0) !important;
     display: flex !important;
     align-items: center;
@@ -60,13 +59,28 @@ body.logo-hover #text-logo { opacity: 0.1; }
 }
 #canvas-controls-top button {
     width: 32px;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, background-color 0.2s ease !important;
 }
 #canvas-controls-mid button {
     width: 66px;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease, background-color 0.2s ease !important;
 }
 #canvas-controls-top button:hover, #canvas-controls-mid button:hover {
     opacity: 1;
     background-color: rgb(229, 231, 235) !important;
+}
+
+body[data-app-theme="dark"] #canvas-controls-top button,
+body[data-app-theme="dark"] #canvas-controls-mid button {
+    background-color: rgba(30, 30, 30, 0.85) !important;
+    color: #e5e7eb !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+body[data-app-theme="dark"] #canvas-controls-top button:hover,
+body[data-app-theme="dark"] #canvas-controls-mid button:hover {
+    background-color: rgba(60, 60, 60, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.3 ) !important;
+    color: #ffffff !important;
 }
 
 /* Retracted state (hidden offscreen bottom) */
@@ -77,25 +91,25 @@ body.controls-retracted #canvas-controls-mid button {
 }
 
 /* Staggered bounce back in (entrance wave) */
-body:not(.controls-retracted) #add-element-canvas-btn { transition-delay: 0.0s; }
-body:not(.controls-retracted) #placeholder-1-btn { transition-delay: 0.02s; }
-body:not(.controls-retracted) #placeholder-2-btn { transition-delay: 0.04s; }
-body:not(.controls-retracted) #placeholder-3-btn { transition-delay: 0.06s; }
-body:not(.controls-retracted) #placeholder-4-btn { transition-delay: 0.08s; }
-body:not(.controls-retracted) #placeholder-5-btn { transition-delay: 0.10s; }
-body:not(.controls-retracted) #placeholder-6-btn { transition-delay: 0.12s; }
-body:not(.controls-retracted) #undo-btn { transition-delay: 0.14s; }
-body:not(.controls-retracted) #redo-btn { transition-delay: 0.16s; }
+body:not(.controls-retracted) #add-element-canvas-btn { transition-delay: 0.0s !important; }
+body:not(.controls-retracted) #redo-btn { transition-delay: 0.0s !important; }
+body:not(.controls-retracted) #undo-btn { transition-delay: 0.04s !important; }
+body:not(.controls-retracted) #placeholder-6-btn { transition-delay: 0.08s !important; }
+body:not(.controls-retracted) #placeholder-5-btn { transition-delay: 0.12s !important; }
+body:not(.controls-retracted) #placeholder-4-btn { transition-delay: 0.16s !important; }
+body:not(.controls-retracted) #placeholder-3-btn { transition-delay: 0.20s !important; }
+body:not(.controls-retracted) #placeholder-2-btn { transition-delay: 0.24s !important; }
+body:not(.controls-retracted) #placeholder-1-btn { transition-delay: 0.28s !important; }
 
 /* Staggered bounce away (retraction wave) */
-body.controls-retracted #redo-btn { transition-delay: 0.0s; }
-body.controls-retracted #undo-btn { transition-delay: 0.02s; }
-body.controls-retracted #placeholder-6-btn { transition-delay: 0.04s; }
-body.controls-retracted #placeholder-5-btn { transition-delay: 0.06s; }
-body.controls-retracted #placeholder-4-btn { transition-delay: 0.08s; }
-body.controls-retracted #placeholder-3-btn { transition-delay: 0.10s; }
-body.controls-retracted #placeholder-2-btn { transition-delay: 0.12s; }
-body.controls-retracted #placeholder-1-btn { transition-delay: 0.14s; }
+body.controls-retracted #placeholder-1-btn { transition-delay: 0.0s !important; }
+body.controls-retracted #placeholder-2-btn { transition-delay: 0.04s !important; }
+body.controls-retracted #placeholder-3-btn { transition-delay: 0.08s !important; }
+body.controls-retracted #placeholder-4-btn { transition-delay: 0.12s !important; }
+body.controls-retracted #placeholder-5-btn { transition-delay: 0.16s !important; }
+body.controls-retracted #placeholder-6-btn { transition-delay: 0.20s !important; }
+body.controls-retracted #undo-btn { transition-delay: 0.24s !important; }
+body.controls-retracted #redo-btn { transition-delay: 0.28s !important; }
 
 #undo-btn.disabled, #redo-btn.disabled {
     opacity: 0.3 !important;
@@ -107,10 +121,7 @@ body.controls-retracted #placeholder-1-btn { transition-delay: 0.14s; }
     right: calc(1rem + 48px + 1rem) !important;
 }
 
-/* Apply the red glow directly as an inset shadow on the main content flex container so it NEVER alters the box model */
-body.edit-mode-active #main-content-area {
-    box-shadow: inset 0 0 0 2px #ef4444 !important;
-}
+/* Glow was moved to sidebar */
 
 /* --- Main Content Area --- */
 #main-content-area {
@@ -171,6 +182,10 @@ body.edit-mode-active #status {
         repeating-linear-gradient(to bottom, var(--grid-line-color) 0, var(--grid-line-color) 1px, transparent 1px, transparent var(--grid-background-size));
     background-size: var(--grid-background-size) var(--grid-background-size);
     background-position: center center;
+}
+
+body.edit-mode-active #main-content-area.grid-visible #canvas-viewport {
+    --grid-line-color: rgba(239, 68, 68, 0.35) !important;
 }
 
 /* --- GUI Zoom Canvas --- */

@@ -351,6 +351,28 @@ export function getParamValue(node, offset = 0, attributeName = 'param') {
     return rawValue;
 }
 
+// Helper to substitute macro defs into a string (for StaticText text attribute, etc.)
+export function substituteMacroDefs(textValue, macroDefs) {
+    if (!textValue || typeof textValue !== 'string' || !macroDefs) {
+        return textValue;
+    }
+    let result = textValue;
+    for (const key in macroDefs) {
+        try {
+            const value = String(macroDefs[key]);
+            const escaped = String(key).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\\\$&');
+            const re = new RegExp(escaped, 'gi');
+            if (re.test(result)) {
+                result = result.replace(re, value);
+            }
+        } catch (e) {
+            const value = String(macroDefs[key]);
+            if (result.includes(key)) result = result.replaceAll(key, value);
+        }
+    }
+    return result;
+}
+
 export function applyCommonAttributes(element, xmlNode, styleName = null) {
     if (!element) { console.warn('[domUtils applyCommonAttributes] HTML Element is null/undefined. Skipping.'); return; }
     if (!xmlNode) { console.warn('[domUtils applyCommonAttributes] xmlNode is null/undefined. Skipping for element:', element.tagName); return; }

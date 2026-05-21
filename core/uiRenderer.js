@@ -17,6 +17,7 @@ import * as KeyboardRenderer from '../renderers/keyboardRenderer.js';
 import * as TextDisplayRenderer from '../renderers/textDisplayRenderer.js';
 import * as ContainerRenderer from '../renderers/containerRenderer.js';
 import * as DropDownRenderer from '../renderers/dropDownRenderer.js';
+import * as CurveEditorRenderer from '../renderers/curveEditorRenderer.js';
 
 // Unpack and layer semicolon-delimited compound styles from left to right safely without mutating read-only module namespace objects
 function localApplyStyles(htmlElement, styleName, xmlNode, currentParams) {
@@ -137,6 +138,8 @@ const tagToRendererMap = {
     'CS01Browser': ContainerRenderer,
     'CS01WaveEditorContainer': ContainerRenderer,
     'CS01WaveEditor': ContainerRenderer,
+    'CS01CurveEditorContainer': ContainerRenderer,
+    'CS01CurveEditor': CurveEditorRenderer,
 
     // DropDownRenderer tags
     'PresetMenu': DropDownRenderer,
@@ -498,11 +501,30 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
         for (const key in mergedAttributes) {
             if (typeof mergedAttributes[key] === 'string') {
                 let val = mergedAttributes[key];
+                // Debug: log potential $OP_NUM occurrences before substitution
+                try {
+                    if (key === 'text' && (String(val).includes('$OP_NUM') || String(val).includes('$op_num'))) {
+                        console.debug(`[uiRenderer] Pre-macro substitution: key=${key}, val='${val}', macroDefs=${JSON.stringify(currentParams.macroDefs)}`);
+                    }
+                } catch (dbgErr) { /* ignore debug errors */ }
                 for (const defKey in currentParams.macroDefs) {
-                    if (val.includes(defKey)) {
-                        val = val.replaceAll(defKey, currentParams.macroDefs[defKey]);
+                    try {
+                        // Replace all occurrences of defKey case-insensitively (e.g., $OP_NUM, $op_num)
+                        const escaped = String(defKey).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                        const re = new RegExp(escaped, 'gi');
+                        if (re.test(val)) {
+                            val = val.replace(re, currentParams.macroDefs[defKey]);
+                        }
+                    } catch (e) {
+                        // Fallback to simple replaceAll if regex construction fails for any reason
+                        if (val.includes(defKey)) val = val.replaceAll(defKey, currentParams.macroDefs[defKey]);
                     }
                 }
+                try {
+                    if (key === 'text' && (String(mergedAttributes[key]).includes('$OP_NUM') || String(mergedAttributes[key]).includes('$op_num'))) {
+                        console.debug(`[uiRenderer] Post-macro substitution: key=${key}, before='${mergedAttributes[key]}', after='${val}'`);
+                    }
+                } catch (dbgErr) { /* ignore debug errors */ }
                 mergedAttributes[key] = val;
             }
         }
@@ -1133,7 +1155,7 @@ export function renderElement(xmlNode, parentHtmlElement, currentParams = {}, so
             const parentForChildren = childAppendElement; 
             for (const childNode of xmlNode.children) {
                 if (childNode.nodeType === Node.ELEMENT_NODE) {
-                    renderElement(childNode, parentForChildren, currentParams, sourcePath, nodeIsCommented);
+                    renderElement(childNode, parentForChildren, currentParams, sourcePath);
                 }
             }
         }

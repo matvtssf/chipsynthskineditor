@@ -913,15 +913,17 @@ function renderScrollViewPageController(xmlNode, mergedAttributes, currentParams
     if (circleEdit) {
         const parsedCircleColor = DomUtils.parseColor(circleColorStr);
         if (parsedCircleColor !== 'rgba(0,0,0,0)' && parsedCircleColor !== 'none') { 
-            circleElement = document.createElementNS(DomUtils.SVG_NS, "svg"); 
+            circleElement = document.createElementNS("http://www.w3.org/2000/svg", "svg"); 
             circleElement.setAttribute('width', '10'); 
             circleElement.setAttribute('height', '10');
             
-            circleElement.style.display = 'inline-block';
-            circleElement.style.verticalAlign = 'middle';
-            
-            circleElement.style.marginLeft = '5px'; circleElement.style.marginRight = '5px';
-            const circle = document.createElementNS(DomUtils.SVG_NS, 'circle');
+            if (circleElement.style) {
+                circleElement.style.display = 'inline-block';
+                circleElement.style.verticalAlign = 'middle';
+                circleElement.style.marginLeft = '5px'; 
+                circleElement.style.marginRight = '5px';
+            }
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
             circle.setAttribute('cx', '5'); circle.setAttribute('cy', '5');
             circle.setAttribute('r', '4'); 
             circle.setAttribute('fill', parsedCircleColor);

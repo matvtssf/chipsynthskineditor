@@ -2,7 +2,11 @@
 import * as DomUtils from '../core/domUtils.js';
 import * as State from '../core/state.js';
 
-function renderStaticText(xmlNode, mergedAttributes) {
+function renderStaticText(xmlNode, mergedAttributes, currentParams) {
+    // Early macro substitution for text attribute before rendering
+    if (mergedAttributes['text'] && currentParams && currentParams.macroDefs) {
+        mergedAttributes['text'] = DomUtils.substituteMacroDefs(mergedAttributes['text'], currentParams.macroDefs);
+    }
     const htmlElement = document.createElement('div'); // Use a div for StaticText
     htmlElement.classList.add('gui-statictext');
     
@@ -12,10 +16,23 @@ function renderStaticText(xmlNode, mergedAttributes) {
     htmlElement.style.whiteSpace = 'nowrap';
     htmlElement.style.overflow = 'hidden';
     
-    let textContent = mergedAttributes['text'] || xmlNode.textContent.trim() || '';
+    let textContent = mergedAttributes['text'] || (xmlNode.getAttribute ? xmlNode.getAttribute('text') : null) || xmlNode.textContent.trim() || '';
+
+    // Substitute macro variables from currentParams.macroDefs
+    if (typeof textContent === 'string' && textContent && currentParams && currentParams.macroDefs) {
+        for (const defKey in currentParams.macroDefs) {
+            const defValue = String(currentParams.macroDefs[defKey]);
+            if (textContent.includes(defKey)) {
+                textContent = textContent.replaceAll(defKey, defValue);
+            }
+        }
+        if (textContent.includes('$OP_NUM') || textContent.includes('$op_num')) {
+            console.debug(`[textDisplayRenderer] StaticText macro: original='${mergedAttributes['text']}', after substitution='${textContent}', macroDefs=${JSON.stringify(currentParams.macroDefs)}`);
+        }
+    }
     
     // Check for localization keys like "$SOME_KEY"
-    if (textContent.startsWith('$')) {
+    if (typeof textContent === 'string' && textContent.startsWith('$')) {
         const locKey = textContent.substring(1);
         const localizedText = State.getLocalizedString(locKey);
         if (localizedText !== null) {
@@ -164,7 +181,7 @@ export function render(tagName, xmlNode, parentHtmlElement, currentParams, sourc
     const normalizedTagName = tagName.toUpperCase();
     switch (normalizedTagName) {
         case 'STATICTEXT':
-            return renderStaticText(xmlNode, mergedAttributes);
+            return renderStaticText(xmlNode, mergedAttributes, currentParams);
         case 'LABEL':
             return renderLabel(xmlNode, mergedAttributes, currentParams);
         case 'TEXTEDITOR':

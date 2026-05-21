@@ -1272,7 +1272,7 @@ export const SelectionManager = {
             { id: 'delete', icon: 'iconoir-xmark', title: 'Delete' },
             { id: 'layer-up', icon: 'iconoir-transition-up', title: 'Layer Up' },
             { id: 'layer-down', icon: 'iconoir-transition-down', title: 'Layer Down' },
-            { id: 'edit', icon: 'iconoir-edit-pencil', title: 'Open Element Editor' },
+            { id: 'edit', icon: 'iconoir-edit-pencil', title: 'Open Element Inspector' },
             { id: 'jump-to-xml', icon: 'iconoir-code', title: 'Jump to XML' }
         ];
 

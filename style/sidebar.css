@@ -12,6 +12,17 @@
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
+/* Sidebar Red Glow in Edit Mode */
+body.edit-mode-active #sidebar {
+    border-color: rgba(239, 68, 68, 0.8) !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5), 0 4px 20px rgba(239, 68, 68, 0.3) !important;
+}
+
+body.edit-mode-active[data-app-theme="dark"] #sidebar {
+    border-color: rgba(239, 68, 68, 0.9) !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6), 0 4px 25px rgba(239, 68, 68, 0.4) !important;
+}
+
 body[data-app-theme="dark"] #sidebar {
     background-color: rgba(30, 30, 30, 0.85) !important;
     border-color: rgba(68, 68, 68, 0.5) !important;
@@ -133,6 +144,17 @@ body[data-app-theme="dark"] #skin-selector {
 .file-browser-buttons button { padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 0.25rem; background-color: #e5e7eb; transition: background-color 0.2s; } 
 .file-browser-buttons button:hover:not(:disabled) { background-color: #d1d5db; } 
 .file-browser-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Dark Mode overrides for file browser utility buttons */
+body[data-app-theme="dark"] .file-browser-buttons button {
+    background-color: rgba(55, 65, 81, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #e5e7eb !important;
+}
+body[data-app-theme="dark"] .file-browser-buttons button:hover:not(:disabled) {
+    background-color: rgba(75, 85, 99, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
 
 /* --- Preview Area --- */
 #preview-area-container { flex-shrink: 0; flex-grow: 0; width: 100%; height: 150px; min-height: 80px; display: flex; flex-direction: column; background-color: rgba(255, 255, 255, 0.7); border-radius: 0.25rem; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); padding: 0.5rem; margin-bottom: 0.5rem; border: 1px solid #d1d5db; }
